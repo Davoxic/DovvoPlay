@@ -1,0 +1,23 @@
+# Xcode / build
+*.xcodeproj/
+*.xcworkspace/
+build/
+DerivedData/
+Payload/
+*.ipa
+*.dSYM.zip
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# output del tool
+Sonora/Downloads/
+tools/Sonora/
+*.yt-archive.txt
