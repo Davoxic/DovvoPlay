@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Goccia densa che cola dall'alto.
-private struct Drop {
+struct LaunchDrop {
     var x: CGFloat        // 0…1 rispetto alla larghezza
     var delay: Double
     var speed: Double     // schermate al secondo
@@ -16,17 +16,17 @@ struct LaunchView: View {
 
     var onFinish: () -> Void
 
-    @State var drops: [Drop] = LaunchView.makeDrops()
+    @State var drops: [LaunchDrop] = LaunchView.makeDrops()
     @State var startDate = Date()
     @State var logoShown = false
     @State var fadingOut = false
     @State var finished = false
 
-    private static func makeDrops() -> [Drop] {
-        var out: [Drop] = []
+    static func makeDrops() -> [LaunchDrop] {
+        var out: [LaunchDrop] = []
         for i in 0..<34 {
             let col = CGFloat(i) / 34.0
-            out.append(Drop(x: col + CGFloat.random(in: -0.015...0.015),
+            out.append(LaunchDrop(x: col + CGFloat.random(in: -0.015...0.015),
                             delay: Double.random(in: 0...1.5),
                             speed: Double.random(in: 0.42...0.85),
                             radius: CGFloat.random(in: 7...19),
@@ -120,7 +120,7 @@ struct LaunchView: View {
             endPoint: CGPoint(x: 0, y: base + 40)))
     }
 
-    private func drawDrop(_ drop: Drop, in context: inout GraphicsContext, size: CGSize, time: Double) {
+    private func drawDrop(_ drop: LaunchDrop, in context: inout GraphicsContext, size: CGSize, time: Double) {
         let local = time - drop.delay
         guard local > 0 else { return }
 
