@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Copertina con fallback grafico quando il brano non ha artwork.
 struct ArtworkView: View {
@@ -220,4 +221,21 @@ struct EmptyLibraryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.bottom, 60)
     }
+}
+
+/// Foglio di condivisione di sistema, per mandare il backup su File, iCloud, AirDrop…
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+/// Involucro per poter usare un URL con `.sheet(item:)`.
+struct ExportedFile: Identifiable {
+    let id = UUID()
+    let url: URL
 }

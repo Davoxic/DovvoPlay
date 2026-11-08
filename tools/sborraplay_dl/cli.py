@@ -208,6 +208,71 @@ def cmd_library(args) -> int:
     return 0
 
 
+
+def cmd_backup(args) -> int:
+    import json as _json
+    from datetime import datetime
+    from . import pusher
+
+    device = resolve_device(args.host)
+    if device is None:
+        return 1
+    step(f"Scarico il backup da {device.host}")
+    try:
+        payload = pusher.fetch_backup(device)
+    except Exception as exc:
+        err(f"Backup non riuscito: {exc}")
+        return 1
+
+    try:
+        data = _json.loads(payload)
+        label = "%d playlist · %d brani · %d copertine" % (
+            len(data.get("playlists", [])),
+            len(data.get("tracks", [])),
+            len(data.get("covers", {})),
+        )
+    except Exception:
+        label = "contenuto non interpretabile"
+
+    out = Path(args.out).expanduser() if args.out else Path.cwd() / (
+        "SborraPlay-%s.sborraplay.json" % datetime.now().strftime("%Y-%m-%d-%H%M"))
+    if out.is_dir():
+        out = out / ("SborraPlay-%s.sborraplay.json" % datetime.now().strftime("%Y-%m-%d-%H%M"))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(payload)
+    ok(f"{out}  ({len(payload)/1024:.0f} KB)")
+    info(label)
+    info("I file audio non sono nel backup: restano nelle cartelle che hai scaricato qui sul PC.")
+    return 0
+
+
+def cmd_restore(args) -> int:
+    from . import pusher
+
+    path = Path(args.file).expanduser()
+    if not path.exists():
+        err(f"Non trovo {path}")
+        return 1
+    payload = path.read_bytes()
+
+    device = resolve_device(args.host)
+    if device is None:
+        return 1
+
+    mode = "sostituendo le playlist attuali" if args.replace else "unendo alle playlist attuali"
+    step(f"Rimando {path.name} al telefono, {mode}")
+    try:
+        res = pusher.send_backup(device, payload, replace=args.replace)
+    except Exception as exc:
+        err(f"Ripristino non riuscito: {exc}")
+        return 1
+    if res.get("ok"):
+        ok("Ripristinato. Controlla la scheda Playlist sul telefono.")
+        return 0
+    err(str(res))
+    return 1
+
+
 # ------------------------------------------------------------------ device
 
 def resolve_device(host: str | None):
@@ -257,6 +322,8 @@ def build_parser() -> argparse.ArgumentParser:
   sborraplay-dl playlist <url> --host 192.168.1.42:8080 --workers 4
   sborraplay-dl push ~/Musica/Estate --playlist "Estate 2026"
   sborraplay-dl discover
+  sborraplay-dl backup -o ~/Backup
+  sborraplay-dl restore ~/Backup/SborraPlay-2026-11-08-2340.sborraplay.json
 """)
     p.add_argument("--version", action="version", version=f"sborraplay-dl {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
@@ -294,6 +361,18 @@ def build_parser() -> argparse.ArgumentParser:
     li = sub.add_parser("library", help="elenca ciò che c'è già sul telefono")
     li.add_argument("--host")
     li.set_defaults(func=cmd_library)
+
+    bk = sub.add_parser("backup", help="scarica da telefono playlist, copertine e impostazioni")
+    bk.add_argument("-o", "--out", help="file o cartella di destinazione")
+    bk.add_argument("--host")
+    bk.set_defaults(func=cmd_backup)
+
+    rs = sub.add_parser("restore", help="rimanda un backup al telefono")
+    rs.add_argument("file", help="file .sborraplay.json")
+    rs.add_argument("--host")
+    rs.add_argument("--replace", action="store_true",
+                    help="sostituisce le playlist attuali invece di unirle")
+    rs.set_defaults(func=cmd_restore)
 
     return p
 

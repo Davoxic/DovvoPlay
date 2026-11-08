@@ -5,6 +5,11 @@ struct SettingsView: View {
     @EnvironmentObject var library: LibraryStore
     @ObservedObject var server = LocalServer.shared
     @AppStorage("serverAutoStart") var autoStart = false
+    @AppStorage("autoBackup") var autoBackup = true
+    @State var exporting: ExportedFile?
+    @State var showBackupImporter = false
+    @State var pendingBackup: Data?
+    @State var askRestoreMode = false
     @State var showImporter = false
     @State var copied = false
 
@@ -21,7 +26,9 @@ struct SettingsView: View {
             Form {
                 serverSection
                 importSection
+                backupSection
                 librarySection
+                storageSection
                 aboutSection
             }
             .navigationTitle("Impostazioni")
@@ -36,6 +43,22 @@ struct SettingsView: View {
                 }
             }
             .onAppear { server.refreshAddresses() }
+            .sheet(item: $exporting) { item in
+                ShareSheet(items: [item.url])
+            }
+            .confirmationDialog("Come vuoi ripristinare?",
+                                isPresented: $askRestoreMode,
+                                titleVisibility: .visible) {
+                Button("Unisci alle playlist attuali") {
+                    if let data = pendingBackup { library.importBackup(data: data, replace: false) }
+                    pendingBackup = nil
+                }
+                Button("Sostituisci tutto", role: .destructive) {
+                    if let data = pendingBackup { library.importBackup(data: data, replace: true) }
+                    pendingBackup = nil
+                }
+                Button("Annulla", role: .cancel) { pendingBackup = nil }
+            }
         }
     }
 
@@ -119,6 +142,59 @@ struct SettingsView: View {
         }
     }
 
+    private var backupSection: some View {
+        Section {
+            Button {
+                if let url = library.exportBackup() { exporting = ExportedFile(url: url) }
+            } label: {
+                Label("Esporta backup…", systemImage: "square.and.arrow.up")
+            }
+
+            Button {
+                showBackupImporter = true
+            } label: {
+                Label("Importa backup…", systemImage: "square.and.arrow.down")
+            }
+
+            Toggle(isOn: $autoBackup) {
+                Label("Copia automatica giornaliera", systemImage: "clock.arrow.circlepath")
+            }
+
+            NavigationLink {
+                BackupsListView().environmentObject(library)
+            } label: {
+                HStack {
+                    Label("Copie automatiche", systemImage: "folder.badge.gearshape")
+                    Spacer()
+                    Text("\(BackupManager.listBackups().count)")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Backup")
+        } footer: {
+            Text("Il backup contiene playlist, copertine, ordinamento e impostazioni, più l'elenco dei brani per sapere cosa manca dopo un ripristino. I file audio non ci stanno dentro: quelli restano in Documents/Music e li vedi dall'app File. Esporta il backup su iCloud o sul PC prima di disinstallare l'app.")
+        }
+        .fileImporter(isPresented: $showBackupImporter,
+                      allowedContentTypes: [.json],
+                      allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                if let data = try? Data(contentsOf: url) {
+                    pendingBackup = data
+                    askRestoreMode = true
+                } else {
+                    library.lastMessage = "Non riesco a leggere quel file"
+                }
+            case .failure(let error):
+                library.lastMessage = error.localizedDescription
+            }
+        }
+    }
+
     private var librarySection: some View {
         Section("Libreria") {
             Picker("Ordinamento", selection: Binding(get: { library.sortMode },
@@ -136,6 +212,18 @@ struct SettingsView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
+        }
+    }
+
+    private var storageSection: some View {
+        Section {
+            LabeledContent("Musica", value: "Documents/Music")
+            LabeledContent("Playlist", value: "playlists.json")
+            LabeledContent("Copertine", value: "Documents/Covers")
+        } header: {
+            Text("Dove stanno i tuoi file")
+        } footer: {
+            Text("I brani che importi vengono copiati dentro l'app, non letti dal percorso d'origine: puoi cancellare gli originali sul computer. Reinstallando sopra la stessa app (per rinnovare la firma) non perdi niente; disinstallandola invece sparisce tutto, quindi tieni un backup esportato.")
         }
     }
 

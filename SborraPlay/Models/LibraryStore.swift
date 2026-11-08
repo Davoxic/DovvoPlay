@@ -401,4 +401,101 @@ final class LibraryStore: ObservableObject {
 
     var totalBytes: Int64 { tracks.reduce(0) { $0 + $1.fileSize } }
     var totalDuration: Double { tracks.reduce(0) { $0 + $1.duration } }
+
+    // MARK: - backup
+
+    var currentSettings: [String: String] {
+        let d = UserDefaults.standard
+        return [
+            "sortMode": sortMode.rawValue,
+            "shuffle": String(d.bool(forKey: "shuffle")),
+            "repeatMode": d.string(forKey: "repeatMode") ?? "off",
+            "serverAutoStart": String(d.bool(forKey: "serverAutoStart")),
+            "autoBackup": String(d.object(forKey: "autoBackup") == nil ? true : d.bool(forKey: "autoBackup"))
+        ]
+    }
+
+    func makeBackup() -> BackupFile {
+        BackupManager.make(playlists: playlists, tracks: tracks, settings: currentSettings)
+    }
+
+    func backupData() -> Data? {
+        try? BackupManager.encode(makeBackup())
+    }
+
+    /// Scrive il backup in un file temporaneo pronto da condividere.
+    func exportBackup() -> URL? {
+        do {
+            return try BackupManager.writeTemporary(makeBackup())
+        } catch {
+            lastMessage = "Backup non riuscito"
+            return nil
+        }
+    }
+
+    /// Ripristina da un file di backup. `replace` sostituisce le playlist attuali
+    /// invece di unirle.
+    @discardableResult
+    func importBackup(data: Data, replace: Bool) -> Bool {
+        guard let backup = try? BackupManager.decode(data) else {
+            lastMessage = "File di backup non valido"
+            return false
+        }
+        let restoredCovers = BackupManager.restoreCovers(from: backup)
+
+        if replace {
+            playlists = backup.playlists
+        } else {
+            for incoming in backup.playlists {
+                if let idx = playlists.firstIndex(where: { $0.name.caseInsensitiveCompare(incoming.name) == .orderedSame }) {
+                    var merged = playlists[idx]
+                    for id in incoming.trackIDs where !merged.trackIDs.contains(id) {
+                        merged.trackIDs.append(id)
+                    }
+                    if merged.coverID == nil { merged.coverID = incoming.coverID }
+                    playlists[idx] = merged
+                } else {
+                    playlists.append(incoming)
+                }
+            }
+        }
+        savePlaylists()
+        applySettings(backup.settings)
+
+        let known = Set(tracks.map { $0.id })
+        let missing = backup.tracks.filter { !known.contains($0.id) }.count
+        var parts = ["\(backup.playlists.count) playlist", "\(restoredCovers) copertine"]
+        if missing > 0 { parts.append("\(missing) brani ancora da ricaricare") }
+        lastMessage = "Ripristinato: " + parts.joined(separator: " · ")
+        return true
+    }
+
+    private func applySettings(_ settings: [String: String]) {
+        let d = UserDefaults.standard
+        if let raw = settings["sortMode"], let mode = SortMode(rawValue: raw) { sortMode = mode }
+        if let v = settings["serverAutoStart"] { d.set(v == "true", forKey: "serverAutoStart") }
+        if let v = settings["shuffle"] { d.set(v == "true", forKey: "shuffle") }
+        if let v = settings["repeatMode"] { d.set(v, forKey: "repeatMode") }
+    }
+
+    /// Copia di sicurezza automatica, al massimo una al giorno, ultime 5 tenute.
+    func runAutoBackupIfNeeded() {
+        let d = UserDefaults.standard
+        if d.object(forKey: "autoBackup") == nil { d.set(true, forKey: "autoBackup") }
+        guard d.bool(forKey: "autoBackup"), !playlists.isEmpty else { return }
+        let last = (d.object(forKey: "lastAutoBackup") as? Date) ?? .distantPast
+        guard Date().timeIntervalSince(last) > 24 * 3600 else { return }
+        if BackupManager.autoBackup(makeBackup()) != nil {
+            d.set(Date(), forKey: "lastAutoBackup")
+        }
+    }
+
+    func restoreFromFile(at url: URL, replace: Bool) {
+        guard let data = try? Data(contentsOf: url) else {
+            lastMessage = "Copia non leggibile"
+            return
+        }
+        importBackup(data: data, replace: replace)
+    }
+
 }

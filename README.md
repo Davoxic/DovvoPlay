@@ -68,6 +68,43 @@ Tieni l'app in primo piano mentre trasferisci. Il server non ha password ed è r
 - **Finder / iTunes**: collega il cavo, scheda File, trascina su SborraPlay.
 - **Impostazioni → Importa da File / iCloud**, anche per i `.m3u`.
 
+### Dove finiscono i file, e cosa si perde
+
+I brani che importi vengono **copiati** dentro l'app: non li rileggo dal percorso d'origine, quindi puoi cancellare gli originali sul computer.
+
+| cosa | dove | si ricostruisce da solo? |
+|---|---|---|
+| file audio | `Documents/Music/` | no (ma li hai anche sul PC) |
+| indice della libreria | `Documents/library.json` | sì, riscansionando |
+| playlist | `Documents/playlists.json` | **no** |
+| copertine delle playlist | `Documents/Covers/` | **no** |
+| copertine dei brani | cache | sì, rileggendo i tag |
+| copie automatiche | `Documents/Backups/` | — |
+
+`Documents/` è visibile dall'app File (Sul mio iPhone → SborraPlay) e dal Finder col cavo, quindi puoi anche copiare tutto a mano.
+
+Reinstallare l'app sopra sé stessa — cosa che farai ogni 7 giorni per rinnovare la firma — **non cancella niente**: per iOS è un aggiornamento. A sparire è tutto solo se disinstalli l'app o se cambi il bundle id.
+
+### Backup
+
+Impostazioni → Backup:
+
+- **Esporta backup** produce un file `SborraPlay-<data>.sborraplay.json` con playlist, copertine, ordinamento, impostazioni e l'elenco dei brani; lo mandi dove vuoi col foglio di condivisione (File, iCloud, AirDrop, Mail).
+- **Importa backup** lo rilegge e ti chiede se unire alle playlist attuali o sostituirle. Le playlist con lo stesso nome vengono fuse, non duplicate.
+- **Copia automatica giornaliera** (attiva di default) salva una copia in `Documents/Backups/` al massimo una volta al giorno e tiene le ultime 5. Da **Copie automatiche** le riapri, le condividi o le ripristini.
+
+Il backup non contiene l'audio: pesa qualche decina di KB più le copertine. I brani li hai già nella cartella del PC da cui li hai caricati.
+
+Dal computer, senza toccare il telefono:
+
+```bash
+sborraplay-dl backup -o ~/Backup            # scarica il backup dall'iPhone
+sborraplay-dl restore ~/Backup/SborraPlay-….sborraplay.json
+sborraplay-dl restore … --replace           # sostituisce invece di unire
+```
+
+Prima di ogni reinstallazione conviene lanciare `sborraplay-dl backup`: dopo il reinstall, `restore` ti rimette playlist e copertine al loro posto.
+
 ### API del server (usate dal tool PC)
 ```
 GET    /                      pagina di upload
@@ -76,6 +113,8 @@ GET    /api/library           elenco brani e playlist (JSON)
 PUT    /api/file/<nome>       carica un file (corpo = byte grezzi)
 DELETE /api/file/<nome>       cancella un file
 POST   /api/playlist          {"name": "…", "files": ["a.mp3", …]}
+GET    /api/backup            backup completo in JSON
+POST   /api/restore[?replace=1]   rimanda indietro un backup
 ```
 Esempio: `curl -T "brano.mp3" http://192.168.1.42:8080/api/file/brano.mp3`
 

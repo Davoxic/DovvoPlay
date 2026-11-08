@@ -13,7 +13,7 @@ final class HTTPConnection {
     private let onClose: (HTTPConnection) -> Void
 
     private static let maxHeaderBytes = 64 * 1024
-    private static let maxMemoryBody = 8 * 1024 * 1024
+    private static let maxMemoryBody = 48 * 1024 * 1024
     private static let separator = Data("\r\n\r\n".utf8)
 
     private var headBuffer = Data()

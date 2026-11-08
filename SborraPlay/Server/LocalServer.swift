@@ -18,6 +18,8 @@ final class LocalServer: ObservableObject {
     var onLibraryChanged: (() -> Void)?
     /// Chiamata (sul main) quando il PC invia una playlist.
     var onPlaylistReceived: ((String, [String]) -> Void)?
+    /// Chiamata (sul main) quando il PC rimanda indietro un backup.
+    var onRestoreRequested: ((Data, Bool) -> Void)?
 
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "sborraplay.server", qos: .userInitiated)
@@ -155,6 +157,41 @@ final class LocalServer: ObservableObject {
                 ["name": p.name, "tracks": p.trackIDs]
             }
             respond(.json(["count": tracks.count, "tracks": tracks, "playlists": playlists]))
+
+        case ("GET", "/api/backup"):
+            let d = UserDefaults.standard
+            let settings: [String: String] = [
+                "sortMode": d.string(forKey: "sortMode") ?? "artist",
+                "shuffle": String(d.bool(forKey: "shuffle")),
+                "repeatMode": d.string(forKey: "repeatMode") ?? "off",
+                "serverAutoStart": String(d.bool(forKey: "serverAutoStart")),
+                "autoBackup": String(d.object(forKey: "autoBackup") == nil ? true : d.bool(forKey: "autoBackup"))
+            ]
+            let backup = BackupManager.make(playlists: LibrarySnapshot.shared.playlists,
+                                            tracks: LibrarySnapshot.shared.tracks,
+                                            settings: settings)
+            guard let data = try? BackupManager.encode(backup) else {
+                respond(.json(["error": "Backup non generato"], status: 500))
+                return
+            }
+            respond(HTTPResponse(status: 200,
+                                 contentType: "application/json; charset=utf-8",
+                                 body: data,
+                                 extraHeaders: ["Content-Disposition":
+                                                "attachment; filename=\"\(BackupManager.fileName())\""]))
+
+        case ("POST", "/api/restore"):
+            guard let body, !body.isEmpty else {
+                respond(.json(["error": "Corpo mancante"], status: 400))
+                return
+            }
+            guard (try? BackupManager.decode(body)) != nil else {
+                respond(.json(["error": "Il file non è un backup valido"], status: 400))
+                return
+            }
+            let replace = (request.query["replace"] ?? "") == "1"
+            DispatchQueue.main.async { self.onRestoreRequested?(body, replace) }
+            respond(.json(["ok": true, "replace": replace]))
 
         case ("POST", "/api/playlist"):
             guard let body,

@@ -219,3 +219,21 @@ def push_many(device: Device, paths: list[Path], skip_existing: bool = True,
                 print()
             warn(f"{path.name}: {exc}")
     return done, names
+
+
+# ------------------------------------------------------------------ backup
+
+def fetch_backup(device: Device, timeout: int = 120) -> bytes:
+    """Scarica dal telefono il backup di playlist, copertine e impostazioni."""
+    req = urllib.request.Request(f"{device.base}/api/backup", method="GET")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def send_backup(device: Device, payload: bytes, replace: bool = False, timeout: int = 120) -> dict:
+    """Rimanda un backup al telefono. replace=True sostituisce le playlist attuali."""
+    url = f"{device.base}/api/restore"
+    if replace:
+        url += "?replace=1"
+    return _request(url, method="POST", data=payload,
+                    headers={"Content-Type": "application/json"}, timeout=timeout)

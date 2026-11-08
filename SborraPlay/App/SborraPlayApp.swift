@@ -30,6 +30,7 @@ struct SborraPlayApp: App {
         let store = library
         await store.bootstrap()
         PlayerEngine.shared.restoreLastSession(from: store.tracks)
+        store.runAutoBackupIfNeeded()
 
         let server = LocalServer.shared
         server.onLibraryChanged = {
@@ -39,6 +40,11 @@ struct SborraPlayApp: App {
             Task { @MainActor in
                 await store.rescan()
                 store.applyRemotePlaylist(name: name, fileNames: files)
+            }
+        }
+        server.onRestoreRequested = { data, replace in
+            Task { @MainActor in
+                store.importBackup(data: data, replace: replace)
             }
         }
         if UserDefaults.standard.bool(forKey: "serverAutoStart") {
