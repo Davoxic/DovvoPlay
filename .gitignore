@@ -21,3 +21,7 @@ venv/
 SborraPlay/Downloads/
 tools/SborraPlay/
 *.yt-archive.txt
+
+# ambiente creato dai lanciatori a doppio clic
+tools/.venv/
+.venv/

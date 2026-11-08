@@ -122,7 +122,33 @@ Esempio: `curl -T "brano.mp3" http://192.168.1.42:8080/api/file/brano.mp3`
 
 ## 3. Il tool PC
 
-Dettagli completi in [`tools/README.md`](tools/README.md). In breve:
+### Avvio a doppio clic
+
+Nella cartella del progetto ci sono due lanciatori: **`SborraPlay.bat`** (Windows) e
+**`SborraPlay.command`** (macOS, tasto destro → Apri la prima volta).
+
+Doppio clic e basta: al primo avvio si creano da soli un ambiente Python isolato in
+`tools/.venv`, installano le librerie e, se manca ffmpeg, si offrono di installarlo.
+Dalla seconda volta partono subito su un menu:
+
+```
+  1  Scarica una playlist Spotify
+  2  Manda musica gia' scaricata al telefono
+  3  Backup del telefono sul PC
+  4  Rimetti un backup sul telefono
+  5  Guarda cosa c'e' sul telefono
+  6  Cerca il telefono sulla rete
+  7  Aggiorna yt-dlp
+```
+
+Dove serve un file o una cartella puoi trascinarli dentro la finestra invece di scrivere
+il percorso. Il link di Spotify si incolla col tasto destro.
+
+### Da riga di comando
+
+
+
+Per chi preferisce il terminale, dettagli completi in [`tools/README.md`](tools/README.md):
 
 ```bash
 cd tools
