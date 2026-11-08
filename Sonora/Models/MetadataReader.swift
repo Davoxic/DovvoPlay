@@ -55,7 +55,7 @@ enum MetadataReader {
                 if meta.discNumber == nil { meta.discNumber = await number(item) }
             case "artwork":
                 if meta.artwork == nil {
-                    if let data = try? await item.load(.dataValue), let data, data.count > 100 {
+                    if let data = try? await item.load(.dataValue), data.count > 100 {
                         meta.artwork = data
                     }
                 }
@@ -80,22 +80,22 @@ enum MetadataReader {
     // MARK: - helper
 
     private static func string(_ item: AVMetadataItem) async -> String? {
-        if let s = try? await item.load(.stringValue), let s {
+        if let s = try? await item.load(.stringValue) {
             let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
             return t.isEmpty ? nil : t
         }
-        if let n = try? await item.load(.numberValue), let n { return n.stringValue }
+        if let n = try? await item.load(.numberValue) { return n.stringValue }
         return nil
     }
 
     private static func number(_ item: AVMetadataItem) async -> Int? {
-        if let n = try? await item.load(.numberValue), let n { return n.intValue }
+        if let n = try? await item.load(.numberValue) { return n.intValue }
         if let s = await string(item) {
             let first = s.split(separator: "/").first.map(String.init) ?? s
             let digits = first.filter { $0.isNumber }
             return Int(digits)
         }
-        if let d = try? await item.load(.dataValue), let d, d.count >= 4 {
+        if let d = try? await item.load(.dataValue), d.count >= 4 {
             // iTunes "trkn": 8 byte, il numero è nei byte 2-3
             let bytes = [UInt8](d)
             if bytes.count >= 4 { return Int(bytes[2]) << 8 | Int(bytes[3]) }
@@ -104,7 +104,7 @@ enum MetadataReader {
     }
 
     private static func year(_ item: AVMetadataItem) async -> Int? {
-        if let date = try? await item.load(.dateValue), let date {
+        if let date = try? await item.load(.dateValue) {
             return Calendar.current.component(.year, from: date)
         }
         if let s = await string(item) {
@@ -112,7 +112,7 @@ enum MetadataReader {
             if digits.count == 4, let y = Int(digits) { return y }
             if let range = s.range(of: #"\d{4}"#, options: .regularExpression) { return Int(s[range]) }
         }
-        if let n = try? await item.load(.numberValue), let n { return n.intValue }
+        if let n = try? await item.load(.numberValue) { return n.intValue }
         return nil
     }
 

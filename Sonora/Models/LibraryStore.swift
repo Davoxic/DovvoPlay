@@ -14,6 +14,13 @@ enum SortMode: String, CaseIterable, Identifiable {
     }
 }
 
+struct AudioFileInfo {
+    let id: String
+    let url: URL
+    let size: Int64
+    let modified: Date
+}
+
 @MainActor
 final class LibraryStore: ObservableObject {
 
@@ -91,30 +98,7 @@ final class LibraryStore: ObservableObject {
         defer { isScanning = false }
 
         LibraryPaths.ensureDirectories()
-        let fm = FileManager.default
-        let root = LibraryPaths.musicDirectory
-        let rootPath = root.standardizedFileURL.path
-
-        var files: [(id: String, url: URL, size: Int64, modified: Date)] = []
-        if let en = fm.enumerator(at: root,
-                                  includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey],
-                                  options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
-            for case let url as URL in en {
-                let ext = url.pathExtension.lowercased()
-                guard LibraryPaths.supportedExtensions.contains(ext) else { continue }
-                let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey])
-                guard values?.isRegularFile == true else { continue }
-                var rel = url.standardizedFileURL.path
-                if rel.hasPrefix(rootPath) {
-                    rel = String(rel.dropFirst(rootPath.count))
-                    while rel.hasPrefix("/") { rel.removeFirst() }
-                }
-                files.append((rel,
-                              url,
-                              Int64(values?.fileSize ?? 0),
-                              values?.contentModificationDate ?? Date()))
-            }
-        }
+        let files = LibraryStore.collectAudioFiles()
 
         scanTotal = files.count
         let existing = Dictionary(uniqueKeysWithValues: tracks.map { ($0.id, $0) })
@@ -160,6 +144,39 @@ final class LibraryStore: ObservableObject {
         scanDone = processed
         tracks = sorted(result)
         saveIndex()
+    }
+
+    /// Enumera i file audio dentro Music/. Sincrona di proposito: l'enumeratore
+    /// di FileManager non si può iterare da un contesto asincrono.
+    private static func collectAudioFiles() -> [AudioFileInfo] {
+        let fm = FileManager.default
+        let root = LibraryPaths.musicDirectory
+        let rootPath = root.standardizedFileURL.path
+        let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
+
+        var files: [AudioFileInfo] = []
+        guard let en = fm.enumerator(at: root,
+                                     includingPropertiesForKeys: keys,
+                                     options: [.skipsHiddenFiles, .skipsPackageDescendants]) else {
+            return files
+        }
+        for element in en {
+            guard let url = element as? URL else { continue }
+            let ext = url.pathExtension.lowercased()
+            guard LibraryPaths.supportedExtensions.contains(ext) else { continue }
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            guard values?.isRegularFile == true else { continue }
+            var rel = url.standardizedFileURL.path
+            if rel.hasPrefix(rootPath) {
+                rel = String(rel.dropFirst(rootPath.count))
+                while rel.hasPrefix("/") { rel.removeFirst() }
+            }
+            files.append(AudioFileInfo(id: rel,
+                                       url: url,
+                                       size: Int64(values?.fileSize ?? 0),
+                                       modified: values?.contentModificationDate ?? Date()))
+        }
+        return files
     }
 
     private func sorted(_ list: [Track]) -> [Track] {
