@@ -5,15 +5,29 @@ struct RootView: View {
     @ObservedObject var player = PlayerEngine.shared
     @State var selection = 0
     @State var showNowPlaying = false
+    @State var showLaunch = true
 
     var body: some View {
+        ZStack {
+            main
+            if showLaunch {
+                LaunchView {
+                    withAnimation(.easeOut(duration: 0.2)) { showLaunch = false }
+                }
+                .transition(.opacity)
+                .zIndex(10)
+            }
+        }
+    }
+
+    private var main: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $selection) {
+                PlaylistsView()
+                    .tabItem { Label("Playlist", systemImage: "rectangle.stack.fill") }
+                    .tag(0)
                 LibraryView()
                     .tabItem { Label("Libreria", systemImage: "music.note.list") }
-                    .tag(0)
-                PlaylistsView()
-                    .tabItem { Label("Playlist", systemImage: "rectangle.stack") }
                     .tag(1)
                 SettingsView()
                     .tabItem { Label("Impostazioni", systemImage: "gearshape") }

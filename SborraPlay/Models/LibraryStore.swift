@@ -345,6 +345,7 @@ final class LibraryStore: ObservableObject {
     }
 
     func deletePlaylists(ids: Set<UUID>) {
+        for p in playlists where ids.contains(p.id) { CoverStore.remove(id: p.coverID) }
         playlists.removeAll { ids.contains($0.id) }
         savePlaylists()
     }
@@ -366,6 +367,26 @@ final class LibraryStore: ObservableObject {
     func moveTracks(from source: IndexSet, to destination: Int, in playlist: Playlist) {
         guard let idx = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
         playlists[idx].trackIDs.move(fromOffsets: source, toOffset: destination)
+        savePlaylists()
+    }
+
+    // MARK: - copertine delle playlist
+
+    func setCover(data: Data, for playlist: Playlist) {
+        guard let idx = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+        guard let id = CoverStore.store(data: data, for: playlist.id) else {
+            lastMessage = "Immagine non valida"
+            return
+        }
+        playlists[idx].coverID = id
+        savePlaylists()
+        lastMessage = "Copertina aggiornata"
+    }
+
+    func removeCover(for playlist: Playlist) {
+        guard let idx = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+        CoverStore.remove(id: playlists[idx].coverID)
+        playlists[idx].coverID = nil
         savePlaylists()
     }
 

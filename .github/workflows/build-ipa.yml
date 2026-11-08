@@ -34,8 +34,8 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild \
-            -project Sonora.xcodeproj \
-            -scheme Sonora \
+            -project SborraPlay.xcodeproj \
+            -scheme SborraPlay \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
@@ -52,25 +52,25 @@ jobs:
       - name: Package into .ipa
         run: |
           set -euo pipefail
-          APP_PATH="build/Build/Products/Release-iphoneos/Sonora.app"
+          APP_PATH="build/Build/Products/Release-iphoneos/SborraPlay.app"
           if [ ! -d "$APP_PATH" ]; then
-            echo "::error::Sonora.app non trovata in $APP_PATH"
+            echo "::error::SborraPlay.app non trovata in $APP_PATH"
             find build -name "*.app" -maxdepth 6 -print || true
             exit 1
           fi
-          rm -rf Payload Sonora-unsigned.ipa
+          rm -rf Payload SborraPlay-unsigned.ipa
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           # rimuove eventuali firme/placeholder lasciati dal build
-          rm -rf "Payload/Sonora.app/_CodeSignature" "Payload/Sonora.app/embedded.mobileprovision"
-          zip -qry Sonora-unsigned.ipa Payload
-          ls -lh Sonora-unsigned.ipa
+          rm -rf "Payload/SborraPlay.app/_CodeSignature" "Payload/SborraPlay.app/embedded.mobileprovision"
+          zip -qry SborraPlay-unsigned.ipa Payload
+          ls -lh SborraPlay-unsigned.ipa
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Sonora-unsigned-ipa
-          path: Sonora-unsigned.ipa
+          name: SborraPlay-unsigned-ipa
+          path: SborraPlay-unsigned.ipa
           if-no-files-found: error
           retention-days: 90
 
@@ -79,7 +79,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" Sonora-unsigned.ipa \
-            --title "Sonora ${GITHUB_REF_NAME}" \
+          gh release create "${GITHUB_REF_NAME}" SborraPlay-unsigned.ipa \
+            --title "SborraPlay ${GITHUB_REF_NAME}" \
             --notes "Build unsigned. Firmala con Sideloadly / AltStore / ESign prima di installarla." \
-            || gh release upload "${GITHUB_REF_NAME}" Sonora-unsigned.ipa --clobber
+            || gh release upload "${GITHUB_REF_NAME}" SborraPlay-unsigned.ipa --clobber

@@ -1,7 +1,7 @@
-# sonora-dl
+# sborraplay-dl
 
 Dalla playlist Spotify ai file sul tuo iPhone: legge la playlist, trova i brani su YouTube,
-li scarica con yt-dlp, scrive i tag e li carica nell'app Sonora.
+li scarica con yt-dlp, scrive i tag e li carica nell'app SborraPlay.
 
 ## Installazione
 
@@ -17,23 +17,23 @@ Serve anche **ffmpeg** nel PATH:
 | Windows | `winget install Gyan.FFmpeg` |
 | Debian/Ubuntu | `sudo apt install ffmpeg` |
 
-Poi si usa direttamente: `./sonora-dl …` (oppure `python -m sonora_dl …`).
+Poi si usa direttamente: `./sborraplay-dl …` (oppure `python -m sborraplay_dl …`).
 
 ## Comandi
 
 ```bash
-sonora-dl discover                       # cerca l'iPhone sulla rete e lo ricorda
-sonora-dl playlist <url Spotify>         # scarica tutto e lo manda al telefono
-sonora-dl playlist export.csv --no-push  # solo download, niente invio
-sonora-dl push ~/Musica/Estate --playlist "Estate 2026"
-sonora-dl library                        # cosa c'è già sul telefono
+sborraplay-dl discover                       # cerca l'iPhone sulla rete e lo ricorda
+sborraplay-dl playlist <url Spotify>         # scarica tutto e lo manda al telefono
+sborraplay-dl playlist export.csv --no-push  # solo download, niente invio
+sborraplay-dl push ~/Musica/Estate --playlist "Estate 2026"
+sborraplay-dl library                        # cosa c'è già sul telefono
 ```
 
 ### Opzioni di `playlist`
 
 | opzione | effetto |
 |---|---|
-| `-o DIR` | cartella di destinazione (default `./Sonora/<nome playlist>`) |
+| `-o DIR` | cartella di destinazione (default `./SborraPlay/<nome playlist>`) |
 | `-f mp3\|m4a\|flac` | formato finale (default mp3) |
 | `-q 320` | bitrate mp3 |
 | `--host 192.168.1.42:8080` | indirizzo del telefono (altrimenti Bonjour o quello salvato) |
@@ -85,7 +85,7 @@ Sotto la soglia (`--min-score`, default 35) il brano viene saltato e finito in
 - viene scritto anche un `.m3u` con l'ordine della playlist
 - i file vengono caricati sul telefono via `PUT /api/file/...` e l'app crea la playlist con lo stesso nome
 - `.yt-archive.txt` tiene traccia dei video già scaricati, così rilanciare il comando non riscarica nulla
-- l'indirizzo del telefono viene ricordato in `~/.sonora-dl.json`
+- l'indirizzo del telefono viene ricordato in `~/.sborraplay-dl.json`
 
 ## Se qualcosa non va
 
@@ -94,6 +94,6 @@ Sotto la soglia (`--min-score`, default 35) il brano viene saltato e finito in
 | `ffmpeg non trovato` | installalo (tabella sopra) |
 | `Telefono non raggiungibile` | app aperta + server acceso in Impostazioni, stessa rete, poi `--host IP:8080` |
 | Bonjour non trova niente | `pip install zeroconf`, oppure usa `--host` |
-| scarica la versione sbagliata | alza `--min-score`, o scarica quel brano a mano e usa `sonora-dl push` |
+| scarica la versione sbagliata | alza `--min-score`, o scarica quel brano a mano e usa `sborraplay-dl push` |
 | YouTube chiede la verifica | `--cookies-from-browser chrome` |
 | playlist tagliata a 100 brani | usa l'export CSV o le credenziali Spotify |

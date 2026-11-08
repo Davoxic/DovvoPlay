@@ -1,4 +1,4 @@
-# Sonora
+# SborraPlay
 
 Player musicale locale per iPhone + tool da PC per portarci dentro le tue playlist Spotify.
 
@@ -6,7 +6,7 @@ Due pezzi indipendenti:
 
 | | cosa fa |
 |---|---|
-| **app iOS** (`Sonora/`) | riproduce i file audio che hai sul telefono, con copertine, playlist, lock screen e un server Wi-Fi per caricare la musica dal computer via browser |
+| **app iOS** (`SborraPlay/`) | riproduce i file audio che hai sul telefono, con copertine, playlist, lock screen e un server Wi-Fi per caricare la musica dal computer via browser |
 | **tool PC** (`tools/`) | legge una playlist Spotify, trova i brani su YouTube, li scarica con yt-dlp, scrive i tag e li manda al telefono |
 
 ---
@@ -17,21 +17,21 @@ Non serve un Mac: la build gira su GitHub Actions, che usa runner macOS gratuiti
 
 1. Crea un repository su GitHub e caricaci questa cartella:
    ```bash
-   cd sonora
-   git init && git add . && git commit -m "Sonora"
+   cd sborraplay
+   git init && git add . && git commit -m "SborraPlay"
    git branch -M main
-   git remote add origin https://github.com/TUO-UTENTE/sonora.git
+   git remote add origin https://github.com/Davoxic/sonora.git
    git push -u origin main
    ```
 2. Vai su **Actions** → `Build IPA (unsigned)`. Parte da sola al push; altrimenti premi **Run workflow**.
-3. A fine build (5-8 minuti) scarica l'artifact **Sonora-unsigned-ipa** e scompattalo: dentro c'è `Sonora-unsigned.ipa`.
+3. A fine build (5-8 minuti) scarica l'artifact **SborraPlay-unsigned-ipa** e scompattalo: dentro c'è `SborraPlay-unsigned.ipa`.
 
 Se invece hai un Mac con Xcode:
 
 ```bash
 brew install xcodegen
 xcodegen generate
-open Sonora.xcodeproj      # Signing & Capabilities → scegli il tuo team → Run
+open SborraPlay.xcodeproj      # Signing & Capabilities → scegli il tuo team → Run
 ```
 
 ### Firmare e installare
@@ -47,7 +47,7 @@ L'`.ipa` esce **senza firma**: va firmata con il tuo Apple ID prima di finire su
 
 Con un Apple ID gratuito la firma **scade dopo 7 giorni** e puoi avere al massimo 3 app sideloaded: va rinnovata (AltStore lo fa da solo). Con un account sviluppatore a pagamento dura un anno.
 
-Il bundle id è `com.dchietti.sonora`: cambialo in `project.yml` se ti serve.
+Il bundle id è `com.dchietti.sborraplay`: cambialo in `project.yml` se ti serve.
 
 ---
 
@@ -64,8 +64,8 @@ Il bundle id è `com.dchietti.sonora`: cambialo in `project.yml` se ti serve.
 Tieni l'app in primo piano mentre trasferisci. Il server non ha password ed è raggiungibile da chiunque sia sulla tua rete: spegnilo quando hai finito.
 
 ### Altri modi
-- **App File**: Sul mio iPhone → Sonora → copia i file lì dentro.
-- **Finder / iTunes**: collega il cavo, scheda File, trascina su Sonora.
+- **App File**: Sul mio iPhone → SborraPlay → copia i file lì dentro.
+- **Finder / iTunes**: collega il cavo, scheda File, trascina su SborraPlay.
 - **Impostazioni → Importa da File / iCloud**, anche per i `.m3u`.
 
 ### API del server (usate dal tool PC)
@@ -90,8 +90,8 @@ cd tools
 pip install -r requirements.txt        # yt-dlp, mutagen, zeroconf
 # serve anche ffmpeg nel PATH
 
-./sonora-dl discover                                   # trova l'iPhone sulla rete
-./sonora-dl playlist https://open.spotify.com/playlist/XXXX
+./sborraplay-dl discover                                   # trova l'iPhone sulla rete
+./sborraplay-dl playlist https://open.spotify.com/playlist/XXXX
 ```
 
 Legge la playlist → cerca ogni brano su YouTube e sceglie il risultato più probabile (durata, titolo, canale) → scarica in MP3 320 → scrive tag e copertina → manda tutto al telefono e crea la playlist dentro l'app.
@@ -101,14 +101,14 @@ Legge la playlist → cerca ogni brano su YouTube e sceglie il risultato più pr
 ## Struttura
 
 ```
-Sonora/
+SborraPlay/
   App/            punto di ingresso SwiftUI
   Models/         Track, Playlist, libreria su disco, lettura metadati, copertine
   Audio/          PlayerEngine: coda, shuffle, repeat, lock screen, interruzioni
   Server/         server HTTP (Network.framework) + pagina di upload
   Views/          libreria, album, artisti, playlist, now playing, impostazioni
 tools/
-  sonora_dl/      spotify.py · matcher.py · downloader.py · pusher.py · cli.py
+  sborraplay_dl/      spotify.py · matcher.py · downloader.py · pusher.py · cli.py
 .github/workflows/build-ipa.yml
 project.yml       spec XcodeGen (il .xcodeproj viene generato, non è versionato)
 ```

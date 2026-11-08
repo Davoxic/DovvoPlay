@@ -18,6 +18,6 @@ __pycache__/
 venv/
 
 # output del tool
-Sonora/Downloads/
-tools/Sonora/
+SborraPlay/Downloads/
+tools/SborraPlay/
 *.yt-archive.txt

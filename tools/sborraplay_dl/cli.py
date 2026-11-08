@@ -48,7 +48,7 @@ def cmd_playlist(args) -> int:
     tracks = playlist.tracks[:args.limit] if args.limit else playlist.tracks
     ok(f"{playlist.name} — {len(tracks)} brani")
 
-    outdir = Path(args.out).expanduser() if args.out else Path.cwd() / "Sonora" / safe_filename(playlist.name)
+    outdir = Path(args.out).expanduser() if args.out else Path.cwd() / "SborraPlay" / safe_filename(playlist.name)
     outdir.mkdir(parents=True, exist_ok=True)
     archive = outdir / ".yt-archive.txt" if args.archive else None
 
@@ -134,7 +134,7 @@ def cmd_playlist(args) -> int:
     device = resolve_device(args.host)
     if device is None:
         warn("Nessun telefono raggiungibile: i file restano nella cartella, "
-             "puoi inviarli dopo con  sonora-dl push \"" + str(outdir) + "\"")
+             "puoi inviarli dopo con  sborraplay-dl push \"" + str(outdir) + "\"")
         return 0 if not bad else 1
 
     sent, names = pusher.push_many(device, [r.path for r in good], skip_existing=not args.overwrite)
@@ -179,7 +179,7 @@ def cmd_push(args) -> int:
 
 def cmd_discover(args) -> int:
     from . import pusher
-    info("Cerco Sonora sulla rete locale…")
+    info("Cerco SborraPlay sulla rete locale…")
     devices = pusher.discover(timeout=args.timeout)
     if not devices:
         warn("Nessun dispositivo trovato. Controlla che l'app sia aperta con il server acceso, "
@@ -239,7 +239,7 @@ def resolve_device(host: str | None):
             ok(f"Trovato: {device.host}:{device.port}")
             return device
 
-    err("Telefono non raggiungibile. Apri Sonora, vai in Impostazioni, accendi il server Wi-Fi "
+    err("Telefono non raggiungibile. Apri SborraPlay, vai in Impostazioni, accendi il server Wi-Fi "
         "e passa l'indirizzo mostrato con --host 192.168.x.x:8080")
     return None
 
@@ -248,17 +248,17 @@ def resolve_device(host: str | None):
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="sonora-dl",
+        prog="sborraplay-dl",
         description="Dalla playlist Spotify ai file sul tuo iPhone, passando da YouTube e yt-dlp.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""esempi:
-  sonora-dl playlist https://open.spotify.com/playlist/37i9dQZF1DX...
-  sonora-dl playlist miei_brani.csv --format m4a --no-push
-  sonora-dl playlist <url> --host 192.168.1.42:8080 --workers 4
-  sonora-dl push ~/Musica/Estate --playlist "Estate 2026"
-  sonora-dl discover
+  sborraplay-dl playlist https://open.spotify.com/playlist/37i9dQZF1DX...
+  sborraplay-dl playlist miei_brani.csv --format m4a --no-push
+  sborraplay-dl playlist <url> --host 192.168.1.42:8080 --workers 4
+  sborraplay-dl push ~/Musica/Estate --playlist "Estate 2026"
+  sborraplay-dl discover
 """)
-    p.add_argument("--version", action="version", version=f"sonora-dl {__version__}")
+    p.add_argument("--version", action="version", version=f"sborraplay-dl {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
     pl = sub.add_parser("playlist", help="scarica una playlist Spotify (o un file CSV/JSON/TXT)")

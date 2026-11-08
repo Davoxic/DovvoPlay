@@ -342,6 +342,6 @@ def load_playlist(reference: str) -> SpotifyPlaylist:
     raise RuntimeError(
         "Non sono riuscito a leggere la playlist.\n"
         "  • controlla che sia pubblica (o condivisa con link)\n"
-        "  • oppure esportala in CSV con exportify.net e passa il file a sonora-dl\n"
+        "  • oppure esportala in CSV con exportify.net e passa il file a sborraplay-dl\n"
         "  • oppure imposta SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET"
     )

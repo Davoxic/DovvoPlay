@@ -115,7 +115,7 @@ struct SettingsView: View {
         } header: {
             Text("Import")
         } footer: {
-            Text("Puoi anche copiare i file nella cartella Sonora tramite l'app File (Sul mio iPhone → Sonora) o dal Finder collegando il cavo.")
+            Text("Puoi anche copiare i file nella cartella SborraPlay tramite l'app File (Sul mio iPhone → SborraPlay) o dal Finder collegando il cavo.")
         }
     }
 

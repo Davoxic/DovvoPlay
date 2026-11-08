@@ -14,6 +14,9 @@ enum LibraryPaths {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         return caches.appendingPathComponent("Artwork", isDirectory: true)
     }
+    static var coversDirectory: URL {
+        documents.appendingPathComponent("Covers", isDirectory: true)
+    }
     static var indexFile: URL { documents.appendingPathComponent("library.json") }
     static var playlistsFile: URL { documents.appendingPathComponent("playlists.json") }
 
@@ -27,7 +30,7 @@ enum LibraryPaths {
 
     static func ensureDirectories() {
         let fm = FileManager.default
-        for dir in [musicDirectory, artworkDirectory] {
+        for dir in [musicDirectory, artworkDirectory, coversDirectory] {
             if !fm.fileExists(atPath: dir.path) {
                 try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
             }

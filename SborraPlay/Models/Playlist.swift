@@ -6,6 +6,8 @@ struct Playlist: Identifiable, Codable, Hashable {
     var trackIDs: [String] = []
     var createdAt: Date = Date()
     var source: String = "locale"   // "locale", "spotify", "m3u"
+    /// Nome del file di copertina scelto dal rullino, dentro Documents/Covers.
+    var coverID: String? = nil
 
     var subtitle: String {
         let n = trackIDs.count

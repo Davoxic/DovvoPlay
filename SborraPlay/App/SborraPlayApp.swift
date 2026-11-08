@@ -2,7 +2,7 @@ import SwiftUI
 import AVFoundation
 
 @main
-struct SonoraApp: App {
+struct SborraPlayApp: App {
     @StateObject var library = LibraryStore()
     @Environment(\.scenePhase) var scenePhase
 

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Sonora</string>
+	<string>SborraPlay</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -36,11 +36,13 @@
 	<true/>
 	<key>UISupportsDocumentBrowser</key>
 	<false/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Serve per scegliere dalle tue foto la copertina di una playlist.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Sonora apre un server locale sulla tua rete Wi-Fi per permetterti di caricare musica dal computer.</string>
+	<string>SborraPlay apre un server locale sulla tua rete Wi-Fi per permetterti di caricare musica dal computer.</string>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_sonora._tcp</string>
+		<string>_sborraplay._tcp</string>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>

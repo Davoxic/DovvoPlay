@@ -4,7 +4,7 @@ import math, os
 from PIL import Image, ImageDraw
 
 S = 1024
-OUT = os.path.join(os.path.dirname(__file__), "..", "Sonora", "Resources",
+OUT = os.path.join(os.path.dirname(__file__), "..", "SborraPlay", "Resources",
                    "Assets.xcassets", "AppIcon.appiconset", "AppIcon.png")
 
 img = Image.new("RGB", (S, S), (12, 10, 22))

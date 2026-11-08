@@ -1,4 +1,4 @@
-"""Invio dei file al server Wi-Fi dell'app Sonora sull'iPhone."""
+"""Invio dei file al server Wi-Fi dell'app SborraPlay sull'iPhone."""
 from __future__ import annotations
 
 import json
@@ -14,7 +14,7 @@ from typing import Callable
 from .util import human_size, info, warn
 
 DEFAULT_PORT = 8080
-SERVICE_TYPE = "_sonora._tcp.local."
+SERVICE_TYPE = "_sborraplay._tcp.local."
 
 
 @dataclass

@@ -7,7 +7,7 @@ enum UploadPage {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sonora · carica musica</title>
+<title>SborraPlay · carica musica</title>
 <style>
   :root {
     --bg: #0d0a17;
@@ -83,7 +83,7 @@ enum UploadPage {
   <header>
     <div class="logo"><span></span></div>
     <div>
-      <h1>Sonora</h1>
+      <h1>SborraPlay</h1>
       <div class="sub" id="sub">caricamento in corso…</div>
     </div>
   </header>

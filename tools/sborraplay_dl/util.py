@@ -7,7 +7,7 @@ import sys
 import unicodedata
 from pathlib import Path
 
-CONFIG_PATH = Path(os.path.expanduser("~")) / ".sonora-dl.json"
+CONFIG_PATH = Path(os.path.expanduser("~")) / ".sborraplay-dl.json"
 
 # ---------------------------------------------------------------- output
 

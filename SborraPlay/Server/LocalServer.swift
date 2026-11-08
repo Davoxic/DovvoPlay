@@ -20,7 +20,7 @@ final class LocalServer: ObservableObject {
     var onPlaylistReceived: ((String, [String]) -> Void)?
 
     private var listener: NWListener?
-    private let queue = DispatchQueue(label: "sonora.server", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "sborraplay.server", qos: .userInitiated)
     private var connections: [ObjectIdentifier: HTTPConnection] = [:]
     private var rescanWork: DispatchWorkItem?
 
@@ -46,7 +46,7 @@ final class LocalServer: ObservableObject {
             params.includePeerToPeer = false
             do {
                 let l = try NWListener(using: params, on: nwPort)
-                l.service = NWListener.Service(name: "Sonora", type: "_sonora._tcp")
+                l.service = NWListener.Service(name: "SborraPlay", type: "_sborraplay._tcp")
                 l.stateUpdateHandler = { [weak self] state in
                     guard let self else { return }
                     switch state {
@@ -134,7 +134,7 @@ final class LocalServer: ObservableObject {
 
         case ("GET", "/api/ping"):
             respond(.json([
-                "app": "sonora",
+                "app": "sborraplay",
                 "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0",
                 "device": UIDevice.current.name,
                 "tracks": LibrarySnapshot.shared.tracks.count
