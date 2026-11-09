@@ -125,39 +125,95 @@ enum PipedClient {
 
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 12
+        config.timeoutIntervalForRequest = 9
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         return URLSession(configuration: config)
     }()
 
     // MARK: - chiamate con failover
 
+    /// Le istanze pubbliche sono spesso lente o bloccate da YouTube: invece di
+    /// provarle in fila (e far aspettare un minuto), le interroghiamo tutte
+    /// insieme e teniamo la prima che risponde.
     private static func get(path: String, query: [URLQueryItem]) async throws -> Any {
-        var lastError: Error = PipedError.allInstancesDown
-        for base in instanceList {
-            guard var comps = URLComponents(string: base + path) else { continue }
-            if !query.isEmpty { comps.queryItems = query }
-            guard let url = comps.url else { continue }
-            do {
-                let (data, response) = try await session.data(from: url)
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                    lastError = PipedError.badResponse
-                    continue
+        let bases = Array(instanceList.prefix(6))
+        guard !bases.isEmpty else { throw PipedError.allInstancesDown }
+
+        let winner: (data: Data, base: String)? = await withTaskGroup(
+            of: (Data, String)?.self
+        ) { group in
+            for base in bases {
+                group.addTask {
+                    guard var comps = URLComponents(string: base + path) else { return nil }
+                    if !query.isEmpty { comps.queryItems = query }
+                    guard let url = comps.url else { return nil }
+                    guard let (data, response) = try? await session.data(from: url),
+                          let http = response as? HTTPURLResponse,
+                          http.statusCode == 200,
+                          data.count > 2 else { return nil }
+                    return (data, base)
                 }
-                let json = try JSONSerialization.jsonObject(with: data)
-                if let dict = json as? [String: Any], let message = dict["error"] as? String, dict["items"] == nil {
-                    lastError = PipedError.badResponse
-                    _ = message
-                    continue
+            }
+            for await result in group {
+                if let result {
+                    group.cancelAll()
+                    return result
                 }
-                working = base
-                return json
-            } catch {
-                lastError = error
-                continue
+            }
+            return nil
+        }
+
+        guard let winner else { throw PipedError.allInstancesDown }
+        working = winner.base
+        guard let json = try? JSONSerialization.jsonObject(with: winner.data) else {
+            throw PipedError.badResponse
+        }
+        return json
+    }
+
+    // MARK: - diagnostica
+
+    struct InstanceReport: Identifiable {
+        let id = UUID()
+        let base: String
+        let ok: Bool
+        let millis: Int
+    }
+
+    /// Prova tutte le istanze e dice quali rispondono: serve a capire se il
+    /// problema è YouTube, la rete o l'app.
+    static func probeAll() async -> [InstanceReport] {
+        await withTaskGroup(of: InstanceReport.self) { group in
+            for base in instanceList {
+                group.addTask {
+                    let start = Date()
+                    var comps = URLComponents(string: base + "/search")
+                    comps?.queryItems = [URLQueryItem(name: "q", value: "music"),
+                                         URLQueryItem(name: "filter", value: "music_songs")]
+                    guard let url = comps?.url else {
+                        return InstanceReport(base: base, ok: false, millis: 0)
+                    }
+                    let response = try? await session.data(from: url)
+                    let elapsed = Int(Date().timeIntervalSince(start) * 1000)
+                    let code = (response?.1 as? HTTPURLResponse)?.statusCode ?? 0
+                    let hasItems: Bool
+                    if let data = response?.0,
+                       let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let items = root["items"] as? [[String: Any]] {
+                        hasItems = !items.isEmpty
+                    } else {
+                        hasItems = false
+                    }
+                    return InstanceReport(base: base, ok: code == 200 && hasItems, millis: elapsed)
+                }
+            }
+            var out: [InstanceReport] = []
+            for await report in group { out.append(report) }
+            return out.sorted { a, b in
+                if a.ok != b.ok { return a.ok }
+                return a.millis < b.millis
             }
         }
-        throw lastError
     }
 
     // MARK: - ricerca

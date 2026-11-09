@@ -234,6 +234,12 @@ struct SettingsView: View {
                     }
             }
 
+            NavigationLink {
+                DiagnosticsView()
+            } label: {
+                Label("Diagnostica sorgenti", systemImage: "stethoscope")
+            }
+
             Button {
                 let target = pipedInstance.isEmpty ? PipedClient.activeInstance : pipedInstance
                 instanceCheck = "provo…"

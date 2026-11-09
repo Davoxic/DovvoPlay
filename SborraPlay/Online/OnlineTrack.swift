@@ -32,6 +32,8 @@ struct OnlineTrack: Identifiable, Hashable {
     var resolveHint: String?
     /// SoundCloud: la transcodifica progressiva, l'unica scaricabile come file.
     var downloadHint: String? = nil
+    /// Anteprima da 30 secondi riservata agli abbonati: inutile in un player.
+    var isPreviewOnly: Bool = false
 
     var durationText: String { Track.timeString(duration) }
 

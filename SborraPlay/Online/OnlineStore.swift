@@ -17,6 +17,8 @@ final class OnlineStore: ObservableObject {
     @Published var errorText: String?
     @Published private(set) var bridgeReady = false
     @Published private(set) var lastQuery = ""
+    /// Chi ha risposto all'ultima ricerca YouTube: utile quando qualcosa non va.
+    @Published private(set) var backend = "—"
     @Published var quality: StreamQuality = StreamQuality.preferred {
         didSet { StreamQuality.preferred = quality }
     }
@@ -77,16 +79,9 @@ final class OnlineStore: ObservableObject {
     /// Prima Piped, che funziona ovunque; se tutte le istanze sono giù e c'è il
     /// computer acceso, si ripiega sul ponte con yt-dlp.
     private func searchYouTube(_ text: String) async throws -> [OnlineTrack] {
-        do {
-            return try await PipedClient.search(text)
-        } catch {
-            if bridgeReady || BridgeClient.isConfigured {
-                if let viaBridge = try? await BridgeClient.search(text), !viaBridge.isEmpty {
-                    return viaBridge
-                }
-            }
-            throw error
-        }
+        let found = try await YouTubeClient.search(text, allowBridge: bridgeReady || BridgeClient.isConfigured)
+        backend = YouTubeClient.lastBackend
+        return found
     }
 
     func clear() {
@@ -129,8 +124,8 @@ final class OnlineStore: ObservableObject {
         case .youtube:
             guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
             do {
-                let bundle = try await PipedClient.streams(for: videoID)
-                guard let option = PipedClient.pick(bundle.audio, quality: quality) else {
+                let options = try await YouTubeClient.audioOptions(for: videoID)
+                guard let option = PipedClient.pick(options, quality: quality) else {
                     throw PipedClient.PipedError.noAudio
                 }
                 return option.url
@@ -145,7 +140,8 @@ final class OnlineStore: ObservableObject {
 
     // MARK: - download
 
-    func download(_ track: OnlineTrack, kind: DownloadKind, into library: LibraryStore) {
+    func download(_ track: OnlineTrack, kind: DownloadKind, into library: LibraryStore,
+                  addTo playlist: Playlist? = nil) {
         guard !busy.contains(track.id), !downloads.isRunning(track.id) else { return }
         busy.insert(track.id)
         errorText = nil
@@ -155,7 +151,7 @@ final class OnlineStore: ObservableObject {
             do {
                 switch kind {
                 case .audio(let requested):
-                    try await self.downloadAudio(track, quality: requested, into: library)
+                    try await self.downloadAudio(track, quality: requested, into: library, addTo: playlist)
                 case .video:
                     try await self.downloadVideo(track)
                 }
@@ -167,11 +163,17 @@ final class OnlineStore: ObservableObject {
     }
 
     private func downloadAudio(_ track: OnlineTrack, quality requested: StreamQuality,
-                               into library: LibraryStore) async throws {
+                               into library: LibraryStore,
+                               addTo playlist: Playlist? = nil) async throws {
         LibraryPaths.ensureDirectories()
 
-        if track.isDownloaded {
-            library.lastMessage = "Già in libreria"
+        if let existing = track.localFile {
+            if let playlist {
+                library.add(trackIDs: [existing.lastPathComponent], to: playlist)
+                library.lastMessage = "Aggiunto a \(playlist.name)"
+            } else {
+                library.lastMessage = "Già in libreria"
+            }
             return
         }
 
@@ -188,8 +190,8 @@ final class OnlineStore: ObservableObject {
             ext = "mp3"
         case .youtube:
             guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
-            let bundle = try await PipedClient.streams(for: videoID)
-            guard let option = PipedClient.pick(bundle.audio, quality: requested) else {
+            let options = try await YouTubeClient.audioOptions(for: videoID)
+            guard let option = PipedClient.pick(options, quality: requested) else {
                 throw PipedClient.PipedError.noAudio
             }
             remote = option.url
@@ -208,15 +210,20 @@ final class OnlineStore: ObservableObject {
         if let artwork {
             library.attachArtwork(artwork, toFileNamed: destination.lastPathComponent)
         }
-        library.lastMessage = "Aggiunto: \(destination.lastPathComponent)"
+        if let playlist {
+            library.add(trackIDs: [destination.lastPathComponent], to: playlist)
+            library.lastMessage = "\(track.title) → \(playlist.name)"
+        } else {
+            library.lastMessage = "Aggiunto: \(destination.lastPathComponent)"
+        }
     }
 
     private func downloadVideo(_ track: OnlineTrack) async throws {
         guard track.source == .youtube, let videoID = track.resolveHint else {
             throw PipedClient.PipedError.noAudio
         }
-        let bundle = try await PipedClient.streams(for: videoID)
-        guard let option = PipedClient.bestVideo(bundle.video) else {
+        let options = try await YouTubeClient.videoOptions(for: videoID)
+        guard let option = PipedClient.bestVideo(options) else {
             throw PipedClient.PipedError.noAudio
         }
         let folder = LibraryPaths.documents.appendingPathComponent("Video", isDirectory: true)

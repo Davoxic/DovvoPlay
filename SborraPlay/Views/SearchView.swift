@@ -6,6 +6,8 @@ struct SearchView: View {
     @ObservedObject var player = PlayerEngine.shared
     @ObservedObject var downloads = DownloadManager.shared
     @ObservedObject var network = NetworkMonitor.shared
+    @State var playlistTarget: OnlineTrack?
+    @State var pendingKind: DownloadKind = .audio(.auto)
 
     var body: some View {
         NavigationStack {
@@ -35,6 +37,12 @@ struct SearchView: View {
                 if !online.query.isEmpty { online.search() }
             }
             .task { await online.refreshBridge() }
+            .sheet(item: $playlistTarget) { track in
+                OnlinePlaylistPicker(track: track) { playlist in
+                    online.download(track, kind: pendingKind, into: library, addTo: playlist)
+                }
+                .environmentObject(library)
+            }
         }
     }
 
@@ -49,6 +57,9 @@ struct SearchView: View {
             Text(online.connectionNote)
                 .font(.caption2)
                 .lineLimit(1)
+            if online.source == .youtube && online.backend != "—" {
+                Text("· via \(online.backend)").font(.caption2).lineLimit(1)
+            }
             Spacer(minLength: 4)
             Menu {
                 Picker("Qualità", selection: $online.quality) {
@@ -168,42 +179,65 @@ struct SearchView: View {
             .frame(width: 30)
         } else if online.isBusy(track) {
             ProgressView().frame(width: 30)
-        } else if track.isDownloaded {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 21))
-                .foregroundStyle(.green)
-        } else if track.source == .youtube {
+        } else {
             Menu {
                 Button {
-                    online.download(track, kind: .audio(.high), into: library)
+                    online.play(track, in: library)
                 } label: {
-                    Label("Alta qualità", systemImage: "waveform")
+                    Label(track.isDownloaded ? "Ascolta il file" : "Ascolta in streaming",
+                          systemImage: "play.fill")
                 }
-                Button {
-                    online.download(track, kind: .audio(.saver), into: library)
-                } label: {
-                    Label("Risparmio dati", systemImage: "arrow.down.circle.dotted")
-                }
+
                 Divider()
-                Button {
-                    online.download(track, kind: .video, into: library)
-                } label: {
-                    Label("Scarica il video (mp4)", systemImage: "film")
+
+                if track.isDownloaded {
+                    Button {
+                        pendingKind = .audio(online.quality)
+                        playlistTarget = track
+                    } label: {
+                        Label("Aggiungi a playlist…", systemImage: "text.badge.plus")
+                    }
+                } else if track.source == .youtube {
+                    Button {
+                        online.download(track, kind: .audio(.high), into: library)
+                    } label: {
+                        Label("Scarica in alta qualità", systemImage: "waveform")
+                    }
+                    Button {
+                        online.download(track, kind: .audio(.saver), into: library)
+                    } label: {
+                        Label("Scarica leggero", systemImage: "arrow.down.circle.dotted")
+                    }
+                    Button {
+                        pendingKind = .audio(online.quality)
+                        playlistTarget = track
+                    } label: {
+                        Label("Scarica e aggiungi a…", systemImage: "text.badge.plus")
+                    }
+                    Divider()
+                    Button {
+                        online.download(track, kind: .video, into: library)
+                    } label: {
+                        Label("Scarica il video (mp4)", systemImage: "film")
+                    }
+                } else {
+                    Button {
+                        online.download(track, kind: .audio(online.quality), into: library)
+                    } label: {
+                        Label("Scarica", systemImage: "arrow.down")
+                    }
+                    Button {
+                        pendingKind = .audio(online.quality)
+                        playlistTarget = track
+                    } label: {
+                        Label("Scarica e aggiungi a…", systemImage: "text.badge.plus")
+                    }
                 }
             } label: {
-                Image(systemName: "arrow.down.circle")
+                Image(systemName: track.isDownloaded ? "checkmark.circle.fill" : "ellipsis.circle")
                     .font(.system(size: 21))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(track.isDownloaded ? Color.green : Color.accentColor)
             }
-        } else {
-            Button {
-                online.download(track, kind: .audio(online.quality), into: library)
-            } label: {
-                Image(systemName: "arrow.down.circle")
-                    .font(.system(size: 21))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.accentColor)
         }
     }
 
@@ -227,5 +261,79 @@ struct SearchView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.bottom, 70)
+    }
+}
+
+/// Scelta della playlist in cui infilare il brano appena scaricato.
+struct OnlinePlaylistPicker: View {
+    let track: OnlineTrack
+    var onPick: (Playlist) -> Void
+
+    @EnvironmentObject var library: LibraryStore
+    @Environment(\.dismiss) var dismiss
+    @State var newName = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    HStack(spacing: 10) {
+                        AsyncImage(url: track.artworkURL) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            Color.secondary.opacity(0.15)
+                        }
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(track.title).font(.subheadline).lineLimit(1)
+                            Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                }
+
+                Section("Nuova playlist") {
+                    HStack {
+                        TextField("Nome", text: $newName)
+                        Button("Crea") {
+                            let playlist = library.createPlaylist(name: newName)
+                            onPick(playlist)
+                            dismiss()
+                        }
+                        .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                }
+
+                if !library.playlists.isEmpty {
+                    Section("Le tue playlist") {
+                        ForEach(library.playlists) { playlist in
+                            Button {
+                                onPick(playlist)
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    PlaylistCover(playlist: playlist,
+                                                  fallbackArtworkID: library.tracks(in: playlist).first?.artworkID,
+                                                  size: 34, corner: 6)
+                                    Text(playlist.name)
+                                    Spacer()
+                                    Text(playlist.subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .tint(.primary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Aggiungi a")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annulla") { dismiss() }
+                }
+            }
+        }
     }
 }

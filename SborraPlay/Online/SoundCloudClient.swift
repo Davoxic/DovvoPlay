@@ -74,7 +74,7 @@ enum SoundCloudClient {
 
     // MARK: - ricerca
 
-    static func search(_ query: String, limit: Int = 30) async throws -> [OnlineTrack] {
+    static func search(_ query: String, limit: Int = 50) async throws -> [OnlineTrack] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         do {
@@ -103,15 +103,30 @@ enum SoundCloudClient {
               let collection = root["collection"] as? [[String: Any]] else {
             throw ClientError.badResponse
         }
-        return collection.compactMap(parse)
+        // Le tracce "SNIP" sono anteprime da 30 secondi riservate agli abbonati:
+        // in un player non servono a niente, le togliamo di mezzo.
+        return collection.compactMap(parse).filter { !$0.isPreviewOnly }
     }
 
     private static func parse(_ item: [String: Any]) -> OnlineTrack? {
         guard let title = item["title"] as? String else { return nil }
         let user = item["user"] as? [String: Any]
         let artist = (user?["username"] as? String) ?? ""
-        let millis = (item["duration"] as? Double) ?? (item["full_duration"] as? Double) ?? 0
-        let identifier = String(describing: item["id"] ?? UUID().uuidString)
+        // "duration" per le anteprime vale 30000: la durata vera è full_duration
+        let fullMillis = (item["full_duration"] as? Double) ?? 0
+        let shortMillis = (item["duration"] as? Double) ?? 0
+        let millis = max(fullMillis, shortMillis)
+
+        let policy = ((item["policy"] as? String) ?? "").uppercased()
+        let snipped = (item["snipped"] as? Bool) ?? false
+        let streamable = (item["streamable"] as? Bool) ?? true
+        let isPreview = policy == "SNIP" || snipped || !streamable
+            || (fullMillis > 40000 && shortMillis > 0 && shortMillis <= 31000)
+
+        var identifier = ""
+        if let numeric = item["id"] as? NSNumber { identifier = numeric.stringValue }
+        else if let text = item["id"] as? String { identifier = text }
+        guard !identifier.isEmpty else { return nil }
 
         var artwork: URL?
         if let raw = item["artwork_url"] as? String {
@@ -171,14 +186,44 @@ enum SoundCloudClient {
                            artworkURL: artwork,
                            pageURL: URL(string: (item["permalink_url"] as? String) ?? ""),
                            resolveHint: streamHint,
-                           downloadHint: downloadHint)
+                           downloadHint: downloadHint,
+                           isPreviewOnly: isPreview)
+    }
+
+    /// Rilegge la singola traccia: qui le transcodifiche ci sono sempre.
+    static func details(for track: OnlineTrack) async throws -> OnlineTrack {
+        let numericID = track.id.replacingOccurrences(of: "sc-", with: "")
+        guard !numericID.isEmpty else { throw ClientError.noStream }
+        let id = try await clientID()
+        var comps = URLComponents(string: "https://api-v2.soundcloud.com/tracks/\(numericID)")!
+        comps.queryItems = [URLQueryItem(name: "client_id", value: id)]
+        guard let url = comps.url else { throw ClientError.noStream }
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let item = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let parsed = parse(item) else {
+            throw ClientError.noStream
+        }
+        return parsed
     }
 
     // MARK: - stream
 
     /// Trasforma la transcodifica in un URL riproducibile.
     static func streamURL(for track: OnlineTrack, preferDownloadable: Bool = false) async throws -> URL {
-        let chosen = preferDownloadable ? (track.downloadHint ?? track.resolveHint) : track.resolveHint
+        var streamHint = track.resolveHint
+        var downloadHint = track.downloadHint
+
+        // la ricerca non sempre include media.transcodings: in quel caso
+        // interroghiamo la singola traccia, che le ha sempre
+        if streamHint == nil || (preferDownloadable && downloadHint == nil) {
+            if let refreshed = try? await details(for: track) {
+                streamHint = refreshed.resolveHint ?? streamHint
+                downloadHint = refreshed.downloadHint ?? downloadHint
+            }
+        }
+
+        let chosen = preferDownloadable ? (downloadHint ?? streamHint) : streamHint
         guard let hint = chosen, var comps = URLComponents(string: hint) else {
             throw ClientError.noStream
         }
