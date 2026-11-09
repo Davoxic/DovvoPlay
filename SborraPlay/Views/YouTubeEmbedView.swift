@@ -2,10 +2,12 @@ import SwiftUI
 import WebKit
 import AVFoundation
 
-/// Player YouTube ufficiale incorporato, lo stesso meccanismo della libreria
-/// youtube-ios-player-helper di Google: una WebView che ospita l'IFrame Player
-/// API e un ponte verso il suo JavaScript. È la via supportata per riprodurre
-/// YouTube in un'app di terze parti, e non richiede il computer acceso.
+/// Player YouTube ufficiale.
+///
+/// Prima costruivo una pagina HTML con dentro l'IFrame API dichiarando
+/// `origin: youtube.com`: un'origine falsa, che YouTube rifiuta con
+/// l'errore 152. Ora la web view naviga direttamente alla pagina di embed
+/// ufficiale, quindi l'origine è autentica e non c'è niente da fingere.
 struct YouTubeEmbedView: UIViewRepresentable {
     let videoID: String
     var onState: (String) -> Void = { _ in }
@@ -16,82 +18,78 @@ struct YouTubeEmbedView: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
-        config.userContentController.add(context.coordinator, name: "yt")
 
         let view = WKWebView(frame: .zero, configuration: config)
+        view.navigationDelegate = context.coordinator
         view.scrollView.isScrollEnabled = false
         view.isOpaque = false
         view.backgroundColor = .black
         view.scrollView.backgroundColor = .black
-        context.coordinator.webView = view
-
-        view.loadHTMLString(Self.html(for: videoID),
-                            baseURL: URL(string: "https://www.youtube.com"))
+        context.coordinator.load(videoID, in: view)
         return view
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
-    static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
-        uiView.configuration.userContentController.removeScriptMessageHandler(forName: "yt")
-        uiView.loadHTMLString("", baseURL: nil)
-    }
-
-    final class Coordinator: NSObject, WKScriptMessageHandler {
-        weak var webView: WKWebView?
+    final class Coordinator: NSObject, WKNavigationDelegate {
         private let onState: (String) -> Void
+        private var controlli = 0
 
         init(onState: @escaping (String) -> Void) { self.onState = onState }
 
-        func userContentController(_ controller: WKUserContentController,
-                                   didReceive message: WKScriptMessage) {
-            guard let text = message.body as? String else { return }
-            DispatchQueue.main.async { self.onState(text) }
+        func load(_ videoID: String, in view: WKWebView) {
+            var comps = URLComponents(string: "https://www.youtube.com/embed/\(videoID)")!
+            comps.queryItems = [
+                URLQueryItem(name: "playsinline", value: "1"),
+                URLQueryItem(name: "autoplay", value: "1"),
+                URLQueryItem(name: "rel", value: "0"),
+                URLQueryItem(name: "modestbranding", value: "1")
+            ]
+            guard let url = comps.url else { return }
+            onState("loading")
+            view.load(URLRequest(url: url))
         }
-    }
 
-    private static func html(for videoID: String) -> String {
-        let safe = videoID.replacingOccurrences(of: "\"", with: "")
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-        <style>
-          html, body { margin:0; padding:0; background:#000; height:100%; overflow:hidden; }
-          #player { width:100%; height:100%; }
-        </style>
-        </head>
-        <body>
-        <div id="player"></div>
-        <script src="https://www.youtube.com/iframe_api"></script>
-        <script>
-          var player;
-          function tell(m) {
-            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.yt) {
-              window.webkit.messageHandlers.yt.postMessage(m);
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            onState("loaded")
+            controlli = 0
+            verifica(webView)
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            onState("neterror:\(error.localizedDescription)")
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            onState("neterror:\(error.localizedDescription)")
+        }
+
+        /// Il player mostra l'eventuale errore dentro la pagina: lo leggiamo
+        /// invece di lasciare l'utente davanti a un rettangolo nero.
+        private func verifica(_ webView: WKWebView) {
+            guard controlli < 4 else { return }
+            controlli += 1
+            let js = """
+            (function () {
+              var e = document.querySelector('.ytp-error');
+              if (e) { return 'blocked:' + (e.innerText || '').slice(0, 120); }
+              var v = document.querySelector('video');
+              if (v && !v.paused && v.currentTime > 0) { return 'playing'; }
+              if (v) { return 'ready'; }
+              return 'wait';
+            })();
+            """
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self, weak webView] in
+                guard let self, let webView else { return }
+                webView.evaluateJavaScript(js) { risultato, _ in
+                    let esito = (risultato as? String) ?? "wait"
+                    self.onState(esito)
+                    if esito != "playing" && !esito.hasPrefix("blocked") {
+                        self.verifica(webView)
+                    }
+                }
             }
-          }
-          function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', {
-              height: '100%', width: '100%',
-              videoId: '\(safe)',
-              playerVars: {
-                playsinline: 1, controls: 1, rel: 0,
-                modestbranding: 1, fs: 1, origin: 'https://www.youtube.com'
-              },
-              events: {
-                onReady: function () { tell('ready'); player.playVideo(); },
-                onStateChange: function (e) { tell('state:' + e.data); },
-                onError: function (e) { tell('error:' + e.data); }
-              }
-            });
-          }
-          setTimeout(function () { if (!player) tell('timeout'); }, 12000);
-        </script>
-        </body>
-        </html>
-        """
+        }
     }
 }
 
@@ -271,37 +269,35 @@ struct YouTubePlayerSheet: View {
     }
 
     private func aggiorna(_ messaggio: String) {
-        if messaggio.hasPrefix("error:") {
-            let codice = messaggio.replacingOccurrences(of: "error:", with: "")
-            // 101, 150 e 152: incorporamento vietato dal titolare
-            if ["101", "150", "152"].contains(codice) {
-                if indice + 1 < coda.count {
-                    stato = "questa versione non è incorporabile, ne provo un'altra…"
-                    Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 400_000_000)
-                        indice += 1
-                        errore = nil
-                    }
-                } else {
-                    esaurite = true
-                    errore = "L'etichetta ha vietato l'incorporamento di questo brano, e non ho trovato altre versioni."
+        if messaggio.hasPrefix("blocked") {
+            let motivo = messaggio
+                .replacingOccurrences(of: "blocked:", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if indice + 1 < coda.count {
+                stato = "questa versione non parte, ne provo un'altra…"
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    indice += 1
+                    errore = nil
                 }
-                return
-            }
-            switch codice {
-            case "100": errore = "Video non disponibile o rimosso."
-            case "2":   errore = "Identificativo del video non valido."
-            default:    errore = "Il player ha segnalato l'errore \(codice)."
+            } else {
+                esaurite = true
+                errore = motivo.isEmpty
+                    ? "Nessuna versione di questo brano parte nel player."
+                    : motivo
             }
             return
         }
+        if messaggio.hasPrefix("neterror:") {
+            errore = "Connessione: " + messaggio.replacingOccurrences(of: "neterror:", with: "")
+            return
+        }
         switch messaggio {
-        case "ready":   stato = "pronto"
-        case "state:1": stato = "in riproduzione"; errore = nil; esaurite = false
-        case "state:2": stato = "in pausa"
-        case "state:3": stato = "sto caricando…"
-        case "state:0": stato = "finito"
-        case "timeout": errore = "Il player non si è caricato: controlla la connessione."
+        case "loading": stato = "carico il player…"
+        case "loaded":  stato = "player caricato"
+        case "ready":   stato = "pronto, premi play se non parte da solo"
+        case "playing": stato = "in riproduzione"; errore = nil; esaurite = false
+        case "wait":    stato = "sto caricando…"
         default:        break
         }
     }
