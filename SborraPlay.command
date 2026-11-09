@@ -74,8 +74,7 @@ while true; do
   echo "    6   Cerca il telefono sulla rete"
   echo "    7   Aggiorna yt-dlp"
   echo
-  echo "    8   Avvia il ponte per YouTube (lascia aperto)"
-  echo "    9   Scarica da un link YouTube o SoundCloud"
+  echo "    8   Scarica da un link YouTube o SoundCloud"
   echo
   echo "    0   Esci"
   echo
@@ -126,11 +125,6 @@ while true; do
       ;;
     7) "$VPY" -m pip install --upgrade yt-dlp ;;
     8)
-      echo "  Tieni aperto mentre cerchi su YouTube dall'iPhone. Ctrl+C per chiudere."
-      echo
-      "$VPY" sborraplay-dl serve
-      ;;
-    9)
       echo "  Incolla il link YouTube o SoundCloud"
       read -r -p "  > " lnk
       [ -z "$lnk" ] && continue

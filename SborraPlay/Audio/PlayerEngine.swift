@@ -4,6 +4,17 @@ import MediaPlayer
 import UIKit
 import Combine
 
+/// Un brano che arriva da un indirizzo remoto invece che da un file.
+/// Il player sa riprodurlo; da dove venga l'indirizzo non lo riguarda.
+struct RemoteItem: Identifiable, Hashable {
+    var id: String
+    var title: String
+    var artist: String
+    var subtitle: String = ""
+    var artworkURL: URL?
+    var duration: Double = 0
+}
+
 enum RepeatMode: String, CaseIterable {
     case off, all, one
     var symbol: String {
@@ -44,7 +55,7 @@ final class PlayerEngine: NSObject, ObservableObject {
     }
 
     /// Brano online in ascolto, quando non stiamo suonando un file locale.
-    @Published private(set) var streamingItem: OnlineTrack?
+    @Published private(set) var streamingItem: RemoteItem?
     @Published private(set) var isBuffering = false
     /// Id dell'ultimo brano online che non è riuscito a partire.
     @Published var streamFailure: String?
@@ -75,7 +86,7 @@ final class PlayerEngine: NSObject, ObservableObject {
         streamingItem?.artist ?? current?.displayArtist ?? ""
     }
     var displaySubtitle: String {
-        if let item = streamingItem { return item.source.label }
+        if let item = streamingItem { return item.subtitle }
         return current?.displayAlbum ?? ""
     }
     var progress: Double {
@@ -487,10 +498,10 @@ final class PlayerEngine: NSObject, ObservableObject {
         if t > 1, t < duration - 1 { seek(to: t) }
     }
 
-    // MARK: - streaming da YouTube / SoundCloud
+    // MARK: - riproduzione da un indirizzo remoto
 
     /// Riproduce un brano online. Interrompe la coda locale: è un ascolto al volo.
-    func playStream(_ track: OnlineTrack, url: URL) {
+    func playStream(_ item: RemoteItem, url: URL) {
         player?.stop()
         player = nil
         stopTicker()
@@ -505,8 +516,8 @@ final class PlayerEngine: NSObject, ObservableObject {
         let remote = AVPlayer(playerItem: item)
         remote.automaticallyWaitsToMinimizeStalling = true
         remotePlayer = remote
-        streamingItem = track
-        duration = track.duration
+        streamingItem = item
+        duration = item.duration
         currentTime = 0
         artwork = nil
         errorMessage = nil
@@ -628,14 +639,14 @@ final class PlayerEngine: NSObject, ObservableObject {
         isBuffering = false
     }
 
-    private func loadRemoteArtwork(_ track: OnlineTrack) {
-        guard let url = track.artworkURL else { return }
+    private func loadRemoteArtwork(_ item: RemoteItem) {
+        guard let url = item.artworkURL else { return }
         Task { [weak self] in
             guard let (data, _) = try? await URLSession.shared.data(from: url),
                   let image = UIImage(data: data),
                   let engine = self else { return }
             await MainActor.run {
-                guard engine.streamingItem?.id == track.id else { return }
+                guard engine.streamingItem?.id == item.id else { return }
                 engine.artwork = image
                 engine.updateNowPlaying()
             }

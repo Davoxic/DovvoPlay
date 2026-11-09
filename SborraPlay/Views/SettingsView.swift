@@ -6,12 +6,6 @@ struct SettingsView: View {
     @ObservedObject var server = LocalServer.shared
     @AppStorage("serverAutoStart") var autoStart = false
     @AppStorage("autoBackup") var autoBackup = true
-    @AppStorage("streamQuality") var qualityRaw = StreamQuality.auto.rawValue
-    @AppStorage("pipedInstance") var pipedInstance = ""
-    @ObservedObject var network = NetworkMonitor.shared
-    @State var instanceCheck: String?
-    @ObservedObject var scAuth = SoundCloudAuth.shared
-    @State var showSoundCloudLogin = false
     @State var exporting: ExportedFile?
     @State var showBackupImporter = false
     @State var pendingBackup: Data?
@@ -32,9 +26,6 @@ struct SettingsView: View {
             Form {
                 serverSection
                 importSection
-                accountSection
-                streamingSection
-                bridgeSection
                 backupSection
                 librarySection
                 storageSection
@@ -52,9 +43,6 @@ struct SettingsView: View {
                 }
             }
             .onAppear { server.refreshAddresses() }
-            .sheet(isPresented: $showSoundCloudLogin) {
-                SoundCloudLoginView()
-            }
             .sheet(item: $exporting) { item in
                 ShareSheet(items: [item.url])
             }
@@ -204,117 +192,6 @@ struct SettingsView: View {
             case .failure(let error):
                 library.lastMessage = error.localizedDescription
             }
-        }
-    }
-
-    private var accountSection: some View {
-        Section {
-            if scAuth.isLoggedIn {
-                LabeledContent("Account", value: scAuth.username ?? "connesso")
-                if scAuth.isGoPlus {
-                    Label("Abbonamento Go attivo", systemImage: "checkmark.seal")
-                        .font(.footnote)
-                        .foregroundStyle(.green)
-                }
-                Button(role: .destructive) {
-                    scAuth.signOut()
-                } label: {
-                    Label("Esci da SoundCloud", systemImage: "rectangle.portrait.and.arrow.right")
-                }
-            } else {
-                Button {
-                    showSoundCloudLogin = true
-                } label: {
-                    Label("Accedi a SoundCloud", systemImage: "person.crop.circle")
-                }
-            }
-        } header: {
-            Text("Account SoundCloud")
-        } footer: {
-            Text("Con l'accesso i brani che da sloggato durano 30 secondi tornano interi, e compaiono i tuoi preferiti. I brani col lucchetto restano fuori portata: SoundCloud li protegge con FairPlay, e nessun accesso permette a un'app di terze parti di decifrarli.")
-        }
-    }
-
-    private var streamingSection: some View {
-        Section {
-            Picker(selection: $qualityRaw) {
-                ForEach(StreamQuality.allCases) { q in
-                    Text(q.label).tag(q.rawValue)
-                }
-            } label: {
-                Label("Qualità", systemImage: "dial.high")
-            }
-            .onChange(of: qualityRaw) { _ in PipedClient.resetInstanceCache() }
-
-            if let q = StreamQuality(rawValue: qualityRaw) {
-                Text(q.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            LabeledContent("Connessione", value: network.connectionLabel)
-
-            HStack {
-                Label("Istanza Piped", systemImage: "server.rack")
-                Spacer()
-                TextField(PipedClient.activeInstance, text: $pipedInstance)
-                    .multilineTextAlignment(.trailing)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .font(.footnote)
-                    .onChange(of: pipedInstance) { _ in
-                        PipedClient.resetInstanceCache()
-                        instanceCheck = nil
-                    }
-            }
-
-            NavigationLink {
-                DiagnosticsView()
-            } label: {
-                Label("Diagnostica sorgenti", systemImage: "stethoscope")
-            }
-
-            Button {
-                let target = pipedInstance.isEmpty ? PipedClient.activeInstance : pipedInstance
-                instanceCheck = "provo…"
-                Task {
-                    let ok = await PipedClient.test(target)
-                    await MainActor.run { instanceCheck = ok ? "funziona" : "non risponde" }
-                }
-            } label: {
-                HStack {
-                    Label("Prova l'istanza", systemImage: "bolt.horizontal")
-                    if let instanceCheck {
-                        Spacer()
-                        Text(instanceCheck).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
-        } header: {
-            Text("Ricerca e streaming")
-        } footer: {
-            Text("YouTube passa dalle istanze pubbliche Piped: nessun computer acceso, nessuna configurazione. Se una istanza è lenta o giù, l'app ne prova un'altra da sola; qui puoi forzarne una tua. SoundCloud invece parla direttamente col suo server. In risparmio dati gli stream scendono a 48-70 kbps.")
-        }
-    }
-
-    private var bridgeSection: some View {
-        Section {
-            if let bridge = UserDefaults.standard.string(forKey: "bridgeURL"), !bridge.isEmpty {
-                LabeledContent("Computer", value: bridge)
-                Button(role: .destructive) {
-                    UserDefaults.standard.removeObject(forKey: "bridgeURL")
-                    library.lastMessage = "Computer scollegato"
-                } label: {
-                    Label("Scollega il computer", systemImage: "xmark.circle")
-                }
-            } else {
-                Label("Nessun computer collegato", systemImage: "desktopcomputer")
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("Ponte sul computer (riserva)")
-        } footer: {
-            Text("Serve solo se le istanze Piped sono tutte irraggiungibili: in quel caso la ricerca YouTube ripiega su yt-dlp che gira sul PC. Sul computer apri SborraPlay e scegli \"Avvia il ponte\": si annuncia da solo.")
         }
     }
 

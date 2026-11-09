@@ -274,31 +274,6 @@ def cmd_restore(args) -> int:
 
 
 
-def cmd_serve(args) -> int:
-    from . import bridge
-    from . import pusher
-
-    device = None
-    if args.host:
-        try:
-            device = pusher.normalize_host(args.host)
-        except ValueError as exc:
-            warn(str(exc))
-    if device is None:
-        saved = load_config().get("host")
-        if saved:
-            try:
-                candidate = pusher.normalize_host(saved)
-                if pusher.ping(candidate):
-                    device = candidate
-            except ValueError:
-                pass
-
-    outdir = Path(args.out).expanduser() if args.out else None
-    step("Ponte YouTube per l'iPhone")
-    return bridge.serve(port=args.port, outdir=outdir, device=device)
-
-
 def cmd_grab(args) -> int:
     """Scarica un singolo link YouTube o SoundCloud e lo manda al telefono."""
     import shutil
@@ -404,7 +379,6 @@ def build_parser() -> argparse.ArgumentParser:
   sborraplay-dl playlist <url> --host 192.168.1.42:8080 --workers 4
   sborraplay-dl push ~/Musica/Estate --playlist "Estate 2026"
   sborraplay-dl grab "https://soundcloud.com/artista/brano"
-  sborraplay-dl serve
   sborraplay-dl discover
   sborraplay-dl backup -o ~/Backup
   sborraplay-dl restore ~/Backup/SborraPlay-2026-11-08-2340.sborraplay.json
@@ -457,12 +431,6 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument("--replace", action="store_true",
                     help="sostituisce le playlist attuali invece di unirle")
     rs.set_defaults(func=cmd_restore)
-
-    sv = sub.add_parser("serve", help="accende il ponte che presta yt-dlp al telefono")
-    sv.add_argument("--port", type=int, default=8077)
-    sv.add_argument("--out", help="dove salvare i brani scaricati dal telefono")
-    sv.add_argument("--host", help="indirizzo del telefono")
-    sv.set_defaults(func=cmd_serve)
 
     gr = sub.add_parser("grab", help="scarica un singolo link YouTube o SoundCloud")
     gr.add_argument("url")
