@@ -120,21 +120,47 @@ enum SoundCloudClient {
             artwork = URL(string: avatar)
         }
 
-        // transcodifica progressiva = un mp3 diretto, riproducibile e scaricabile
-        var hint: String?
+        // Scelta della transcodifica. AVPlayer non apre Opus in WebM, quindi
+        // va escluso: era questo a mandare in stallo la riproduzione.
+        var streamHint: String?
+        var downloadHint: String?
         if let media = item["media"] as? [String: Any],
            let transcodings = media["transcodings"] as? [[String: Any]] {
+
+            struct Option {
+                let url: String
+                let isProgressive: Bool
+                let rank: Int
+            }
+            var options: [Option] = []
+
             for t in transcodings {
+                guard let link = t["url"] as? String else { continue }
                 let format = t["format"] as? [String: Any]
-                let protocolName = (format?["protocol"] as? String) ?? ""
-                if protocolName == "progressive", let link = t["url"] as? String {
-                    hint = link
-                    break
+                let proto = ((format?["protocol"] as? String) ?? "").lowercased()
+                let mime = ((format?["mime_type"] as? String) ?? "").lowercased()
+                let preset = ((t["preset"] as? String) ?? "").lowercased()
+
+                if preset.contains("opus") || mime.contains("opus") || mime.contains("ogg") {
+                    continue
                 }
+                let isMP3 = preset.contains("mp3") || mime.contains("mpeg")
+                let isAAC = preset.contains("aac") || mime.contains("mp4") || mime.contains("aac")
+                guard isMP3 || isAAC else { continue }
+
+                let progressive = proto == "progressive"
+                // progressivo mp3 è il massimo: si ascolta e si scarica
+                let rank: Int
+                if progressive && isMP3 { rank = 0 }
+                else if progressive && isAAC { rank = 1 }
+                else if isMP3 { rank = 2 }
+                else { rank = 3 }
+                options.append(Option(url: link, isProgressive: progressive, rank: rank))
             }
-            if hint == nil, let first = transcodings.first, let link = first["url"] as? String {
-                hint = link      // hls: AVPlayer lo riproduce comunque
-            }
+
+            options.sort { $0.rank < $1.rank }
+            streamHint = options.first?.url
+            downloadHint = options.first(where: { $0.isProgressive })?.url
         }
 
         return OnlineTrack(id: "sc-\(identifier)",
@@ -144,14 +170,16 @@ enum SoundCloudClient {
                            duration: millis / 1000.0,
                            artworkURL: artwork,
                            pageURL: URL(string: (item["permalink_url"] as? String) ?? ""),
-                           resolveHint: hint)
+                           resolveHint: streamHint,
+                           downloadHint: downloadHint)
     }
 
     // MARK: - stream
 
     /// Trasforma la transcodifica in un URL riproducibile.
-    static func streamURL(for track: OnlineTrack) async throws -> URL {
-        guard let hint = track.resolveHint, var comps = URLComponents(string: hint) else {
+    static func streamURL(for track: OnlineTrack, preferDownloadable: Bool = false) async throws -> URL {
+        let chosen = preferDownloadable ? (track.downloadHint ?? track.resolveHint) : track.resolveHint
+        guard let hint = chosen, var comps = URLComponents(string: hint) else {
             throw ClientError.noStream
         }
         let id = try await clientID()

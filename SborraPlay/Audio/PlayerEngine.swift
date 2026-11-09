@@ -46,11 +46,16 @@ final class PlayerEngine: NSObject, ObservableObject {
     /// Brano online in ascolto, quando non stiamo suonando un file locale.
     @Published private(set) var streamingItem: OnlineTrack?
     @Published private(set) var isBuffering = false
+    /// Id dell'ultimo brano online che non è riuscito a partire.
+    @Published var streamFailure: String?
 
     private var player: AVAudioPlayer?
     private var remotePlayer: AVPlayer?
     private var remoteTimeObserver: Any?
     private var remoteEndObserver: NSObjectProtocol?
+    private var itemStatusObserver: NSKeyValueObservation?
+    private var rateObserver: NSKeyValueObservation?
+    private var stallWatchdog: Task<Void, Never>?
     private var ticker: Timer?
     private var order: [Int] = []
     private var orderPos: Int = -1
@@ -375,6 +380,11 @@ final class PlayerEngine: NSObject, ObservableObject {
 
     func toggleRepeat() { repeatMode = repeatMode.next }
 
+    func clearError() {
+        errorMessage = nil
+        streamFailure = nil
+    }
+
     func play(track: Track, in list: [Track]) {
         let idx = list.firstIndex(of: track) ?? 0
         play(tracks: list, startAt: idx)
@@ -513,7 +523,11 @@ final class PlayerEngine: NSObject, ObservableObject {
                 let total = CMTimeGetSeconds(itemDuration)
                 if total.isFinite, total > 0 { self.duration = total }
             }
-            if self.isBuffering, seconds > 0 { self.isBuffering = false }
+            if seconds > 0 {
+                self.isBuffering = false
+                self.stallWatchdog?.cancel()
+                self.stallWatchdog = nil
+            }
             self.updateNowPlaying()
         }
 
@@ -528,13 +542,78 @@ final class PlayerEngine: NSObject, ObservableObject {
             self.updateNowPlaying()
         }
 
+        // senza questi, un flusso che fallisce lascia girare la rotella all'infinito
+        itemStatusObserver = item.observe(\.status, options: [.new]) { [weak self] observed, _ in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                switch observed.status {
+                case .failed:
+                    let reason = observed.error?.localizedDescription ?? "formato non supportato"
+                    self.failStream("Riproduzione non riuscita: \(reason)")
+                case .readyToPlay:
+                    self.isBuffering = false
+                default:
+                    break
+                }
+            }
+        }
+
+        rateObserver = remote.observe(\.timeControlStatus, options: [.new]) { [weak self] observed, _ in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                switch observed.timeControlStatus {
+                case .playing:
+                    self.isBuffering = false
+                    self.isPlaying = true
+                case .waitingToPlayAtSpecifiedRate:
+                    self.isBuffering = true
+                case .paused:
+                    self.isBuffering = false
+                @unknown default:
+                    break
+                }
+                self.updateNowPlaying()
+            }
+        }
+
+        startStallWatchdog()
         remote.play()
         isPlaying = true
         updateNowPlaying()
         loadRemoteArtwork(track)
     }
 
+    /// Se dopo 18 secondi non è partito niente, meglio dirlo che restare a girare.
+    private func startStallWatchdog() {
+        stallWatchdog?.cancel()
+        stallWatchdog = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 18_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self, self.isStreaming, self.currentTime <= 0.1 else { return }
+                self.failStream("Questo brano non parte: la sorgente non risponde o il formato non è supportato")
+            }
+        }
+    }
+
+    private func failStream(_ message: String) {
+        let item = streamingItem
+        detachRemote()
+        isPlaying = false
+        isBuffering = false
+        currentTime = 0
+        errorMessage = message
+        if let item { streamFailure = item.id }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
     private func detachRemote() {
+        stallWatchdog?.cancel()
+        stallWatchdog = nil
+        itemStatusObserver?.invalidate()
+        itemStatusObserver = nil
+        rateObserver?.invalidate()
+        rateObserver = nil
         if let observer = remoteTimeObserver, let remote = remotePlayer {
             remote.removeTimeObserver(observer)
         }

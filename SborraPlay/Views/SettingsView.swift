@@ -6,6 +6,10 @@ struct SettingsView: View {
     @ObservedObject var server = LocalServer.shared
     @AppStorage("serverAutoStart") var autoStart = false
     @AppStorage("autoBackup") var autoBackup = true
+    @AppStorage("streamQuality") var qualityRaw = StreamQuality.auto.rawValue
+    @AppStorage("pipedInstance") var pipedInstance = ""
+    @ObservedObject var network = NetworkMonitor.shared
+    @State var instanceCheck: String?
     @State var exporting: ExportedFile?
     @State var showBackupImporter = false
     @State var pendingBackup: Data?
@@ -26,6 +30,7 @@ struct SettingsView: View {
             Form {
                 serverSection
                 importSection
+                streamingSection
                 bridgeSection
                 backupSection
                 librarySection
@@ -196,6 +201,62 @@ struct SettingsView: View {
         }
     }
 
+    private var streamingSection: some View {
+        Section {
+            Picker(selection: $qualityRaw) {
+                ForEach(StreamQuality.allCases) { q in
+                    Text(q.label).tag(q.rawValue)
+                }
+            } label: {
+                Label("Qualità", systemImage: "dial.high")
+            }
+            .onChange(of: qualityRaw) { _ in PipedClient.resetInstanceCache() }
+
+            if let q = StreamQuality(rawValue: qualityRaw) {
+                Text(q.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            LabeledContent("Connessione", value: network.connectionLabel)
+
+            HStack {
+                Label("Istanza Piped", systemImage: "server.rack")
+                Spacer()
+                TextField(PipedClient.activeInstance, text: $pipedInstance)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.footnote)
+                    .onChange(of: pipedInstance) { _ in
+                        PipedClient.resetInstanceCache()
+                        instanceCheck = nil
+                    }
+            }
+
+            Button {
+                let target = pipedInstance.isEmpty ? PipedClient.activeInstance : pipedInstance
+                instanceCheck = "provo…"
+                Task {
+                    let ok = await PipedClient.test(target)
+                    await MainActor.run { instanceCheck = ok ? "funziona" : "non risponde" }
+                }
+            } label: {
+                HStack {
+                    Label("Prova l'istanza", systemImage: "bolt.horizontal")
+                    if let instanceCheck {
+                        Spacer()
+                        Text(instanceCheck).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Text("Ricerca e streaming")
+        } footer: {
+            Text("YouTube passa dalle istanze pubbliche Piped: nessun computer acceso, nessuna configurazione. Se una istanza è lenta o giù, l'app ne prova un'altra da sola; qui puoi forzarne una tua. SoundCloud invece parla direttamente col suo server. In risparmio dati gli stream scendono a 48-70 kbps.")
+        }
+    }
+
     private var bridgeSection: some View {
         Section {
             if let bridge = UserDefaults.standard.string(forKey: "bridgeURL"), !bridge.isEmpty {
@@ -211,9 +272,9 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("Ponte per YouTube")
+            Text("Ponte sul computer (riserva)")
         } footer: {
-            Text("yt-dlp gira solo su computer, quindi la ricerca su YouTube passa di lì. Sul PC apri SborraPlay e scegli \"Avvia il ponte\": si annuncia da solo e questa riga si compila. SoundCloud non ne ha bisogno.")
+            Text("Serve solo se le istanze Piped sono tutte irraggiungibili: in quel caso la ricerca YouTube ripiega su yt-dlp che gira sul PC. Sul computer apri SborraPlay e scegli \"Avvia il ponte\": si annuncia da solo.")
         }
     }
 

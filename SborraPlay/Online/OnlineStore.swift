@@ -1,6 +1,11 @@
 import Foundation
 import SwiftUI
 
+enum DownloadKind {
+    case audio(StreamQuality)
+    case video
+}
+
 @MainActor
 final class OnlineStore: ObservableObject {
 
@@ -12,10 +17,14 @@ final class OnlineStore: ObservableObject {
     @Published var errorText: String?
     @Published private(set) var bridgeReady = false
     @Published private(set) var lastQuery = ""
+    @Published var quality: StreamQuality = StreamQuality.preferred {
+        didSet { StreamQuality.preferred = quality }
+    }
 
+    let downloads = DownloadManager.shared
     private var searchTask: Task<Void, Never>?
 
-    // MARK: - ponte
+    // MARK: - stato del ponte (resta come riserva per YouTube)
 
     func refreshBridge() async {
         guard BridgeClient.isConfigured else {
@@ -25,8 +34,10 @@ final class OnlineStore: ObservableObject {
         bridgeReady = await BridgeClient.health()
     }
 
-    var bridgeAddress: String {
-        BridgeClient.baseURL?.absoluteString ?? "nessuno"
+    var connectionNote: String {
+        let net = NetworkMonitor.shared.connectionLabel
+        let q = quality == .auto ? "\(quality.label) → \(quality.resolved.label.lowercased())" : quality.label
+        return "\(net) · \(q)"
     }
 
     // MARK: - ricerca
@@ -48,7 +59,7 @@ final class OnlineStore: ObservableObject {
                 case .soundcloud:
                     found = try await SoundCloudClient.search(text)
                 case .youtube:
-                    found = try await BridgeClient.search(text)
+                    found = try await self.searchYouTube(text)
                 }
                 if Task.isCancelled { return }
                 self.results = found
@@ -63,6 +74,21 @@ final class OnlineStore: ObservableObject {
         }
     }
 
+    /// Prima Piped, che funziona ovunque; se tutte le istanze sono giù e c'è il
+    /// computer acceso, si ripiega sul ponte con yt-dlp.
+    private func searchYouTube(_ text: String) async throws -> [OnlineTrack] {
+        do {
+            return try await PipedClient.search(text)
+        } catch {
+            if bridgeReady || BridgeClient.isConfigured {
+                if let viaBridge = try? await BridgeClient.search(text), !viaBridge.isEmpty {
+                    return viaBridge
+                }
+            }
+            throw error
+        }
+    }
+
     func clear() {
         searchTask?.cancel()
         results = []
@@ -72,18 +98,22 @@ final class OnlineStore: ObservableObject {
 
     // MARK: - ascolto
 
-    func play(_ track: OnlineTrack) {
+    func play(_ track: OnlineTrack, in library: LibraryStore) {
         guard !busy.contains(track.id) else { return }
-        busy.insert(track.id)
         errorText = nil
+
+        // se è già sul telefono non sprechiamo dati: si ascolta il file
+        if let local = track.localFile,
+           let known = library.tracks.first(where: { $0.id == local.lastPathComponent }) {
+            PlayerEngine.shared.play(tracks: [known], startAt: 0)
+            return
+        }
+
+        busy.insert(track.id)
         Task { [weak self] in
             guard let self else { return }
             do {
-                let url: URL
-                switch track.source {
-                case .soundcloud: url = try await SoundCloudClient.streamURL(for: track)
-                case .youtube:    url = try await BridgeClient.streamURL(for: track)
-                }
+                let url = try await self.streamURL(for: track)
                 PlayerEngine.shared.playStream(track, url: url)
             } catch {
                 self.errorText = error.localizedDescription
@@ -92,25 +122,42 @@ final class OnlineStore: ObservableObject {
         }
     }
 
+    private func streamURL(for track: OnlineTrack) async throws -> URL {
+        switch track.source {
+        case .soundcloud:
+            return try await SoundCloudClient.streamURL(for: track)
+        case .youtube:
+            guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
+            do {
+                let bundle = try await PipedClient.streams(for: videoID)
+                guard let option = PipedClient.pick(bundle.audio, quality: quality) else {
+                    throw PipedClient.PipedError.noAudio
+                }
+                return option.url
+            } catch {
+                if bridgeReady, let viaBridge = try? await BridgeClient.streamURL(for: track) {
+                    return viaBridge
+                }
+                throw error
+            }
+        }
+    }
+
     // MARK: - download
 
-    func download(_ track: OnlineTrack, into library: LibraryStore) {
-        guard !busy.contains(track.id) else { return }
+    func download(_ track: OnlineTrack, kind: DownloadKind, into library: LibraryStore) {
+        guard !busy.contains(track.id), !downloads.isRunning(track.id) else { return }
         busy.insert(track.id)
         errorText = nil
+
         Task { [weak self] in
             guard let self else { return }
             do {
-                switch track.source {
-                case .soundcloud:
-                    try await self.downloadDirect(track, into: library)
-                case .youtube:
-                    let callback = LocalServer.shared.primaryURL
-                    let name = try await BridgeClient.grab(track, callback: callback)
-                    library.lastMessage = callback == nil
-                        ? "Scaricato sul computer: \(name). Accendi il server Wi-Fi per riceverlo."
-                        : "\(name) in arrivo dal computer"
-                    await library.rescan()
+                switch kind {
+                case .audio(let requested):
+                    try await self.downloadAudio(track, quality: requested, into: library)
+                case .video:
+                    try await self.downloadVideo(track)
                 }
             } catch {
                 self.errorText = error.localizedDescription
@@ -119,29 +166,44 @@ final class OnlineStore: ObservableObject {
         }
     }
 
-    /// SoundCloud: scarica il file direttamente dal telefono, senza PC di mezzo.
-    private func downloadDirect(_ track: OnlineTrack, into library: LibraryStore) async throws {
-        let streamURL = try await SoundCloudClient.streamURL(for: track)
-        let raw = streamURL.absoluteString
-        if raw.contains(".m3u8") || raw.contains("/hls/") {
-            throw SoundCloudClient.ClientError.noStream
-        }
-
-        let (temp, response) = try await URLSession.shared.download(from: streamURL)
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw SoundCloudClient.ClientError.noStream
-        }
-
+    private func downloadAudio(_ track: OnlineTrack, quality requested: StreamQuality,
+                               into library: LibraryStore) async throws {
         LibraryPaths.ensureDirectories()
-        let destination = LibraryPaths.uniqueDestination(for: track.fileName)
-        try FileManager.default.moveItem(at: temp, to: destination)
 
-        // copertina: la scarichiamo prima della riscansione così la ritrova subito
+        if track.isDownloaded {
+            library.lastMessage = "Già in libreria"
+            return
+        }
+
+        var remote: URL
+        var ext = "m4a"
+
+        switch track.source {
+        case .soundcloud:
+            remote = try await SoundCloudClient.streamURL(for: track, preferDownloadable: true)
+            let raw = remote.absoluteString
+            if raw.contains(".m3u8") || raw.contains("/hls/") {
+                throw SoundCloudClient.ClientError.noStream
+            }
+            ext = "mp3"
+        case .youtube:
+            guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
+            let bundle = try await PipedClient.streams(for: videoID)
+            guard let option = PipedClient.pick(bundle.audio, quality: requested) else {
+                throw PipedClient.PipedError.noAudio
+            }
+            remote = option.url
+            ext = option.fileExtension
+        }
+
+        let destination = LibraryPaths.uniqueDestination(for: track.fileName(ext: ext))
+        _ = try await downloads.download(remote, to: destination,
+                                         id: track.id, title: track.title)
+
         var artwork: Data?
         if let artURL = track.artworkURL {
             artwork = try? await URLSession.shared.data(from: artURL).0
         }
-
         await library.rescan()
         if let artwork {
             library.attachArtwork(artwork, toFileNamed: destination.lastPathComponent)
@@ -149,5 +211,29 @@ final class OnlineStore: ObservableObject {
         library.lastMessage = "Aggiunto: \(destination.lastPathComponent)"
     }
 
-    func isBusy(_ track: OnlineTrack) -> Bool { busy.contains(track.id) }
+    private func downloadVideo(_ track: OnlineTrack) async throws {
+        guard track.source == .youtube, let videoID = track.resolveHint else {
+            throw PipedClient.PipedError.noAudio
+        }
+        let bundle = try await PipedClient.streams(for: videoID)
+        guard let option = PipedClient.bestVideo(bundle.video) else {
+            throw PipedClient.PipedError.noAudio
+        }
+        let folder = LibraryPaths.documents.appendingPathComponent("Video", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let destination = folder.appendingPathComponent(track.fileName(ext: "mp4"))
+        _ = try await downloads.download(option.url, to: destination,
+                                         id: track.id, title: track.title)
+        errorText = nil
+    }
+
+    // MARK: - stato per la vista
+
+    func isBusy(_ track: OnlineTrack) -> Bool {
+        busy.contains(track.id) || downloads.isRunning(track.id)
+    }
+
+    func progress(for track: OnlineTrack) -> Double? {
+        downloads.progress(for: track.id)
+    }
 }
