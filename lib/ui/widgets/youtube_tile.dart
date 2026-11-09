@@ -185,8 +185,17 @@ class _YouTubeTileState extends State<YouTubeTile> {
               ),
           ],
         ),
-        onTap: () {
-          playerService.playYouTubeTrack(widget.track);
+        onTap: () async {
+          await playerService.playYouTubeTrack(widget.track);
+          if (context.mounted && playerService.lastErrorMessage != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(playerService.lastErrorMessage!),
+                backgroundColor: Colors.redAccent,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
         },
       ),
     );

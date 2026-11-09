@@ -36,59 +36,73 @@ class YouTubeService {
     }
   }
 
-  /// Recupera l'URL diretto dello stream audio ottimizzato per riproduzione immediata su iOS.
-  /// Usa i client `ios` e `androidVr` per evitare le restrizioni antibot e i blocchi 403 di AVPlayer.
+  /// Recupera l'URL diretto dello stream audio ottimizzato per riproduzione su iOS (AAC/MP4).
   Future<String?> getAudioStreamUrl(String videoId) async {
+    // 1. Prova prima il manifest standard
     try {
-      // 1. Prova prima con i client iOS e Android VR che producono flussi audio puliti senza cipher JS
+      final manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
+      final url = _extractPlayableUrl(manifest);
+      if (url != null) return url;
+    } catch (e) {
+      print('getManifest standard: $e');
+    }
+
+    // 2. Fallback su client Android VR e iOS
+    try {
       final manifest = await yt.videos.streamsClient.getManifest(
         videoId,
         ytClients: [
-          YoutubeApiClient.ios,
           YoutubeApiClient.androidVr,
+          YoutubeApiClient.ios,
         ],
-      ).timeout(const Duration(seconds: 10));
-
-      final audioStreams = manifest.audioOnly.toList();
-      StreamInfo? chosen;
-
-      if (audioStreams.isNotEmpty) {
-        // Cerca prima stream MP4 / AAC (compatibili nativamente al 100% con iOS AVPlayer)
-        final mp4Streams = audioStreams.where(
-          (s) => s.container.name.toLowerCase().contains('mp4') || s.audioCodec.toLowerCase().contains('mp4a'),
-        ).toList();
-
-        chosen = mp4Streams.isNotEmpty
-            ? mp4Streams.reduce((curr, next) => curr.bitrate.bitsPerSecond > next.bitrate.bitsPerSecond ? curr : next)
-            : audioStreams.reduce((curr, next) => curr.bitrate.bitsPerSecond > next.bitrate.bitsPerSecond ? curr : next);
-      } else if (manifest.muxed.isNotEmpty) {
-        chosen = manifest.muxed.reduce((curr, next) => curr.bitrate.bitsPerSecond > next.bitrate.bitsPerSecond ? curr : next);
-      }
-
-      if (chosen != null) {
-        return chosen.url.toString();
-      }
+      ).timeout(const Duration(seconds: 8));
+      final url = _extractPlayableUrl(manifest);
+      if (url != null) return url;
     } catch (e) {
-      print('getAudioStreamUrl primario fallito ($e), provo fallback standard...');
+      print('getManifest ytClients: $e');
     }
 
-    // 2. Fallback su getManifest standard
-    try {
-      final manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
-      final audioStreams = manifest.audioOnly.toList();
-      if (audioStreams.isNotEmpty) {
-        final mp4Streams = audioStreams.where(
-          (s) => s.container.name.toLowerCase().contains('mp4') || s.audioCodec.toLowerCase().contains('mp4a'),
-        ).toList();
-        final chosen = mp4Streams.isNotEmpty
-            ? mp4Streams.reduce((curr, next) => curr.bitrate.bitsPerSecond > next.bitrate.bitsPerSecond ? curr : next)
-            : audioStreams.reduce((curr, next) => curr.bitrate.bitsPerSecond > next.bitrate.bitsPerSecond ? curr : next);
-        return chosen.url.toString();
-      } else if (manifest.muxed.isNotEmpty) {
-        return manifest.muxed.withHighestBitrate().url.toString();
-      }
-    } catch (e) {
-      print('getAudioStreamUrl fallback fallito: $e');
+    return null;
+  }
+
+  /// Seleziona un URL compatibile nativamente con il decoder AVPlayer di iOS (MP4/AAC).
+  String? _extractPlayableUrl(StreamManifest manifest) {
+    // 1. Cerca nei flussi audio-only uno stream MP4 / AAC (itag 140 m4a)
+    final mp4Audio = manifest.audioOnly.where((s) {
+      final containerName = s.container.name.toLowerCase();
+      final codec = s.audioCodec.toLowerCase();
+      return containerName == 'mp4' ||
+             containerName == 'm4a' ||
+             codec.contains('mp4a') ||
+             codec.contains('aac');
+    }).toList();
+
+    if (mp4Audio.isNotEmpty) {
+      final chosen = mp4Audio.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+      return chosen.url.toString();
+    }
+
+    // 2. Se non c'è audio-only MP4 (YouTube offre solo Opus/WebM in audioOnly),
+    // usa i flussi muxed MP4: hanno sempre traccia audio AAC decodificabile nativamente da iOS AVPlayer.
+    final mp4Muxed = manifest.muxed.where((s) {
+      final containerName = s.container.name.toLowerCase();
+      return containerName == 'mp4' || containerName == 'm4a';
+    }).toList();
+
+    if (mp4Muxed.isNotEmpty) {
+      // Scegli lo stream muxed a risoluzione più leggera (es. 360p) per avvio istantaneo con minimo consumo dati
+      final chosen = mp4Muxed.reduce((a, b) => a.bitrate.bitsPerSecond < b.bitrate.bitsPerSecond ? a : b);
+      return chosen.url.toString();
+    }
+
+    // 3. Fallback su HLS m3u8 se disponibile (nativo iOS)
+    if (manifest.hls.isNotEmpty) {
+      return manifest.hls.first.url.toString();
+    }
+
+    // 4. Fallback estremo su qualsiasi audio disponibile
+    if (manifest.audioOnly.isNotEmpty) {
+      return manifest.audioOnly.withHighestBitrate().url.toString();
     }
 
     return null;
@@ -145,9 +159,8 @@ class YouTubeService {
         final request = http.Request('GET', Uri.parse(streamUrl));
         request.headers['User-Agent'] =
             'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
-        request.headers['Referer'] = 'https://www.youtube.com/';
 
-        final response = await client.send(request);
+        final response = await client.send(request).timeout(const Duration(seconds: 15));
         final totalBytes = response.contentLength ?? 0;
         int receivedBytes = 0;
 

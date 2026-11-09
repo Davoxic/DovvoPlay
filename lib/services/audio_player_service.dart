@@ -27,6 +27,7 @@ class AudioPlayerService extends ChangeNotifier {
   PlayerLoopMode _loopMode = PlayerLoopMode.off;
   bool _isShuffle = false;
   int _playRequestId = 0;
+  String? _lastErrorMessage;
 
   AudioPlayer get player => _player;
   Track? get currentTrack => _currentTrack;
@@ -38,6 +39,7 @@ class AudioPlayerService extends ChangeNotifier {
   Duration get duration => _duration;
   PlayerLoopMode get loopMode => _loopMode;
   bool get isShuffle => _isShuffle;
+  String? get lastErrorMessage => _lastErrorMessage;
 
   void _initListeners() {
     _player.playerStateStream.listen((state) {
@@ -54,6 +56,7 @@ class AudioPlayerService extends ChangeNotifier {
       (event) {},
       onError: (Object e, StackTrace st) {
         print('Errore stream riproduzione: $e');
+        _lastErrorMessage = 'Errore riproduzione iOS ($e)';
         _isBuffering = false;
         notifyListeners();
       },
@@ -110,11 +113,11 @@ class AudioPlayerService extends ChangeNotifier {
     _position = Duration.zero;
     _duration = track.duration > Duration.zero ? track.duration : Duration.zero;
     _isBuffering = true;
+    _lastErrorMessage = null;
     notifyListeners();
 
     try {
       Uri audioUri;
-      Map<String, String>? headers;
 
       if (track.isOnline) {
         // 1. Controlla se il brano è già stato scaricato in locale
@@ -122,7 +125,7 @@ class AudioPlayerService extends ChangeNotifier {
         if (localFile != null && await localFile.exists()) {
           audioUri = Uri.file(localFile.path);
         } else {
-          // 2. Altrimenti recupera lo stream URL istantaneo
+          // 2. Altrimenti recupera lo stream URL diretto (MP4/AAC nativo)
           final videoId = track.id.replaceFirst('yt_', '');
           final streamUrl = await YouTubeService.instance.getAudioStreamUrl(videoId);
 
@@ -133,18 +136,11 @@ class AudioPlayerService extends ChangeNotifier {
           }
 
           audioUri = Uri.parse(streamUrl);
-          headers = {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-            'Referer': 'https://www.youtube.com/',
-          };
         }
       } else if (track.filePath != null) {
         audioUri = Uri.file(track.filePath!);
       } else if (track.streamUrl != null && track.streamUrl!.isNotEmpty) {
         audioUri = Uri.parse(track.streamUrl!);
-        headers = {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-        };
       } else {
         throw Exception('Percorso audio non valido.');
       }
@@ -160,12 +156,13 @@ class AudioPlayerService extends ChangeNotifier {
         duration: track.duration > Duration.zero ? track.duration : null,
       );
 
-      final audioSource = AudioSource.uri(audioUri, headers: headers, tag: mediaItem);
+      final audioSource = AudioSource.uri(audioUri, tag: mediaItem);
       await _player.setAudioSource(audioSource);
 
       if (_playRequestId != requestId) return;
       await _player.play();
     } catch (e, stack) {
+      _lastErrorMessage = e.toString().replaceFirst('Exception: ', '');
       print('Errore riproduzione: $e\n$stack');
     } finally {
       if (_playRequestId == requestId) {
