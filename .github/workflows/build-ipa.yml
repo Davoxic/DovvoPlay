@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, master]
     tags: ["v*"]
+    paths-ignore:
+      - "scripts/probe_sources.py"
+      - ".github/workflows/probe.yml"
+      - "**/*.md"
   pull_request:
   workflow_dispatch:
 

@@ -1,0 +1,16 @@
+name: Probe sorgenti
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/probe_sources.py"
+      - ".github/workflows/probe.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Interroga SoundCloud e Piped davvero
+        run: python3 scripts/probe_sources.py
