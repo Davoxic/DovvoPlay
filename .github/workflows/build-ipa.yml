@@ -38,10 +38,12 @@ jobs:
 
       - name: Ensure iOS platform files
         run: |
+          cp -R lib lib_bak
           cp pubspec.yaml pubspec.yaml.bak
           flutter create . --org com.dchietti --project-name sborraplay --platforms ios
-          cp pubspec.yaml.bak pubspec.yaml
-          rm pubspec.yaml.bak
+          rm -rf lib test
+          mv lib_bak lib
+          mv pubspec.yaml.bak pubspec.yaml
 
       - name: Install dependencies
         run: flutter pub get
@@ -53,7 +55,7 @@ jobs:
         run: |
           set -o pipefail
           export LANG=en_US.UTF-8
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign 2>&1 | tee build.log || (echo "=== BUILD LOG ERROR ===" && tail -n 120 build.log && exit 1)
 
       - name: Package into .ipa
         run: |

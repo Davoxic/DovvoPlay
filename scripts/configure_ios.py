@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Configura Info.plist, Podfile e le icone dell'app iOS per SborraPlay."""
+"""Configura Info.plist, Podfile, project.pbxproj e le icone dell'app iOS per SborraPlay."""
 import os
 import plistlib
+import re
 import shutil
 from pathlib import Path
 
@@ -46,6 +47,35 @@ def configure_info_plist():
     with open(INFO_PLIST, "wb") as f:
         plistlib.dump(plist, f)
     print("Info.plist configurato con successo.")
+
+def configure_project_pbxproj():
+    print("Configuro project.pbxproj per disattivare firma...")
+    pbxproj = IOS_DIR / "Runner.xcodeproj" / "project.pbxproj"
+    if not pbxproj.exists():
+        print("project.pbxproj non trovato")
+        return
+    text = pbxproj.read_text(encoding="utf-8")
+    text = re.sub(r'CODE_SIGN_IDENTITY\s*=\s*"[^"]*";', 'CODE_SIGN_IDENTITY = "";', text)
+    text = re.sub(r'CODE_SIGN_STYLE\s*=\s*Automatic;', 'CODE_SIGN_STYLE = Manual;', text)
+    text = re.sub(r'DEVELOPMENT_TEAM\s*=\s*[^;]+;', 'DEVELOPMENT_TEAM = "";', text)
+    text = text.replace(
+        'PRODUCT_BUNDLE_IDENTIFIER = com.dchietti.sborraplay;',
+        'PRODUCT_BUNDLE_IDENTIFIER = com.dchietti.sborraplay;\n\t\t\t\tCODE_SIGNING_ALLOWED = NO;\n\t\t\t\tCODE_SIGNING_REQUIRED = NO;'
+    )
+    pbxproj.write_text(text, encoding="utf-8")
+    print("project.pbxproj configurato con successo.")
+
+def configure_xcconfigs():
+    print("Configuro .xcconfig per disattivare firma...")
+    for name in ["Release.xcconfig", "Debug.xcconfig", "Profile.xcconfig"]:
+        xc = IOS_DIR / "Flutter" / name
+        if xc.exists():
+            content = xc.read_text(encoding="utf-8")
+            patch = "\nCODE_SIGNING_ALLOWED=NO\nCODE_SIGNING_REQUIRED=NO\nCODE_SIGN_IDENTITY=\nDEVELOPMENT_TEAM=\n"
+            if "CODE_SIGNING_ALLOWED=NO" not in content:
+                content += patch
+                xc.write_text(content, encoding="utf-8")
+    print(".xcconfig configurati con successo.")
 
 def configure_podfile():
     print("Configuro Podfile...")
@@ -101,9 +131,6 @@ end
 def configure_icons():
     print("Configuro le icone dell'app...")
     icon_src = ROOT / "assets" / "AppIcon.png"
-    if not icon_src.exists():
-        icon_src = ROOT / "SborraPlay" / "Resources" / "Assets.xcassets" / "AppIcon.appiconset" / "AppIcon.png"
-
     appicon_dir = RUNNER_DIR / "Assets.xcassets" / "AppIcon.appiconset"
     if icon_src.exists() and appicon_dir.exists():
         dest = appicon_dir / "AppIcon.png"
@@ -129,6 +156,8 @@ def configure_icons():
 
 if __name__ == "__main__":
     configure_info_plist()
+    configure_project_pbxproj()
+    configure_xcconfigs()
     configure_podfile()
     configure_icons()
     print("Configurazione completata.")
