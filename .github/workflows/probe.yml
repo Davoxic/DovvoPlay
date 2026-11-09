@@ -4,13 +4,18 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "scripts/probe_sources.py"
+      - "scripts/probe*.py"
+      - "scripts/TryPlay.swift"
       - ".github/workflows/probe.yml"
 
 jobs:
   probe:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Interroga SoundCloud e Piped davvero
-        run: python3 scripts/probe_sources.py
+      - name: Chiamate reali a SoundCloud, Piped e Invidious
+        run: python3 scripts/probe2.py
+      - name: AVPlayer prova davvero a riprodurre
+        run: |
+          URL=$(cat /tmp/sc_url.txt 2>/dev/null || echo "")
+          swift scripts/TryPlay.swift "$URL"
