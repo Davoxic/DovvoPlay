@@ -151,6 +151,53 @@ enum YouTubeClient {
         throw YouTubeError.everythingDown("né le istanze Piped né quelle Invidious hanno risposto")
     }
 
+    /// Non basta che un'istanza risponda: il link che restituisce deve anche
+    /// essere accettato dai server di YouTube. Proviamo istanza per istanza
+    /// finché non ne arriva uno che si apre davvero.
+    static func resolveAudio(videoID: String, quality: StreamQuality) async throws -> URL {
+        var sawOptions = false
+
+        for base in PipedClient.instanceList.prefix(6) {
+            guard let bundle = try? await PipedClient.streams(for: videoID, base: base),
+                  !bundle.audio.isEmpty else { continue }
+            sawOptions = true
+            for candidate in ranked(bundle.audio, quality: quality).prefix(2) {
+                if await StreamProbe.isServed(candidate.url) {
+                    lastBackend = "Piped (\(short(base)))"
+                    return candidate.url
+                }
+            }
+        }
+
+        if let bundle = try? await InvidiousClient.streams(for: videoID), !bundle.audio.isEmpty {
+            sawOptions = true
+            for candidate in ranked(bundle.audio, quality: quality).prefix(2) {
+                if await StreamProbe.isServed(candidate.url) {
+                    lastBackend = "Invidious"
+                    return candidate.url
+                }
+            }
+        }
+
+        lastBackend = "nessuno"
+        throw YouTubeError.everythingDown(sawOptions
+            ? "le istanze rispondono ma YouTube rifiuta i loro link audio"
+            : "nessuna sorgente ha restituito l'audio")
+    }
+
+    /// La qualità richiesta per prima, poi le altre come riserva.
+    private static func ranked(_ options: [AudioStreamOption], quality: StreamQuality) -> [AudioStreamOption] {
+        let playable = options.filter { $0.isPlayable }
+        guard !playable.isEmpty else { return [] }
+        var ordered: [AudioStreamOption] = []
+        if let first = PipedClient.pick(playable, quality: quality) { ordered.append(first) }
+        let sorted = quality.resolved == .saver
+            ? playable.sorted { $0.bitrateKbps < $1.bitrateKbps }
+            : playable.sorted { $0.bitrateKbps > $1.bitrateKbps }
+        for option in sorted where !ordered.contains(option) { ordered.append(option) }
+        return ordered
+    }
+
     static func audioOptions(for videoID: String) async throws -> [AudioStreamOption] {
         if let bundle = try? await PipedClient.streams(for: videoID), !bundle.audio.isEmpty {
             return bundle.audio

@@ -171,6 +171,22 @@ enum PipedClient {
         return json
     }
 
+    /// Interroga una singola istanza, senza gara: serve per provarle a una a una
+    /// quando una risponde ma i suoi URL audio vengono poi rifiutati.
+    static func fetchJSON(base: String, path: String, query: [URLQueryItem] = []) async throws -> Any {
+        guard var comps = URLComponents(string: base + path) else { throw PipedError.badResponse }
+        if !query.isEmpty { comps.queryItems = query }
+        guard let url = comps.url else { throw PipedError.badResponse }
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw PipedError.badResponse
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) else {
+            throw PipedError.badResponse
+        }
+        return json
+    }
+
     // MARK: - diagnostica
 
     struct InstanceReport: Identifiable {
@@ -269,9 +285,18 @@ enum PipedClient {
 
     static func streams(for videoID: String) async throws -> StreamBundle {
         let json = try await get(path: "/streams/\(videoID)", query: [])
-        guard let root = json as? [String: Any] else { throw PipedError.badResponse }
+        return parseStreams(json)
+    }
 
+    static func streams(for videoID: String, base: String) async throws -> StreamBundle {
+        let json = try await fetchJSON(base: base, path: "/streams/\(videoID)")
+        return parseStreams(json)
+    }
+
+    static func parseStreams(_ json: Any) -> StreamBundle {
         var bundle = StreamBundle()
+        guard let root = json as? [String: Any] else { return bundle }
+
         bundle.title = (root["title"] as? String) ?? ""
         bundle.uploader = (root["uploader"] as? String) ?? ""
         bundle.duration = (root["duration"] as? Double) ?? 0
@@ -289,7 +314,7 @@ enum PipedClient {
         }
         for raw in (root["videoStreams"] as? [[String: Any]]) ?? [] {
             guard let link = raw["url"] as? String, let url = URL(string: link) else { continue }
-            if (raw["videoOnly"] as? Bool) == true { continue }   // senza audio non ci serve
+            if (raw["videoOnly"] as? Bool) == true { continue }
             bundle.video.append(VideoStreamOption(
                 url: url,
                 quality: (raw["quality"] as? String) ?? "?",

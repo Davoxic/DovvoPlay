@@ -124,13 +124,12 @@ final class OnlineStore: ObservableObject {
         case .youtube:
             guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
             do {
-                let options = try await YouTubeClient.audioOptions(for: videoID)
-                guard let option = PipedClient.pick(options, quality: quality) else {
-                    throw PipedClient.PipedError.noAudio
-                }
-                return option.url
+                let url = try await YouTubeClient.resolveAudio(videoID: videoID, quality: quality)
+                backend = YouTubeClient.lastBackend
+                return url
             } catch {
                 if bridgeReady, let viaBridge = try? await BridgeClient.streamURL(for: track) {
+                    backend = "ponte sul PC"
                     return viaBridge
                 }
                 throw error
@@ -187,15 +186,15 @@ final class OnlineStore: ObservableObject {
             if raw.contains(".m3u8") || raw.contains("/hls/") {
                 throw SoundCloudClient.ClientError.noStream
             }
+            guard await StreamProbe.isServed(remote) else {
+                throw SoundCloudClient.ClientError.noStream
+            }
             ext = "mp3"
         case .youtube:
             guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
-            let options = try await YouTubeClient.audioOptions(for: videoID)
-            guard let option = PipedClient.pick(options, quality: requested) else {
-                throw PipedClient.PipedError.noAudio
-            }
-            remote = option.url
-            ext = option.fileExtension
+            remote = try await YouTubeClient.resolveAudio(videoID: videoID, quality: requested)
+            backend = YouTubeClient.lastBackend
+            ext = "m4a"
         }
 
         let destination = LibraryPaths.uniqueDestination(for: track.fileName(ext: ext))

@@ -34,6 +34,8 @@ struct OnlineTrack: Identifiable, Hashable {
     var downloadHint: String? = nil
     /// Anteprima da 30 secondi riservata agli abbonati: inutile in un player.
     var isPreviewOnly: Bool = false
+    /// SoundCloud: senza questo token la richiesta dello stream viene rifiutata.
+    var trackAuthorization: String? = nil
 
     var durationText: String { Track.timeString(duration) }
 

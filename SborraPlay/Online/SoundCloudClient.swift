@@ -187,7 +187,8 @@ enum SoundCloudClient {
                            pageURL: URL(string: (item["permalink_url"] as? String) ?? ""),
                            resolveHint: streamHint,
                            downloadHint: downloadHint,
-                           isPreviewOnly: isPreview)
+                           isPreviewOnly: isPreview,
+                           trackAuthorization: item["track_authorization"] as? String)
     }
 
     /// Rilegge la singola traccia: qui le transcodifiche ci sono sempre.
@@ -211,34 +212,69 @@ enum SoundCloudClient {
 
     /// Trasforma la transcodifica in un URL riproducibile.
     static func streamURL(for track: OnlineTrack, preferDownloadable: Bool = false) async throws -> URL {
-        var streamHint = track.resolveHint
-        var downloadHint = track.downloadHint
+        var current = track
 
-        // la ricerca non sempre include media.transcodings: in quel caso
-        // interroghiamo la singola traccia, che le ha sempre
-        if streamHint == nil || (preferDownloadable && downloadHint == nil) {
+        // la ricerca non sempre porta transcodifiche e token: in quel caso
+        // rileggiamo la traccia, che li ha sempre
+        if current.resolveHint == nil
+            || current.trackAuthorization == nil
+            || (preferDownloadable && current.downloadHint == nil) {
             if let refreshed = try? await details(for: track) {
-                streamHint = refreshed.resolveHint ?? streamHint
-                downloadHint = refreshed.downloadHint ?? downloadHint
+                current.resolveHint = refreshed.resolveHint ?? current.resolveHint
+                current.downloadHint = refreshed.downloadHint ?? current.downloadHint
+                current.trackAuthorization = refreshed.trackAuthorization ?? current.trackAuthorization
             }
         }
 
-        let chosen = preferDownloadable ? (downloadHint ?? streamHint) : streamHint
+        if let url = try? await resolve(current, preferDownloadable: preferDownloadable) {
+            return url
+        }
+
+        // un client_id scaduto o un token vecchio: si ricarica tutto e si riprova
+        _ = try? await clientID(forceRefresh: true)
+        if let refreshed = try? await details(for: track),
+           let url = try? await resolve(refreshed, preferDownloadable: preferDownloadable) {
+            return url
+        }
+        throw ClientError.noStream
+    }
+
+    private static func resolve(_ track: OnlineTrack, preferDownloadable: Bool) async throws -> URL {
+        let chosen = preferDownloadable ? (track.downloadHint ?? track.resolveHint) : track.resolveHint
         guard let hint = chosen, var comps = URLComponents(string: hint) else {
             throw ClientError.noStream
         }
         let id = try await clientID()
         var items = comps.queryItems ?? []
         items.append(URLQueryItem(name: "client_id", value: id))
+        // senza track_authorization SoundCloud risponde 401 su moltissimi brani:
+        // era questo a far fallire la riproduzione
+        if let auth = track.trackAuthorization, !auth.isEmpty {
+            items.append(URLQueryItem(name: "track_authorization", value: auth))
+        }
         comps.queryItems = items
         guard let url = comps.url else { throw ClientError.noStream }
 
-        let (data, _) = try await session.data(from: url)
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw ClientError.noStream
+        }
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let raw = root["url"] as? String,
               let final = URL(string: raw) else {
             throw ClientError.noStream
         }
         return final
+    }
+
+    /// Controlla che il file sia davvero servito, prima di darlo in pasto al player.
+    static func validate(_ url: URL) async -> Bool {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("bytes=0-1", forHTTPHeaderField: "Range")
+        request.timeoutInterval = 8
+        guard let (_, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse else { return false }
+        return http.statusCode == 200 || http.statusCode == 206
     }
 }

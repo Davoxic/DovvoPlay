@@ -92,3 +92,23 @@ final class NetworkMonitor: ObservableObject {
         return "connesso"
     }
 }
+
+/// Verifica che un URL audio sia davvero servito prima di passarlo al player.
+/// Le istanze pubbliche spesso rispondono alla ricerca ma restituiscono link
+/// che YouTube poi rifiuta: senza questo controllo il player resta muto.
+enum StreamProbe {
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 8
+        return URLSession(configuration: config)
+    }()
+
+    static func isServed(_ url: URL) async -> Bool {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("bytes=0-1", forHTTPHeaderField: "Range")
+        guard let (_, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse else { return false }
+        return http.statusCode == 200 || http.statusCode == 206
+    }
+}
