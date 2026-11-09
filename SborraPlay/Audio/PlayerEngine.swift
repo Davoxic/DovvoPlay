@@ -588,10 +588,10 @@ final class PlayerEngine: NSObject, ObservableObject {
         stallWatchdog?.cancel()
         stallWatchdog = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 18_000_000_000)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, let engine = self else { return }
             await MainActor.run {
-                guard let self, self.isStreaming, self.currentTime <= 0.1 else { return }
-                self.failStream("Questo brano non parte: la sorgente non risponde o il formato non è supportato")
+                guard engine.isStreaming, engine.currentTime <= 0.1 else { return }
+                engine.failStream("Questo brano non parte: la sorgente non risponde o il formato non è supportato")
             }
         }
     }
@@ -632,11 +632,12 @@ final class PlayerEngine: NSObject, ObservableObject {
         guard let url = track.artworkURL else { return }
         Task { [weak self] in
             guard let (data, _) = try? await URLSession.shared.data(from: url),
-                  let image = UIImage(data: data) else { return }
+                  let image = UIImage(data: data),
+                  let engine = self else { return }
             await MainActor.run {
-                guard let self, self.streamingItem?.id == track.id else { return }
-                self.artwork = image
-                self.updateNowPlaying()
+                guard engine.streamingItem?.id == track.id else { return }
+                engine.artwork = image
+                engine.updateNowPlaying()
             }
         }
     }
