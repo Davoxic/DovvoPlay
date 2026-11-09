@@ -5,19 +5,12 @@ on:
   push:
     paths:
       - "scripts/probe*.py"
-      - "scripts/TryPlay.swift"
       - ".github/workflows/probe.yml"
 
 jobs:
   probe:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Regola di scelta nuova, su cinque ricerche
-        run: python3 scripts/probe3.py
-      - name: Il manifest è in chiaro? i segmenti arrivano?
-        run: python3 scripts/probe4.py
-      - name: AVFoundation carica l'HLS in chiaro
-        run: swift scripts/TryPlay.swift "$(cat /tmp/sc_hls.txt 2>/dev/null || echo '')"
-      - name: AVFoundation carica il progressive
-        run: swift scripts/TryPlay.swift "$(cat /tmp/sc_prog.txt 2>/dev/null || echo '')"
+      - name: Quanti video musicali sono incorporabili
+        run: python3 scripts/probe6.py
