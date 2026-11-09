@@ -13,9 +13,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Chiamate reali a SoundCloud, Piped e Invidious
-        run: python3 scripts/probe2.py
-      - name: AVPlayer prova davvero a riprodurre
-        run: |
-          URL=$(cat /tmp/sc_url.txt 2>/dev/null || echo "")
-          swift scripts/TryPlay.swift "$URL"
+      - name: Regola di scelta nuova, su cinque ricerche
+        run: python3 scripts/probe3.py
+      - name: AVPlayer prova il flusso HLS in chiaro
+        run: swift scripts/TryPlay.swift "$(cat /tmp/sc_hls.txt 2>/dev/null || echo '')"
+      - name: AVPlayer prova il flusso progressive
+        run: swift scripts/TryPlay.swift "$(cat /tmp/sc_prog.txt 2>/dev/null || echo '')"

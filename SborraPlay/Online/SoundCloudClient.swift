@@ -139,6 +139,7 @@ enum SoundCloudClient {
         // va escluso: era questo a mandare in stallo la riproduzione.
         var streamHint: String?
         var downloadHint: String?
+        var protected = false
         if let media = item["media"] as? [String: Any],
            let transcodings = media["transcodings"] as? [[String: Any]] {
 
@@ -156,26 +157,35 @@ enum SoundCloudClient {
                 let mime = ((format?["mime_type"] as? String) ?? "").lowercased()
                 let preset = ((t["preset"] as? String) ?? "").lowercased()
 
-                if preset.contains("opus") || mime.contains("opus") || mime.contains("ogg") {
-                    continue
-                }
-                let isMP3 = preset.contains("mp3") || mime.contains("mpeg")
-                let isAAC = preset.contains("aac") || mime.contains("mp4") || mime.contains("aac")
-                guard isMP3 || isAAC else { continue }
+                // cbc-encrypted-hls / ctr-encrypted-hls sono protetti con FairPlay:
+                // AVPlayer apre il manifest ma non trova nessuna traccia audio.
+                if proto.contains("encrypted") { continue }
+                if preset.contains("opus") || mime.contains("opus") || mime.contains("ogg") { continue }
+
+                // attenzione: "audio/mpegurl" contiene "mpeg" ma è un indice HLS,
+                // non un mp3. Confonderli faceva preferire le versioni protette.
+                let isPlaylist = mime.contains("mpegurl") || mime.contains("x-mpegurl")
+                let isMP3 = preset.contains("mp3") || (mime.contains("mpeg") && !isPlaylist)
+                let isAAC = preset.contains("aac") || mime.contains("mp4")
 
                 let progressive = proto == "progressive"
-                // progressivo mp3 è il massimo: si ascolta e si scarica
                 let rank: Int
                 if progressive && isMP3 { rank = 0 }
                 else if progressive && isAAC { rank = 1 }
-                else if isMP3 { rank = 2 }
-                else { rank = 3 }
+                else if progressive { rank = 2 }
+                else if isMP3 { rank = 3 }
+                else if isAAC { rank = 4 }
+                else if isPlaylist { rank = 5 }
+                else { continue }
+
                 options.append(Option(url: link, isProgressive: progressive, rank: rank))
             }
 
             options.sort { $0.rank < $1.rank }
             streamHint = options.first?.url
             downloadHint = options.first(where: { $0.isProgressive })?.url
+            // nessuna opzione in chiaro: il brano è protetto, inutile provarci
+            protected = options.isEmpty && !transcodings.isEmpty
         }
 
         return OnlineTrack(id: "sc-\(identifier)",
@@ -188,7 +198,8 @@ enum SoundCloudClient {
                            resolveHint: streamHint,
                            downloadHint: downloadHint,
                            isPreviewOnly: isPreview,
-                           trackAuthorization: item["track_authorization"] as? String)
+                           trackAuthorization: item["track_authorization"] as? String,
+                           isProtected: protected)
     }
 
     /// Rilegge la singola traccia: qui le transcodifiche ci sono sempre.

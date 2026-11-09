@@ -36,6 +36,8 @@ struct OnlineTrack: Identifiable, Hashable {
     var isPreviewOnly: Bool = false
     /// SoundCloud: senza questo token la richiesta dello stream viene rifiutata.
     var trackAuthorization: String? = nil
+    /// Solo flussi protetti con FairPlay: iOS non li può riprodurre.
+    var isProtected: Bool = false
 
     var durationText: String { Track.timeString(duration) }
 
