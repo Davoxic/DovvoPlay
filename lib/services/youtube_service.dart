@@ -29,7 +29,6 @@ class YouTubeService {
       }
       return tracks;
     } catch (e) {
-      // In caso di errore ricrea l'istanza
       _yt?.close();
       _yt = YoutubeExplode();
       rethrow;
@@ -46,10 +45,10 @@ class YouTubeService {
       // Su iOS, AVPlayer gestisce nativamente i formati audio m4a/mp4 AAC
       final mp4Streams = audioStreams.where(
         (s) => s.container.name.toLowerCase() == 'mp4' || s.codec.mimeType.contains('mp4'),
-      );
+      ).toList();
 
       final chosen = mp4Streams.isNotEmpty
-          ? mp4Streams.withHighestBitrate()
+          ? mp4Streams.reduce((curr, next) => curr.bitrate.bitsPerSecond > next.bitrate.bitsPerSecond ? curr : next)
           : audioStreams.withHighestBitrate();
 
       return chosen.url.toString();
@@ -72,9 +71,10 @@ class YouTubeService {
 
       final mp4Streams = audioStreams.where(
         (s) => s.container.name.toLowerCase() == 'mp4' || s.codec.mimeType.contains('mp4'),
-      );
+      ).toList();
+
       final chosen = mp4Streams.isNotEmpty
-          ? mp4Streams.withHighestBitrate()
+          ? mp4Streams.reduce((curr, next) => curr.bitrate.bitsPerSecond > next.bitrate.bitsPerSecond ? curr : next)
           : audioStreams.withHighestBitrate();
 
       final stream = yt.videos.streamsClient.get(chosen);
