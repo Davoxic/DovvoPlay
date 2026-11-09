@@ -132,7 +132,11 @@ class WifiServerService extends ChangeNotifier {
 
     if (request.method == 'PUT') {
       final sink = file.openWrite();
-      await request.pipe(sink);
+      await for (final chunk in request) {
+        sink.add(chunk);
+      }
+      await sink.flush();
+      await sink.close();
       _recentUploads.insert(0, fileName);
       if (_recentUploads.length > 30) _recentUploads.removeLast();
       notifyListeners();

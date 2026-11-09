@@ -151,7 +151,7 @@ class WifiTab extends StatelessWidget {
                 desc: 'Digita nella barra degli indirizzi l\'URL mostrato sopra (es. ${wifi.serverUrl}).',
               ),
               _buildInstructionStep(
-                icon: Icons.drag_and_drop_rounded,
+                icon: Icons.upload_file_rounded,
                 step: '3',
                 title: 'Trascina i brani',
                 desc: 'Trascina i file MP3, M4A o FLAC nella pagina del browser. Verranno salvati subito sull\'iPhone!',
