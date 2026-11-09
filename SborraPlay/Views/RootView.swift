@@ -26,12 +26,15 @@ struct RootView: View {
                 PlaylistsView()
                     .tabItem { Label("Playlist", systemImage: "rectangle.stack.fill") }
                     .tag(0)
+                SearchView()
+                    .tabItem { Label("Cerca", systemImage: "magnifyingglass") }
+                    .tag(1)
                 LibraryView()
                     .tabItem { Label("Libreria", systemImage: "music.note.list") }
-                    .tag(1)
+                    .tag(2)
                 SettingsView()
                     .tabItem { Label("Impostazioni", systemImage: "gearshape") }
-                    .tag(2)
+                    .tag(3)
             }
 
             if player.hasTrack {

@@ -26,6 +26,7 @@ struct SettingsView: View {
             Form {
                 serverSection
                 importSection
+                bridgeSection
                 backupSection
                 librarySection
                 storageSection
@@ -192,6 +193,27 @@ struct SettingsView: View {
             case .failure(let error):
                 library.lastMessage = error.localizedDescription
             }
+        }
+    }
+
+    private var bridgeSection: some View {
+        Section {
+            if let bridge = UserDefaults.standard.string(forKey: "bridgeURL"), !bridge.isEmpty {
+                LabeledContent("Computer", value: bridge)
+                Button(role: .destructive) {
+                    UserDefaults.standard.removeObject(forKey: "bridgeURL")
+                    library.lastMessage = "Computer scollegato"
+                } label: {
+                    Label("Scollega il computer", systemImage: "xmark.circle")
+                }
+            } else {
+                Label("Nessun computer collegato", systemImage: "desktopcomputer")
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Ponte per YouTube")
+        } footer: {
+            Text("yt-dlp gira solo su computer, quindi la ricerca su YouTube passa di lì. Sul PC apri SborraPlay e scegli \"Avvia il ponte\": si annuncia da solo e questa riga si compila. SoundCloud non ne ha bisogno.")
         }
     }
 

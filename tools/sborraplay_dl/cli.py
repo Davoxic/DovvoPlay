@@ -273,6 +273,88 @@ def cmd_restore(args) -> int:
     return 1
 
 
+
+def cmd_serve(args) -> int:
+    from . import bridge
+    from . import pusher
+
+    device = None
+    if args.host:
+        try:
+            device = pusher.normalize_host(args.host)
+        except ValueError as exc:
+            warn(str(exc))
+    if device is None:
+        saved = load_config().get("host")
+        if saved:
+            try:
+                candidate = pusher.normalize_host(saved)
+                if pusher.ping(candidate):
+                    device = candidate
+            except ValueError:
+                pass
+
+    outdir = Path(args.out).expanduser() if args.out else None
+    step("Ponte YouTube per l'iPhone")
+    return bridge.serve(port=args.port, outdir=outdir, device=device)
+
+
+def cmd_grab(args) -> int:
+    """Scarica un singolo link YouTube o SoundCloud e lo manda al telefono."""
+    import shutil
+    from .spotify import SpotifyTrack
+    from .matcher import Candidate
+    from .downloader import fetch_and_tag
+    from . import pusher
+
+    if shutil.which("ffmpeg") is None:
+        err("ffmpeg non trovato nel PATH.")
+        return 2
+
+    import yt_dlp
+    step("1 · Leggo il link")
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True,
+                               "skip_download": True, "noplaylist": True}) as ydl:
+            meta = ydl.extract_info(args.url, download=False)
+    except Exception as exc:
+        err(f"Link non leggibile: {exc}")
+        return 1
+    if meta is None:
+        err("Link non leggibile.")
+        return 1
+
+    title = meta.get("track") or meta.get("title") or "brano"
+    artist = meta.get("artist") or meta.get("uploader") or meta.get("channel") or ""
+    duration = float(meta.get("duration") or 0)
+    ok(f"{artist} - {title}" if artist else title)
+
+    track = SpotifyTrack(title=title, artist=artist, album=meta.get("album") or "",
+                         duration=duration, cover_url=meta.get("thumbnail") or "")
+    cand = Candidate(video_id=meta.get("id") or "", title=title,
+                     channel=artist, duration=duration, url=args.url)
+
+    outdir = Path(args.out).expanduser() if args.out else Path.cwd() / "SborraPlay" / "Singoli"
+    step(f"2 · Scarico in {outdir}")
+    try:
+        path = fetch_and_tag(track, cand, outdir, args.format, args.quality, archive=None)
+    except Exception as exc:
+        err(f"Download fallito: {exc}")
+        return 1
+    ok(path.name)
+
+    if args.no_push:
+        return 0
+    step("3 · Invio al telefono")
+    device = resolve_device(args.host)
+    if device is None:
+        warn(f"Il file resta qui: {path}")
+        return 0
+    pusher.push_many(device, [path], skip_existing=False)
+    ok("Fatto, lo trovi in Libreria.")
+    return 0
+
+
 # ------------------------------------------------------------------ device
 
 def resolve_device(host: str | None):
@@ -321,6 +403,8 @@ def build_parser() -> argparse.ArgumentParser:
   sborraplay-dl playlist miei_brani.csv --format m4a --no-push
   sborraplay-dl playlist <url> --host 192.168.1.42:8080 --workers 4
   sborraplay-dl push ~/Musica/Estate --playlist "Estate 2026"
+  sborraplay-dl grab "https://soundcloud.com/artista/brano"
+  sborraplay-dl serve
   sborraplay-dl discover
   sborraplay-dl backup -o ~/Backup
   sborraplay-dl restore ~/Backup/SborraPlay-2026-11-08-2340.sborraplay.json
@@ -373,6 +457,21 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument("--replace", action="store_true",
                     help="sostituisce le playlist attuali invece di unirle")
     rs.set_defaults(func=cmd_restore)
+
+    sv = sub.add_parser("serve", help="accende il ponte che presta yt-dlp al telefono")
+    sv.add_argument("--port", type=int, default=8077)
+    sv.add_argument("--out", help="dove salvare i brani scaricati dal telefono")
+    sv.add_argument("--host", help="indirizzo del telefono")
+    sv.set_defaults(func=cmd_serve)
+
+    gr = sub.add_parser("grab", help="scarica un singolo link YouTube o SoundCloud")
+    gr.add_argument("url")
+    gr.add_argument("-o", "--out", help="cartella di destinazione")
+    gr.add_argument("-f", "--format", default="mp3", help="mp3 (default), m4a o flac")
+    gr.add_argument("-q", "--quality", default="320")
+    gr.add_argument("--host", help="indirizzo del telefono")
+    gr.add_argument("--no-push", action="store_true", help="non inviare al telefono")
+    gr.set_defaults(func=cmd_grab)
 
     return p
 

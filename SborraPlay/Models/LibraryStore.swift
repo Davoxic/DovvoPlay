@@ -134,6 +134,8 @@ final class LibraryStore: ObservableObject {
             if let data = meta.artwork {
                 if !ArtworkStore.exists(artKey) { ArtworkStore.store(data: data, id: artKey) }
                 track.artworkID = artKey
+            } else if let existing = track.artworkID, existing.hasPrefix("dl-"), ArtworkStore.exists(existing) {
+                // copertina presa dal download online: la teniamo
             } else {
                 track.artworkID = ArtworkStore.exists(artKey) ? artKey : nil
             }
@@ -401,6 +403,16 @@ final class LibraryStore: ObservableObject {
 
     var totalBytes: Int64 { tracks.reduce(0) { $0 + $1.fileSize } }
     var totalDuration: Double { tracks.reduce(0) { $0 + $1.duration } }
+
+
+    /// Attacca una copertina presa da un download online a un file appena arrivato.
+    func attachArtwork(_ data: Data, toFileNamed name: String) {
+        guard let idx = tracks.firstIndex(where: { $0.id == name }) else { return }
+        let key = "dl-" + ArtworkStore.key(forAlbumArtist: name, album: "online")
+        guard ArtworkStore.store(data: data, id: key) else { return }
+        tracks[idx].artworkID = key
+        saveIndex()
+    }
 
     // MARK: - backup
 

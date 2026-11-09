@@ -120,7 +120,25 @@ Esempio: `curl -T "brano.mp3" http://192.168.1.42:8080/api/file/brano.mp3`
 
 ---
 
-## 3. Il tool PC
+## 3. Cercare e scaricare da YouTube e SoundCloud
+
+Nell'app c'è la scheda **Cerca**. Tocchi un risultato e parte subito in streaming, tocchi la freccia e te lo salvi in libreria.
+
+**SoundCloud funziona da solo**, ovunque, anche sotto rete dati: l'app parla direttamente con SoundCloud, cerca, riproduce e scarica l'mp3 nella libreria senza passare dal computer.
+
+**YouTube ha bisogno del computer**, perché yt-dlp è un programma Python e su iOS non può girare: non è una scelta, è un limite della piattaforma. Sul PC apri il lanciatore e scegli **8 — Avvia il ponte per YouTube**. Il ponte si annuncia da solo al telefono (niente indirizzi da scrivere) e da quel momento la scheda Cerca interroga YouTube. Lo streaming però non passa dal PC: il ponte chiede a yt-dlp l'indirizzo audio diretto e lo gira al telefono, che scarica dai server di Google. Il PC serve solo per la ricerca e per i download in mp3, che vengono taggati e spediti al telefono da soli.
+
+Dal computer puoi anche scaricare un singolo link, YouTube o SoundCloud, con l'opzione **9** del menu oppure:
+
+```bash
+sborraplay-dl grab "https://www.youtube.com/watch?v=..."
+sborraplay-dl grab "https://soundcloud.com/artista/brano"
+sborraplay-dl serve --port 8077
+```
+
+Il ponte espone `/health`, `/search?q=`, `/stream?id=` e `POST /grab`, e registra sé stesso sul telefono con `POST /api/bridge`.
+
+## 4. Il tool PC
 
 ### Avvio a doppio clic
 

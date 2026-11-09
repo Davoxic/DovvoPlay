@@ -21,10 +21,7 @@ struct NowPlayingView: View {
 
                 Spacer(minLength: 10)
 
-                ArtworkView(artworkID: track?.artworkID,
-                            size: artSize,
-                            corner: 18,
-                            seed: track?.albumKey ?? "")
+                LivePlayerArtwork(size: artSize, corner: 18)
                     .shadow(color: .black.opacity(0.45), radius: 24, y: 14)
                     .scaleEffect(player.isPlaying ? 1.0 : 0.94)
                     .animation(.spring(response: 0.45, dampingFraction: 0.75), value: player.isPlaying)
@@ -32,19 +29,23 @@ struct NowPlayingView: View {
                 Spacer(minLength: 16)
 
                 VStack(spacing: 5) {
-                    Text(track?.displayTitle ?? "Niente in riproduzione")
+                    Text(player.hasTrack ? player.displayTitle : "Niente in riproduzione")
                         .font(.title3.weight(.semibold))
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
-                    Text(track?.displayArtist ?? "—")
+                    Text(player.hasTrack ? player.displayArtist : "—")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.75))
                         .lineLimit(1)
-                    if let album = track?.displayAlbum, !album.isEmpty {
-                        Text(album)
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.5))
-                            .lineLimit(1)
+                    if !player.displaySubtitle.isEmpty {
+                        HStack(spacing: 5) {
+                            if player.isStreaming {
+                                Image(systemName: "dot.radiowaves.left.and.right").font(.caption2)
+                            }
+                            Text(player.displaySubtitle)
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.white.opacity(0.55))
                     }
                 }
                 .padding(.horizontal, 28)
@@ -204,7 +205,7 @@ struct MiniPlayerView: View {
     var onTap: () -> Void
 
     var body: some View {
-        if let track = player.current {
+        if player.hasTrack {
             VStack(spacing: 0) {
                 GeometryReader { geo in
                     Rectangle()
@@ -214,21 +215,35 @@ struct MiniPlayerView: View {
                 .frame(height: 2)
 
                 HStack(spacing: 12) {
-                    ArtworkView(artworkID: track.artworkID, size: 40, corner: 7, seed: track.albumKey)
+                    LivePlayerArtwork(size: 40, corner: 7)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(track.displayTitle).font(.footnote.weight(.medium)).lineLimit(1)
-                        Text(track.displayArtist).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        Text(player.displayTitle).font(.footnote.weight(.medium)).lineLimit(1)
+                        HStack(spacing: 4) {
+                            if player.isStreaming {
+                                Image(systemName: "dot.radiowaves.left.and.right")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                            Text(player.displayArtist)
+                                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        }
                     }
                     Spacer(minLength: 4)
-                    Button { player.togglePlayPause() } label: {
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 19))
-                            .frame(width: 34, height: 34)
+                    if player.isBuffering {
+                        ProgressView().frame(width: 34, height: 34)
+                    } else {
+                        Button { player.togglePlayPause() } label: {
+                            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 19))
+                                .frame(width: 34, height: 34)
+                        }
                     }
-                    Button { player.next() } label: {
-                        Image(systemName: "forward.fill")
-                            .font(.system(size: 17))
-                            .frame(width: 34, height: 34)
+                    if !player.isStreaming {
+                        Button { player.next() } label: {
+                            Image(systemName: "forward.fill")
+                                .font(.system(size: 17))
+                                .frame(width: 34, height: 34)
+                        }
                     }
                 }
                 .padding(.horizontal, 12)

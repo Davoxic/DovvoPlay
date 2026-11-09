@@ -158,6 +158,21 @@ final class LocalServer: ObservableObject {
             }
             respond(.json(["count": tracks.count, "tracks": tracks, "playlists": playlists]))
 
+        case ("POST", "/api/bridge"):
+            guard let body,
+                  let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+                  let raw = obj["url"] as? String,
+                  URL(string: raw) != nil else {
+                respond(.json(["error": "Serve {\"url\": \"http://IP:PORTA\"}"], status: 400))
+                return
+            }
+            UserDefaults.standard.set(raw, forKey: "bridgeURL")
+            DispatchQueue.main.async { self.lastEvent = "Computer collegato: \(raw)" }
+            respond(.json(["ok": true, "bridge": raw]))
+
+        case ("GET", "/api/bridge"):
+            respond(.json(["bridge": UserDefaults.standard.string(forKey: "bridgeURL") ?? ""]))
+
         case ("GET", "/api/backup"):
             let d = UserDefaults.standard
             let settings: [String: String] = [

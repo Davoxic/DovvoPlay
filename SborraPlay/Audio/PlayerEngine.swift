@@ -43,7 +43,14 @@ final class PlayerEngine: NSObject, ObservableObject {
         didSet { UserDefaults.standard.set(repeatMode.rawValue, forKey: "repeatMode") }
     }
 
+    /// Brano online in ascolto, quando non stiamo suonando un file locale.
+    @Published private(set) var streamingItem: OnlineTrack?
+    @Published private(set) var isBuffering = false
+
     private var player: AVAudioPlayer?
+    private var remotePlayer: AVPlayer?
+    private var remoteTimeObserver: Any?
+    private var remoteEndObserver: NSObjectProtocol?
     private var ticker: Timer?
     private var order: [Int] = []
     private var orderPos: Int = -1
@@ -53,7 +60,19 @@ final class PlayerEngine: NSObject, ObservableObject {
     var current: Track? {
         queue.indices.contains(currentIndex) ? queue[currentIndex] : nil
     }
-    var hasTrack: Bool { current != nil }
+    var isStreaming: Bool { remotePlayer != nil }
+    var hasTrack: Bool { current != nil || streamingItem != nil }
+
+    var displayTitle: String {
+        streamingItem?.title ?? current?.displayTitle ?? ""
+    }
+    var displayArtist: String {
+        streamingItem?.artist ?? current?.displayArtist ?? ""
+    }
+    var displaySubtitle: String {
+        if let item = streamingItem { return item.source.label }
+        return current?.displayAlbum ?? ""
+    }
     var progress: Double {
         guard duration > 0 else { return 0 }
         return min(max(currentTime / duration, 0), 1)
@@ -126,6 +145,7 @@ final class PlayerEngine: NSObject, ObservableObject {
     /// Avvia una lista di brani partendo da quello indicato.
     func play(tracks: [Track], startAt index: Int = 0) {
         guard !tracks.isEmpty else { return }
+        detachRemote()
         queue = tracks
         let safeIndex = tracks.indices.contains(index) ? index : 0
         rebuildOrder(startingAt: safeIndex)
@@ -228,6 +248,13 @@ final class PlayerEngine: NSObject, ObservableObject {
     }
 
     func play() {
+        if let remote = remotePlayer {
+            activateSession(true)
+            remote.play()
+            isPlaying = true
+            updateNowPlaying()
+            return
+        }
         guard let p = player else {
             if let first = queue.first, currentIndex < 0 {
                 play(tracks: queue, startAt: queue.firstIndex(of: first) ?? 0)
@@ -246,6 +273,7 @@ final class PlayerEngine: NSObject, ObservableObject {
     }
 
     func pause() {
+        remotePlayer?.pause()
         player?.pause()
         isPlaying = false
         stopTicker()
@@ -258,6 +286,7 @@ final class PlayerEngine: NSObject, ObservableObject {
     }
 
     func stop() {
+        detachRemote()
         player?.stop()
         player = nil
         isPlaying = false
@@ -270,9 +299,16 @@ final class PlayerEngine: NSObject, ObservableObject {
         activateSession(false)
     }
 
-    func next() { advance(auto: false) }
+    func next() {
+        if isStreaming { return }
+        advance(auto: false)
+    }
 
     func previous() {
+        if isStreaming {
+            seek(to: 0)
+            return
+        }
         // come in Musica: prima di 3 secondi torna indietro, altrimenti riparte il brano
         if currentTime > 3 {
             seek(to: 0)
@@ -313,6 +349,13 @@ final class PlayerEngine: NSObject, ObservableObject {
     }
 
     func seek(to time: Double) {
+        if let remote = remotePlayer {
+            let clamped = min(max(time, 0), max(duration - 0.3, 0))
+            remote.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
+            currentTime = clamped
+            updateNowPlaying()
+            return
+        }
         guard let p = player else { return }
         let t = min(max(time, 0), max(p.duration - 0.05, 0))
         p.currentTime = t
@@ -393,14 +436,14 @@ final class PlayerEngine: NSObject, ObservableObject {
     }
 
     private func updateNowPlaying() {
-        guard let track = current else {
+        guard hasTrack else {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             return
         }
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: track.displayTitle,
-            MPMediaItemPropertyArtist: track.displayArtist,
-            MPMediaItemPropertyAlbumTitle: track.displayAlbum,
+            MPMediaItemPropertyTitle: displayTitle,
+            MPMediaItemPropertyArtist: displayArtist,
+            MPMediaItemPropertyAlbumTitle: displaySubtitle,
             MPMediaItemPropertyPlaybackDuration: duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
@@ -433,6 +476,92 @@ final class PlayerEngine: NSObject, ObservableObject {
         let t = d.double(forKey: "lastTrackTime")
         if t > 1, t < duration - 1 { seek(to: t) }
     }
+
+    // MARK: - streaming da YouTube / SoundCloud
+
+    /// Riproduce un brano online. Interrompe la coda locale: è un ascolto al volo.
+    func playStream(_ track: OnlineTrack, url: URL) {
+        player?.stop()
+        player = nil
+        stopTicker()
+        queue = []
+        order = []
+        orderPos = -1
+        currentIndex = -1
+        detachRemote()
+
+        activateSession(true)
+        let item = AVPlayerItem(url: url)
+        let remote = AVPlayer(playerItem: item)
+        remote.automaticallyWaitsToMinimizeStalling = true
+        remotePlayer = remote
+        streamingItem = track
+        duration = track.duration
+        currentTime = 0
+        artwork = nil
+        errorMessage = nil
+        isBuffering = true
+
+        remoteTimeObserver = remote.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.25, preferredTimescale: 600),
+            queue: .main
+        ) { [weak self] time in
+            guard let self else { return }
+            let seconds = CMTimeGetSeconds(time)
+            if seconds.isFinite { self.currentTime = seconds }
+            if let itemDuration = self.remotePlayer?.currentItem?.duration, itemDuration.isNumeric {
+                let total = CMTimeGetSeconds(itemDuration)
+                if total.isFinite, total > 0 { self.duration = total }
+            }
+            if self.isBuffering, seconds > 0 { self.isBuffering = false }
+            self.updateNowPlaying()
+        }
+
+        remoteEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.isPlaying = false
+            self.seek(to: 0)
+            self.updateNowPlaying()
+        }
+
+        remote.play()
+        isPlaying = true
+        updateNowPlaying()
+        loadRemoteArtwork(track)
+    }
+
+    private func detachRemote() {
+        if let observer = remoteTimeObserver, let remote = remotePlayer {
+            remote.removeTimeObserver(observer)
+        }
+        remoteTimeObserver = nil
+        if let observer = remoteEndObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        remoteEndObserver = nil
+        remotePlayer?.pause()
+        remotePlayer = nil
+        streamingItem = nil
+        isBuffering = false
+    }
+
+    private func loadRemoteArtwork(_ track: OnlineTrack) {
+        guard let url = track.artworkURL else { return }
+        Task { [weak self] in
+            guard let (data, _) = try? await URLSession.shared.data(from: url),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run {
+                guard let self, self.streamingItem?.id == track.id else { return }
+                self.artwork = image
+                self.updateNowPlaying()
+            }
+        }
+    }
+
 }
 
 extension PlayerEngine: AVAudioPlayerDelegate {

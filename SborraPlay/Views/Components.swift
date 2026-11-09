@@ -239,3 +239,29 @@ struct ExportedFile: Identifiable {
     let id = UUID()
     let url: URL
 }
+
+/// Copertina di ciò che sta suonando adesso, file locale o streaming che sia.
+struct LivePlayerArtwork: View {
+    @ObservedObject var player = PlayerEngine.shared
+    var size: CGFloat = 48
+    var corner: CGFloat = 8
+
+    var body: some View {
+        Group {
+            if let image = player.artwork {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                ZStack {
+                    LinearGradient(colors: [Color(red: 0.49, green: 0.25, blue: 0.75),
+                                            Color(red: 0.85, green: 0.33, blue: 0.52)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Image(systemName: "music.note")
+                        .font(.system(size: size * 0.36, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+    }
+}

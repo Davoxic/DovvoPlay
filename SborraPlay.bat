@@ -83,6 +83,9 @@ echo     5   Guarda cosa c'e' sul telefono
 echo     6   Cerca il telefono sulla rete
 echo     7   Aggiorna yt-dlp
 echo.
+echo     8   Avvia il ponte per YouTube ^(lascia aperto^)
+echo     9   Scarica da un link YouTube o SoundCloud
+echo.
 echo     0   Esci
 echo.
 set /p scelta=   Scegli un numero:
@@ -94,6 +97,8 @@ if "%scelta%"=="4" goto restore
 if "%scelta%"=="5" goto library
 if "%scelta%"=="6" goto discover
 if "%scelta%"=="7" goto aggiorna
+if "%scelta%"=="8" goto ponte
+if "%scelta%"=="9" goto link
 if "%scelta%"=="0" exit /b 0
 goto menu
 
@@ -172,6 +177,30 @@ echo.
 echo.
 echo   Se non lo trova: apri SborraPlay sull'iPhone, Impostazioni, accendi il
 echo   Server Wi-Fi, e controlla che telefono e PC siano sulla stessa rete.
+echo.
+pause
+goto menu
+
+:ponte
+cls
+echo.
+echo   Accendo il ponte. Tienilo aperto mentre cerchi su YouTube dall'iPhone.
+echo   Per chiuderlo: Ctrl+C, oppure chiudi la finestra.
+echo.
+"%VPY%" sborraplay-dl serve
+echo.
+pause
+goto menu
+
+:link
+cls
+echo.
+echo   Incolla il link del video YouTube o del brano SoundCloud
+echo.
+set /p lnk=   ^>
+if "%lnk%"=="" goto menu
+echo.
+"%VPY%" sborraplay-dl grab %lnk%
 echo.
 pause
 goto menu
