@@ -97,6 +97,11 @@ final class OnlineStore: ObservableObject {
         guard !busy.contains(track.id) else { return }
         errorText = nil
 
+        if track.isProtected {
+            errorText = "\"\(track.title)\" è protetto con DRM da SoundCloud: iOS non può riprodurlo."
+            return
+        }
+
         // se è già sul telefono non sprechiamo dati: si ascolta il file
         if let local = track.localFile,
            let known = library.tracks.first(where: { $0.id == local.lastPathComponent }) {
@@ -123,17 +128,14 @@ final class OnlineStore: ObservableObject {
             return try await SoundCloudClient.streamURL(for: track)
         case .youtube:
             guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
-            do {
-                let url = try await YouTubeClient.resolveAudio(videoID: videoID, quality: quality)
-                backend = YouTubeClient.lastBackend
-                return url
-            } catch {
-                if bridgeReady, let viaBridge = try? await BridgeClient.streamURL(for: track) {
-                    backend = "ponte sul PC"
-                    return viaBridge
-                }
-                throw error
+            // yt-dlp sul PC è l'unica via che YouTube non blocca: se c'è, prima lui
+            if bridgeReady, let viaBridge = try? await BridgeClient.streamURL(for: track) {
+                backend = "ponte sul PC"
+                return viaBridge
             }
+            let url = try await YouTubeClient.resolveAudio(videoID: videoID, quality: quality)
+            backend = YouTubeClient.lastBackend
+            return url
         }
     }
 
@@ -176,20 +178,39 @@ final class OnlineStore: ObservableObject {
             return
         }
 
+        if track.isProtected {
+            throw HLSDownloader.HLSError.encrypted
+        }
+
         var remote: URL
         var ext = "m4a"
 
         switch track.source {
         case .soundcloud:
             remote = try await SoundCloudClient.streamURL(for: track, preferDownloadable: true)
-            let raw = remote.absoluteString
-            if raw.contains(".m3u8") || raw.contains("/hls/") {
-                throw SoundCloudClient.ClientError.noStream
+            ext = "mp3"
+            // niente transcodifica progressiva: scarichiamo i segmenti e li uniamo
+            if HLSDownloader.isPlaylist(remote) {
+                let destination = LibraryPaths.uniqueDestination(for: track.fileName(ext: "mp3"))
+                downloads.beginManual(id: track.id, title: track.title,
+                                      fileName: destination.lastPathComponent)
+                do {
+                    try await HLSDownloader.download(playlist: remote, to: destination) { value in
+                        Task { @MainActor in self.downloads.updateManual(id: track.id, progress: value) }
+                    }
+                } catch {
+                    downloads.endManual(id: track.id)
+                    try? FileManager.default.removeItem(at: destination)
+                    throw error
+                }
+                downloads.endManual(id: track.id)
+                await finishImport(track: track, destination: destination,
+                                   library: library, playlist: playlist)
+                return
             }
             guard await StreamProbe.isServed(remote) else {
                 throw SoundCloudClient.ClientError.noStream
             }
-            ext = "mp3"
         case .youtube:
             guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
             remote = try await YouTubeClient.resolveAudio(videoID: videoID, quality: requested)
@@ -200,7 +221,13 @@ final class OnlineStore: ObservableObject {
         let destination = LibraryPaths.uniqueDestination(for: track.fileName(ext: ext))
         _ = try await downloads.download(remote, to: destination,
                                          id: track.id, title: track.title)
+        await finishImport(track: track, destination: destination,
+                           library: library, playlist: playlist)
+    }
 
+    /// Copertina, riscansione ed eventuale playlist: uguale per ogni strada.
+    private func finishImport(track: OnlineTrack, destination: URL,
+                              library: LibraryStore, playlist: Playlist?) async {
         var artwork: Data?
         if let artURL = track.artworkURL {
             artwork = try? await URLSession.shared.data(from: artURL).0

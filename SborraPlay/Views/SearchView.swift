@@ -141,7 +141,7 @@ struct SearchView: View {
                 Text(track.title)
                     .font(.body)
                     .lineLimit(1)
-                    .foregroundStyle(player.streamingItem?.id == track.id ? Color.accentColor : Color.primary)
+                    .foregroundStyle(titleColor(for: track))
                 HStack(spacing: 5) {
                     Text(track.artist.isEmpty ? track.source.label : track.artist)
                         .lineLimit(1)
@@ -149,6 +149,11 @@ struct SearchView: View {
                     if track.isDownloaded {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
+                    }
+                    if track.isProtected {
+                        Label("protetto", systemImage: "lock.fill")
+                            .labelStyle(.titleAndIcon)
+                            .foregroundStyle(.orange)
                     }
                 }
                 .font(.caption)
@@ -161,6 +166,11 @@ struct SearchView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { online.play(track, in: library) }
+    }
+
+    private func titleColor(for track: OnlineTrack) -> Color {
+        if player.streamingItem?.id == track.id { return .accentColor }
+        return track.isProtected ? .secondary : .primary
     }
 
     @ViewBuilder
@@ -179,6 +189,11 @@ struct SearchView: View {
             .frame(width: 30)
         } else if online.isBusy(track) {
             ProgressView().frame(width: 30)
+        } else if track.isProtected {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 17))
+                .foregroundStyle(.orange)
+                .frame(width: 30)
         } else {
             Menu {
                 Button {

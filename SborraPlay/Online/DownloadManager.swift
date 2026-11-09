@@ -138,3 +138,20 @@ extension DownloadManager: URLSessionDownloadDelegate {
         Task { @MainActor in self.finish(taskID, tempFile: nil, error: error) }
     }
 }
+
+extension DownloadManager {
+    /// Per i download che non passano da URLSession (i segmenti HLS uniti a mano).
+    func beginManual(id: String, title: String, fileName: String) {
+        jobs[id] = Job(id: id, title: title, progress: 0, fileName: fileName)
+    }
+
+    func updateManual(id: String, progress value: Double) {
+        guard var job = jobs[id] else { return }
+        job.progress = min(max(value, 0), 1)
+        jobs[id] = job
+    }
+
+    func endManual(id: String) {
+        jobs[id] = nil
+    }
+}
