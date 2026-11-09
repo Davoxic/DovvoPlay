@@ -19,6 +19,9 @@ enum SoundCloudClient {
         }
     }
 
+    private static let userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+        + "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+
     private static var cachedID: String?
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -71,7 +74,7 @@ enum SoundCloudClient {
         for (key, value) in SoundCloudCredentials.header {
             request.setValue(value, forHTTPHeaderField: key)
         }
-        request.setValue(UA, forHTTPHeaderField: "User-Agent")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 20
         return request
     }
