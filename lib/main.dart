@@ -20,10 +20,11 @@ Future<void> main() async {
     print('Avviso JustAudioBackground: $e');
   }
 
-  // Configura la sessione audio per categoria playback (musica)
+  // Configura la sessione audio per categoria playback (musica) e attivala
   try {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
+    await session.setActive(true);
   } catch (e) {
     print('Avviso AudioSession: $e');
   }

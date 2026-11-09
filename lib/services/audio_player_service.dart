@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -23,6 +24,7 @@ class AudioPlayerService extends ChangeNotifier {
   Duration _duration = Duration.zero;
   PlayerLoopMode _loopMode = PlayerLoopMode.off;
   bool _isShuffle = false;
+  int _playRequestId = 0;
 
   AudioPlayer get player => _player;
   Track? get currentTrack => _currentTrack;
@@ -77,6 +79,8 @@ class AudioPlayerService extends ChangeNotifier {
   bool get hasPrevious => _currentIndex > 0;
 
   Future<void> playTrack(Track track, {List<Track>? newQueue}) async {
+    final requestId = ++_playRequestId;
+
     if (newQueue != null) {
       _queue = List.from(newQueue);
       _currentIndex = _queue.indexWhere((t) => t.id == track.id);
@@ -92,28 +96,37 @@ class AudioPlayerService extends ChangeNotifier {
     }
 
     _currentTrack = track;
+    _position = Duration.zero;
+    _duration = track.duration > Duration.zero ? track.duration : Duration.zero;
     _isBuffering = true;
     notifyListeners();
 
     try {
       Uri audioUri;
       if (track.isOnline) {
-        String? streamUrl = track.streamUrl;
-        if (streamUrl == null || streamUrl.isEmpty) {
-          final videoId = track.id.replaceFirst('yt_', '');
-          streamUrl = await YouTubeService.instance.getAudioStreamUrl(videoId);
-          if (streamUrl == null) {
-            _isBuffering = false;
-            notifyListeners();
-            throw Exception('Impossibile estrarre lo stream audio per questa canzone.');
-          }
+        final videoId = track.id.replaceFirst('yt_', '');
+        final file = await YouTubeService.instance.getCachedOrDownloadAudioStream(
+          videoId,
+          track.title,
+        );
+
+        if (_playRequestId != requestId) {
+          return; // Una nuova riproduzione è stata avviata
         }
-        audioUri = Uri.parse(streamUrl);
+
+        if (file == null || !await file.exists()) {
+          throw Exception('Impossibile caricare o scaricare lo stream audio per questa canzone.');
+        }
+        audioUri = Uri.file(file.path);
       } else if (track.filePath != null) {
         audioUri = Uri.file(track.filePath!);
+      } else if (track.streamUrl != null && track.streamUrl!.isNotEmpty) {
+        audioUri = Uri.parse(track.streamUrl!);
       } else {
         throw Exception('Percorso audio non valido.');
       }
+
+      if (_playRequestId != requestId) return;
 
       final mediaItem = MediaItem(
         id: track.id,
@@ -126,12 +139,16 @@ class AudioPlayerService extends ChangeNotifier {
 
       final audioSource = AudioSource.uri(audioUri, tag: mediaItem);
       await _player.setAudioSource(audioSource);
+
+      if (_playRequestId != requestId) return;
       await _player.play();
-    } catch (e) {
-      print('Errore riproduzione: $e');
+    } catch (e, stack) {
+      print('Errore riproduzione: $e\n$stack');
     } finally {
-      _isBuffering = false;
-      notifyListeners();
+      if (_playRequestId == requestId) {
+        _isBuffering = false;
+        notifyListeners();
+      }
     }
   }
 

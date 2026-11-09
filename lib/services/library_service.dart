@@ -86,9 +86,12 @@ class LibraryService extends ChangeNotifier {
     final foundFiles = <File>[];
     await for (final entity in dir.list(recursive: true, followLinks: false)) {
       if (entity is File) {
-        final ext = entity.path.toLowerCase().substring(entity.path.lastIndexOf('.'));
-        if (validExts.contains(ext)) {
-          foundFiles.add(entity);
+        final dotIdx = entity.path.lastIndexOf('.');
+        if (dotIdx != -1) {
+          final ext = entity.path.toLowerCase().substring(dotIdx);
+          if (validExts.contains(ext)) {
+            foundFiles.add(entity);
+          }
         }
       }
     }
@@ -102,7 +105,8 @@ class LibraryService extends ChangeNotifier {
         newTracks.add(existingMap[path]!);
       } else {
         final name = file.path.split(Platform.pathSeparator).last;
-        final nameWithoutExt = name.substring(0, name.lastIndexOf('.'));
+        final dotIdx = name.lastIndexOf('.');
+        final nameWithoutExt = dotIdx != -1 ? name.substring(0, dotIdx) : name;
         int size = 0;
         try {
           size = await file.length();
