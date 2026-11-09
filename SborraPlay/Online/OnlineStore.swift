@@ -142,6 +142,30 @@ final class OnlineStore: ObservableObject {
             return
         }
 
+        if track.source == .youtube {
+            // Se c'è il ponte sul computer attivo, estrai l'audio per AVPlayer
+            if bridgeReady {
+                busy.insert(track.id)
+                Task { [weak self] in
+                    guard let self else { return }
+                    if let viaBridge = try? await BridgeClient.streamURL(for: track) {
+                        self.backend = "ponte sul PC"
+                        PlayerEngine.shared.playStream(track, url: viaBridge)
+                        self.busy.remove(track.id)
+                        return
+                    }
+                    self.busy.remove(track.id)
+                    self.openEmbed(track)
+                }
+                return
+            }
+
+            // Sul telefono senza PC: apri subito il player YouTube integrato senza attese
+            openEmbed(track)
+            return
+        }
+
+        // SoundCloud: streaming diretto tramite AVPlayer
         busy.insert(track.id)
         Task { [weak self] in
             guard let self else { return }
@@ -149,14 +173,7 @@ final class OnlineStore: ObservableObject {
                 let url = try await self.streamURL(for: track)
                 PlayerEngine.shared.playStream(track, url: url)
             } catch {
-                if track.source == .youtube {
-                    // nessun flusso diretto: si apre il player ufficiale di YouTube
-                    self.errorText = nil
-                    self.embedTrack = track
-                    self.loadEmbedAlternatives(for: track)
-                } else {
-                    self.errorText = error.localizedDescription
-                }
+                self.errorText = error.localizedDescription
             }
             self.busy.remove(track.id)
         }
@@ -170,9 +187,7 @@ final class OnlineStore: ObservableObject {
         loadEmbedAlternatives(for: track)
     }
 
-    /// Cerca le versioni "Topic" e gli audio ufficiali dello stesso brano.
-    /// Parte subito, così quando il primo video risulta bloccato le alternative
-    /// sono già pronte e il passaggio è immediato.
+    /// Cerca altre versioni dello stesso brano su YouTube.
     func loadEmbedAlternatives(for track: OnlineTrack) {
         embedAlternatives = []
         let artista = track.artist
@@ -186,18 +201,11 @@ final class OnlineStore: ObservableObject {
             var raccolte: [OnlineTrack] = []
             var viste = Set<String>([track.id])
 
-            let ricerche = [
-                "\(artista) \(titolo) topic",
-                "\(artista) \(titolo) official audio",
-                "\(artista) \(titolo)"
-            ]
-            for query in ricerche {
-                guard let trovate = try? await PipedClient.search(query, limit: 15) else { continue }
+            let query = "\(artista) \(titolo)".trimmingCharacters(in: .whitespaces)
+            if !query.isEmpty, let trovate = try? await YouTubeClient.search(query, allowBridge: false) {
                 for candidata in trovate where viste.insert(candidata.id).inserted {
                     raccolte.append(candidata)
                 }
-                // appena abbiamo un "Topic" possiamo smettere: è quello buono
-                if raccolte.contains(where: { $0.artist.lowercased().hasSuffix("- topic") }) { break }
             }
             if !raccolte.isEmpty {
                 self.embedAlternatives = raccolte
@@ -211,28 +219,11 @@ final class OnlineStore: ObservableObject {
             return try await SoundCloudClient.streamURL(for: track)
         case .youtube:
             guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
-            // yt-dlp sul PC è l'unica via che YouTube non blocca: se c'è, prima lui
             if bridgeReady, let viaBridge = try? await BridgeClient.streamURL(for: track) {
                 backend = "ponte sul PC"
                 return viaBridge
             }
-            // Senza ponte le istanze pubbliche quasi sempre non danno niente:
-            // ci diamo sette secondi, poi si passa al player incorporato.
-            let found: URL? = await withTaskGroup(of: URL?.self) { group in
-                group.addTask {
-                    try? await YouTubeClient.resolveAudio(videoID: videoID, quality: self.quality)
-                }
-                group.addTask {
-                    try? await Task.sleep(nanoseconds: 7_000_000_000)
-                    return nil
-                }
-                let first = await group.next() ?? nil
-                group.cancelAll()
-                return first
-            }
-            guard let found else { throw PipedClient.PipedError.noAudio }
-            backend = YouTubeClient.lastBackend
-            return found
+            return try await YouTubeClient.resolveAudio(videoID: videoID, quality: self.quality)
         }
     }
 
@@ -309,9 +300,12 @@ final class OnlineStore: ObservableObject {
                 throw SoundCloudClient.ClientError.noStream
             }
         case .youtube:
-            guard let videoID = track.resolveHint else { throw PipedClient.PipedError.noAudio }
-            remote = try await YouTubeClient.resolveAudio(videoID: videoID, quality: requested)
-            backend = YouTubeClient.lastBackend
+            if bridgeReady, let viaBridge = try? await BridgeClient.streamURL(for: track) {
+                remote = viaBridge
+                backend = "ponte sul PC"
+            } else {
+                throw YouTubeClient.YouTubeError.everythingDown("Per scaricare l'audio offline da YouTube accendi il ponte SborraPlay sul PC (l'ascolto in streaming invece funziona direttamente nell'app senza PC)")
+            }
             ext = "m4a"
         }
 

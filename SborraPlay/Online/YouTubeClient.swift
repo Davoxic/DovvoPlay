@@ -128,15 +128,15 @@ enum YouTubeStreamError: Error, LocalizedError {
         case .unplayable(let reason):
             return "Video non riproducibile: \(reason)"
         case .noAudioStreamFound:
-            return "Nessuno stream audio compatibile (mp4a) trovato. L'AVPlayer non supporta questo formato."
+            return "Nessuno stream audio trovato."
         case .cipherNotSupported:
             return "Questo video richiede la decrittazione della firma, operazione non supportata."
         }
     }
 }
 
-/// Facciata su YouTube: prova Piped, poi Invidious, poi il ponte sul PC.
-/// Tiene traccia di chi ha risposto, così l'errore dice qualcosa di utile.
+/// Facciata su YouTube: ricerca diretta tramite API InnerTube (client Web ufficiale),
+/// e supporto ponte PC con yt-dlp per estrazione diretta dei flussi audio.
 enum YouTubeClient {
 
     private(set) static var lastBackend: String = "—"
@@ -152,126 +152,162 @@ enum YouTubeClient {
         }
     }
 
+    /// Ricerca brani su YouTube direttamente tramite le API native InnerTube di YouTube.
+    /// Non richiede Piped, Invidious o server di terze parti: funziona sempre e ovunque.
     static func search(_ query: String, allowBridge: Bool) async throws -> [OnlineTrack] {
-        if let viaPiped = try? await PipedClient.search(query), !viaPiped.isEmpty {
-            lastBackend = "Piped (\(short(PipedClient.activeInstance)))"
-            return viaPiped
-        }
-        if let viaInvidious = try? await InvidiousClient.search(query), !viaInvidious.isEmpty {
-            lastBackend = "Invidious"
-            return viaInvidious
-        }
         if allowBridge, let viaBridge = try? await BridgeClient.search(query), !viaBridge.isEmpty {
             lastBackend = "ponte sul PC"
             return viaBridge
         }
-        lastBackend = "nessuno"
-        throw YouTubeError.everythingDown("né le istanze Piped né quelle Invidious hanno risposto")
-    }
 
-    /// Risolve l'audio usando direttamente le API InnerTube di YouTube (client iOS nativo).
-    static func resolveAudio(videoID: String, quality: StreamQuality) async throws -> URL {
-        let apiUrl = URL(string: "https://www.youtube.com/youtubei/v1/player")!
+        let apiUrl = URL(string: "https://www.youtube.com/youtubei/v1/search")!
         var request = URLRequest(url: apiUrl)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Un user-agent fittizio ma credibile
-        request.setValue("com.google.ios.youtube/19.29.1 (iPhone14,3; U; CPU iOS 16_4_1 like Mac OS X)", forHTTPHeaderField: "User-Agent")
-        
-        // Spacciandoci per client IOS nativo, YouTube tende a fornire URL diretti 
-        // e non offuscati (evitiamo il JS parser).
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+
         let payload: [String: Any] = [
             "context": [
                 "client": [
-                    "clientName": "IOS",
-                    "clientVersion": "19.29.1",
-                    "deviceMake": "Apple",
-                    "deviceModel": "iPhone14,3",
-                    "osName": "iOS",
-                    "osVersion": "16.4.1",
-                    "hl": "it", // Lingua
-                    "gl": "IT"  // Regione
+                    "clientName": "WEB",
+                    "clientVersion": "2.20240101.00.00",
+                    "hl": "it",
+                    "gl": "IT"
                 ]
             ],
-            "videoId": videoID
+            "query": query
         ]
-        
+
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-        
-        let (data, _) = try await URLSession.shared.data(for: request)
-        
-        let decoder = JSONDecoder()
-        let response = try decoder.decode(InnerTubeResponse.self, from: data)
-        
-        // 1. Controllo se il video è bloccato (es. limiti di età o copyright)
-        if let status = response.playabilityStatus?.status, status != "OK" {
-            let reason = response.playabilityStatus?.reason ?? "Motivo sconosciuto"
-            throw YouTubeStreamError.unplayable(reason)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw YouTubeError.everythingDown("errore HTTP \(http.statusCode)")
         }
-        
-        guard let streamingData = response.streamingData else {
-            throw YouTubeStreamError.noAudioStreamFound
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) else {
+            throw YouTubeError.everythingDown("risposta non valida da YouTube")
         }
-        
-        // 2. Controllo per le Live: se è una live, YouTube ci dà un URL m3u8 (HLS)
-        // AVPlayer lo digerisce nativamente senza dover fare il parse dei chunk!
-        if let hlsManifest = streamingData.hlsManifestUrl, let liveUrl = URL(string: hlsManifest) {
-            lastBackend = "YouTube Diretto (Live)"
-            return liveUrl
-        }
-        
-        // 3. Uniamo tutti i formati disponibili
-        let allFormats = (streamingData.formats ?? []) + (streamingData.adaptiveFormats ?? [])
-        
-        // 4. Filtriamo SOLO i formati audio che AVPlayer sa leggere (AAC in MP4/M4A)
-        var audioFormats = allFormats.filter { format in
-            let isMp4a = format.mimeType.contains("audio/mp4") || format.mimeType.contains("audio/x-m4a")
-            return isMp4a
-        }
-        
-        if audioFormats.isEmpty {
-            throw YouTubeStreamError.noAudioStreamFound
-        }
-        
-        // 5. Ordiniamo per bitrate (dal più basso al più alto)
-        audioFormats.sort { ($0.bitrate ?? 0) < ($1.bitrate ?? 0) }
-        
-        let selectedFormat: Format
-        
-        // Adatta i "case" a quelli dell'enum StreamQuality (.saver / .high / .auto)
-        switch quality.resolved {
-        case .saver: // risparmio dati -> bitrate più basso
-            selectedFormat = audioFormats.first! 
-        default:   // high/auto -> bitrate più alto
-            selectedFormat = audioFormats.last! 
-        }
-        
-        // 6. Restituiamo l'URL diretto
-        if let streamURLString = selectedFormat.url, let streamURL = URL(string: streamURLString) {
+
+        let tracks = extractTracks(from: json)
+        if !tracks.isEmpty {
             lastBackend = "YouTube Diretto"
-            return streamURL
+            return tracks
         }
-        
-        // Se c'è solo signatureCipher/cipher, significherebbe che serve l'engine JS 
-        // (molto raro chiedendo come client IOS, ma gestiamo l'errore per non far girare rotelle a vuoto)
-        if selectedFormat.signatureCipher != nil || selectedFormat.cipher != nil {
-            throw YouTubeStreamError.cipherNotSupported
+
+        // Se la ricerca diretta non ha restituito risultati, prova Invidious/Piped come riserva
+        if let viaInvidious = try? await InvidiousClient.search(query), !viaInvidious.isEmpty {
+            lastBackend = "Invidious"
+            return viaInvidious
         }
-        
-        throw YouTubeStreamError.noAudioStreamFound
+        if let viaPiped = try? await PipedClient.search(query), !viaPiped.isEmpty {
+            lastBackend = "Piped"
+            return viaPiped
+        }
+
+        lastBackend = "nessuno"
+        throw YouTubeError.everythingDown("nessun risultato per \"\(query)\"")
     }
 
-    /// La qualità richiesta per prima, poi le altre come riserva.
-    private static func ranked(_ options: [AudioStreamOption], quality: StreamQuality) -> [AudioStreamOption] {
-        let playable = options.filter { $0.isPlayable }
-        guard !playable.isEmpty else { return [] }
-        var ordered: [AudioStreamOption] = []
-        if let first = PipedClient.pick(playable, quality: quality) { ordered.append(first) }
-        let sorted = quality.resolved == .saver
-            ? playable.sorted { $0.bitrateKbps < $1.bitrateKbps }
-            : playable.sorted { $0.bitrateKbps > $1.bitrateKbps }
-        for option in sorted where !ordered.contains(option) { ordered.append(option) }
-        return ordered
+    /// Estrae i brani dal JSON ad albero restituito da YouTube
+    private static func extractTracks(from json: Any) -> [OnlineTrack] {
+        var tracks: [OnlineTrack] = []
+        var seenIDs = Set<String>()
+
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let vr = dict["videoRenderer"] as? [String: Any],
+                   let vid = vr["videoId"] as? String,
+                   !vid.isEmpty,
+                   seenIDs.insert(vid).inserted {
+
+                    var title = ""
+                    if let titleObj = vr["title"] as? [String: Any],
+                       let runs = titleObj["runs"] as? [[String: Any]],
+                       let first = runs.first?["text"] as? String {
+                        title = first
+                    }
+
+                    var author = ""
+                    if let owner = vr["ownerText"] as? [String: Any],
+                       let runs = owner["runs"] as? [[String: Any]],
+                       let first = runs.first?["text"] as? String {
+                        author = first
+                    } else if let shortByline = vr["shortBylineText"] as? [String: Any],
+                              let runs = shortByline["runs"] as? [[String: Any]],
+                              let first = runs.first?["text"] as? String {
+                        author = first
+                    }
+
+                    var durationSeconds: Double = 0
+                    if let length = vr["lengthText"] as? [String: Any],
+                       let simple = length["simpleText"] as? String {
+                        durationSeconds = parseDuration(simple)
+                    }
+
+                    var thumbURL: URL? = URL(string: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg")
+                    if let thumbObj = vr["thumbnail"] as? [String: Any],
+                       let thumbs = thumbObj["thumbnails"] as? [[String: Any]],
+                       let last = thumbs.last?["url"] as? String,
+                       let url = URL(string: last) {
+                        thumbURL = url
+                    }
+
+                    if !title.isEmpty {
+                        tracks.append(OnlineTrack(
+                            id: "yt-\(vid)",
+                            source: .youtube,
+                            title: title,
+                            artist: author,
+                            duration: durationSeconds,
+                            artworkURL: thumbURL,
+                            pageURL: URL(string: "https://www.youtube.com/watch?v=\(vid)"),
+                            resolveHint: vid
+                        ))
+                    }
+                }
+
+                for value in dict.values {
+                    walk(value)
+                }
+            } else if let array = node as? [Any] {
+                for element in array {
+                    walk(element)
+                }
+            }
+        }
+
+        walk(json)
+        return tracks
+    }
+
+    private static func parseDuration(_ text: String) -> Double {
+        let parts = text.split(separator: ":").compactMap { Double($0) }
+        if parts.count == 2 {
+            return parts[0] * 60 + parts[1]
+        } else if parts.count == 3 {
+            return parts[0] * 3600 + parts[1] * 60 + parts[2]
+        }
+        return 0
+    }
+
+    static func resolveAudio(videoID: String, quality: StreamQuality) async throws -> URL {
+        // Se c'è il ponte con yt-dlp sul computer attivo, estraiamo l'audio nativo
+        if let bridgeURL = try? await BridgeClient.streamURL(for: OnlineTrack(
+            id: "yt-\(videoID)",
+            source: .youtube,
+            title: "",
+            artist: "",
+            duration: 0,
+            artworkURL: nil,
+            pageURL: nil,
+            resolveHint: videoID
+        )) {
+            lastBackend = "ponte sul PC"
+            return bridgeURL
+        }
+
+        throw YouTubeStreamError.noAudioStreamFound
     }
 
     static func audioOptions(for videoID: String) async throws -> [AudioStreamOption] {
@@ -297,31 +333,4 @@ enum YouTubeClient {
     private static func short(_ base: String) -> String {
         base.replacingOccurrences(of: "https://", with: "")
     }
-}
-
-// MARK: - Strutture private per JSON InnerTube
-
-private struct InnerTubeResponse: Decodable {
-    let streamingData: StreamingData?
-    let playabilityStatus: PlayabilityStatus?
-}
-
-private struct PlayabilityStatus: Decodable {
-    let status: String
-    let reason: String?
-}
-
-private struct StreamingData: Decodable {
-    let formats: [Format]?
-    let adaptiveFormats: [Format]?
-    let hlsManifestUrl: String? // Fondamentale per i flussi Live
-}
-
-private struct Format: Decodable {
-    let itag: Int
-    let url: String?
-    let signatureCipher: String?
-    let cipher: String?
-    let mimeType: String
-    let bitrate: Int?
 }

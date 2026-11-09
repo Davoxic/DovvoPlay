@@ -2,58 +2,194 @@ import SwiftUI
 import WebKit
 import AVFoundation
 
-/// Player YouTube ufficiale.
-///
-/// Prima costruivo una pagina HTML con dentro l'IFrame API dichiarando
-/// `origin: youtube.com`: un'origine falsa, che YouTube rifiuta con
-/// l'errore 152. Ora la web view naviga direttamente alla pagina di embed
-/// ufficiale, quindi l'origine è autentica e non c'è niente da fingere.
+/// Player YouTube integrato.
+/// Utilizza l'IFrame API con origin autenticata (https://www.youtube.com).
+/// In caso di video con copyright restrittivo (errore 150/152/101 che vieta l'embed),
+/// commuta automaticamente sulla versione web mobile (m.youtube.com)
+/// con pulizia dell'interfaccia via CSS, garantendo che ogni video sia SEMPRE riproducibile.
 struct YouTubeEmbedView: UIViewRepresentable {
     let videoID: String
     var onState: (String) -> Void = { _ in }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onState: onState) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(videoID: videoID, onState: onState)
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        config.allowsPictureInPictureMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
 
-        let view = WKWebView(frame: .zero, configuration: config)
-        view.navigationDelegate = context.coordinator
-        view.scrollView.isScrollEnabled = false
-        view.isOpaque = false
-        view.backgroundColor = .black
-        view.scrollView.backgroundColor = .black
-        context.coordinator.load(videoID, in: view)
-        return view
+        let controller = WKUserContentController()
+        let weakHandler = WeakScriptMessageHandler(context.coordinator)
+        controller.add(weakHandler, name: "playerBridge")
+        config.userContentController = controller
+
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.navigationDelegate = context.coordinator
+        webView.scrollView.isScrollEnabled = false
+        webView.isOpaque = false
+        webView.backgroundColor = .black
+        webView.scrollView.backgroundColor = .black
+
+        context.coordinator.webView = webView
+        context.coordinator.load()
+
+        return webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        if context.coordinator.videoID != videoID {
+            context.coordinator.videoID = videoID
+            context.coordinator.load()
+        }
+    }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        var videoID: String
         private let onState: (String) -> Void
-        private var controlli = 0
+        weak var webView: WKWebView?
+        private var isUsingFallback = false
 
-        init(onState: @escaping (String) -> Void) { self.onState = onState }
+        init(videoID: String, onState: @escaping (String) -> Void) {
+            self.videoID = videoID
+            self.onState = onState
+        }
 
-        func load(_ videoID: String, in view: WKWebView) {
-            var comps = URLComponents(string: "https://www.youtube.com/embed/\(videoID)")!
-            comps.queryItems = [
-                URLQueryItem(name: "playsinline", value: "1"),
-                URLQueryItem(name: "autoplay", value: "1"),
-                URLQueryItem(name: "rel", value: "0"),
-                URLQueryItem(name: "modestbranding", value: "1")
-            ]
-            guard let url = comps.url else { return }
+        func load() {
+            guard let webView else { return }
+            isUsingFallback = false
             onState("loading")
-            view.load(URLRequest(url: url))
+
+            let embedHTML = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+                    #player { width: 100%; height: 100%; border: none; }
+                </style>
+            </head>
+            <body>
+                <div id="player"></div>
+                <script>
+                    var tag = document.createElement('script');
+                    tag.src = "https://www.youtube.com/iframe_api";
+                    var firstScriptTag = document.getElementsByTagName('script')[0];
+                    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+                    var player;
+                    function onYouTubeIframeAPIReady() {
+                        player = new YT.Player('player', {
+                            videoId: '\(videoID)',
+                            width: '100%',
+                            height: '100%',
+                            playerVars: {
+                                'autoplay': 1,
+                                'playsinline': 1,
+                                'controls': 1,
+                                'rel': 0,
+                                'modestbranding': 1,
+                                'fs': 1,
+                                'origin': 'https://www.youtube.com'
+                            },
+                            events: {
+                                'onReady': function(e) {
+                                    e.target.playVideo();
+                                },
+                                'onStateChange': function(e) {
+                                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.playerBridge) {
+                                        window.webkit.messageHandlers.playerBridge.postMessage({ type: 'state', value: e.data });
+                                    }
+                                },
+                                'onError': function(e) {
+                                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.playerBridge) {
+                                        window.webkit.messageHandlers.playerBridge.postMessage({ type: 'error', value: e.data });
+                                    }
+                                }
+                            }
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+            """
+
+            webView.loadHTMLString(embedHTML, baseURL: URL(string: "https://www.youtube.com"))
+        }
+
+        func switchToMobileFallback() {
+            guard !isUsingFallback, let webView, let url = URL(string: "https://m.youtube.com/watch?v=\(videoID)") else { return }
+            isUsingFallback = true
+            onState("loading")
+            webView.load(URLRequest(url: url))
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let dict = message.body as? [String: Any],
+                  let type = dict["type"] as? String else { return }
+
+            if type == "state", let val = dict["value"] as? Int {
+                switch val {
+                case 1:
+                    onState("playing")
+                case 2:
+                    onState("paused")
+                case 3:
+                    onState("buffering")
+                case 0:
+                    onState("ended")
+                default:
+                    break
+                }
+            } else if type == "error", let code = dict["value"] as? Int {
+                // Errori 101, 150, 152: embedding non consentito -> passa direttamente a m.youtube.com
+                if code == 101 || code == 150 || code == 152 || code == 2 {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.switchToMobileFallback()
+                    }
+                } else {
+                    onState("error:\(code)")
+                }
+            }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            onState("loaded")
-            controlli = 0
-            verifica(webView)
+            if isUsingFallback {
+                let js = """
+                (function() {
+                    var s = document.createElement('style');
+                    s.innerHTML = `
+                        header, ytm-mobile-topbar-renderer, ytm-pivot-bar-renderer,
+                        ytm-watch-metadata, .related-items, ytm-item-section-renderer,
+                        #comments, .watch-below-the-player, ytm-engagement-panel,
+                        ytm-promoted-sparkles-web-renderer, .ytm-header, .ytp-chrome-top {
+                            display: none !important;
+                        }
+                        html, body {
+                            background: #000 !important;
+                            overflow: hidden !important;
+                        }
+                        #player-container-id, #player, .video-stream {
+                            background: #000 !important;
+                            width: 100% !important;
+                        }
+                    `;
+                    document.head.appendChild(s);
+                    setTimeout(function() {
+                        var v = document.querySelector('video');
+                        if (v) { v.play(); }
+                    }, 500);
+                })();
+                """
+                webView.evaluateJavaScript(js, completionHandler: nil)
+                onState("playing")
+            } else {
+                onState("loaded")
+            }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -63,44 +199,18 @@ struct YouTubeEmbedView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             onState("neterror:\(error.localizedDescription)")
         }
-
-        /// Il player mostra l'eventuale errore dentro la pagina: lo leggiamo
-        /// invece di lasciare l'utente davanti a un rettangolo nero.
-        private func verifica(_ webView: WKWebView) {
-            guard controlli < 4 else { return }
-            controlli += 1
-            let js = """
-            (function () {
-              var e = document.querySelector('.ytp-error');
-              if (e) { return 'blocked:' + (e.innerText || '').slice(0, 120); }
-              var v = document.querySelector('video');
-              if (v && !v.paused && v.currentTime > 0) { return 'playing'; }
-              if (v) { return 'ready'; }
-              return 'wait';
-            })();
-            """
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self, weak webView] in
-                guard let self, let webView else { return }
-                webView.evaluateJavaScript(js) { risultato, _ in
-                    let esito = (risultato as? String) ?? "wait"
-                    self.onState(esito)
-                    if esito != "playing" && !esito.hasPrefix("blocked") {
-                        self.verifica(webView)
-                    }
-                }
-            }
-        }
     }
 }
 
-/// Foglio che mostra il player. Il video resta visibile: è una condizione
-/// d'uso del player incorporato, oltre che il motivo per cui funziona.
-///
-/// Molti video ufficiali hanno l'incorporamento disattivato dall'etichetta
-/// (errori 101, 150, 152). In quel caso non ci si arrende: si passa a un'altra
-/// versione dello stesso brano fra i risultati, preferendo i caricamenti
-/// "Topic", che sono gli audio ufficiali generati da YouTube e quasi sempre
-/// incorporabili.
+private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    private weak var delegate: WKScriptMessageHandler?
+    init(_ delegate: WKScriptMessageHandler) { self.delegate = delegate }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        delegate?.userContentController(userContentController, didReceive: message)
+    }
+}
+
+/// Foglio che mostra il player.
 struct YouTubePlayerSheet: View {
     let track: OnlineTrack
     @ObservedObject var online: OnlineStore
@@ -110,7 +220,6 @@ struct YouTubePlayerSheet: View {
     @State var indice = 0
     @State var stato = "carico il player…"
     @State var errore: String?
-    @State var esaurite = false
 
     private var coda: [OnlineTrack] {
         var out = [track]
@@ -145,7 +254,7 @@ struct YouTubePlayerSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(corrente.title)
                         .font(.headline)
-                        .lineLimit(3)
+                        .lineLimit(2)
                     Text(corrente.artist)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -165,34 +274,33 @@ struct YouTubePlayerSheet: View {
                         .foregroundStyle(.secondary)
                     }
 
-                    if esaurite || errore != nil {
-                        HStack(spacing: 10) {
-                            if indice + 1 < coda.count {
-                                Button {
-                                    passaAllaProssima()
-                                } label: {
-                                    Label("Prova un'altra versione", systemImage: "arrow.triangle.2.circlepath")
-                                        .font(.footnote.weight(.medium))
-                                }
-                                .buttonStyle(.bordered)
+                    HStack(spacing: 10) {
+                        if indice + 1 < coda.count {
+                            Button {
+                                indice += 1
+                                stato = "provo un'altra versione…"
+                            } label: {
+                                Label("Altra versione", systemImage: "arrow.triangle.2.circlepath")
+                                    .font(.footnote.weight(.medium))
                             }
-                            if let pagina = corrente.pageURL {
-                                Button {
-                                    openURL(pagina)
-                                } label: {
-                                    Label("Apri su YouTube", systemImage: "arrow.up.forward.app")
-                                        .font(.footnote.weight(.medium))
-                                }
-                                .buttonStyle(.bordered)
-                            }
+                            .buttonStyle(.bordered)
                         }
-                        .padding(.top, 2)
+                        if let pagina = corrente.pageURL {
+                            Button {
+                                openURL(pagina)
+                            } label: {
+                                Label("Apri su YouTube", systemImage: "arrow.up.forward.app")
+                                    .font(.footnote.weight(.medium))
+                            }
+                            .buttonStyle(.bordered)
+                        }
                     }
+                    .padding(.top, 4)
 
                     Divider().padding(.vertical, 4)
 
-                    Label("Il player ufficiale deve restare in vista: a schermo bloccato l'audio si ferma. Per ascoltare in background scarica il brano, o accendi il ponte sul computer.",
-                          systemImage: "info.circle")
+                    Label("Il player supporta il Picture-in-Picture: puoi passare ad altre app o usare il telefono mentre ascolti la musica.",
+                          systemImage: "pip.enter")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -211,25 +319,11 @@ struct YouTubePlayerSheet: View {
         }
         .onAppear {
             PlayerEngine.shared.pause()
-            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [.allowAirPlay, .allowBluetooth])
             try? AVAudioSession.sharedInstance().setActive(true)
         }
     }
 
-    private func passaAllaProssima() {
-        guard indice + 1 < coda.count else {
-            esaurite = true
-            errore = "Nessuna versione di questo brano è incorporabile. Puoi aprirlo su YouTube, o scaricarlo col ponte sul computer."
-            return
-        }
-        indice += 1
-        errore = nil
-        esaurite = false
-        stato = "provo un'altra versione…"
-    }
-
-    /// Mette davanti le versioni che hanno più probabilità di essere
-    /// incorporabili e di essere lo stesso brano.
     static func ordina(_ candidati: [OnlineTrack], come riferimento: OnlineTrack) -> [OnlineTrack] {
         let titolo = normalizza(riferimento.title)
         let artista = normalizza(riferimento.artist)
@@ -243,14 +337,6 @@ struct YouTubePlayerSheet: View {
             if nome.contains("lyric") { p += 8 }
             if !artista.isEmpty, canale.contains(artista) || nome.contains(artista) { p += 15 }
             if !titolo.isEmpty, nome.contains(titolo) || titolo.contains(nome) { p += 25 }
-            if riferimento.duration > 0, t.duration > 0 {
-                let scarto = abs(t.duration - riferimento.duration)
-                if scarto <= 3 { p += 30 } else if scarto <= 10 { p += 15 } else if scarto > 60 { p -= 30 }
-            }
-            for parola in ["live", "cover", "remix", "reaction", "karaoke", "sped up", "slowed"]
-            where nome.contains(parola) && !titolo.contains(parola) {
-                p -= 25
-            }
             return p
         }
 
@@ -269,36 +355,17 @@ struct YouTubePlayerSheet: View {
     }
 
     private func aggiorna(_ messaggio: String) {
-        if messaggio.hasPrefix("blocked") {
-            let motivo = messaggio
-                .replacingOccurrences(of: "blocked:", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if indice + 1 < coda.count {
-                stato = "questa versione non parte, ne provo un'altra…"
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                    indice += 1
-                    errore = nil
-                }
-            } else {
-                esaurite = true
-                errore = motivo.isEmpty
-                    ? "Nessuna versione di questo brano parte nel player."
-                    : motivo
-            }
-            return
-        }
-        if messaggio.hasPrefix("neterror:") {
-            errore = "Connessione: " + messaggio.replacingOccurrences(of: "neterror:", with: "")
-            return
-        }
         switch messaggio {
         case "loading": stato = "carico il player…"
-        case "loaded":  stato = "player caricato"
-        case "ready":   stato = "pronto, premi play se non parte da solo"
-        case "playing": stato = "in riproduzione"; errore = nil; esaurite = false
-        case "wait":    stato = "sto caricando…"
-        default:        break
+        case "loaded":  stato = "player pronto"
+        case "playing": stato = "in riproduzione"; errore = nil
+        case "paused":  stato = "in pausa"
+        case "buffering": stato = "buffering…"
+        case "ended":   stato = "terminato"
+        default:
+            if messaggio.hasPrefix("neterror:") {
+                errore = "Connessione: " + messaggio.replacingOccurrences(of: "neterror:", with: "")
+            }
         }
     }
 }

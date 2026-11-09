@@ -5,6 +5,7 @@ import SwiftUI
 struct DiagnosticsView: View {
     @State var reports: [PipedClient.InstanceReport] = []
     @State var running = false
+    @State var youtubeDirect: String = "non provato"
     @State var soundcloud: String = "non provato"
     @State var invidious: String = "non provato"
 
@@ -24,6 +25,10 @@ struct DiagnosticsView: View {
                 .disabled(running)
             } footer: {
                 Text("Ogni sorgente viene interrogata davvero, con una ricerca breve. Le istanze verdi sono quelle che l'app userà.")
+            }
+
+            Section("YouTube (Diretto)") {
+                LabeledContent("Stato", value: youtubeDirect)
             }
 
             Section("SoundCloud") {
@@ -60,10 +65,18 @@ struct DiagnosticsView: View {
 
     private func runAll() async {
         running = true
+        youtubeDirect = "provo…"
         soundcloud = "provo…"
         invidious = "provo…"
 
         async let piped = PipedClient.probeAll()
+
+        do {
+            let found = try await YouTubeClient.search("music", allowBridge: false)
+            youtubeDirect = found.isEmpty ? "risponde ma senza risultati" : "funziona (\(found.count) risultati)"
+        } catch {
+            youtubeDirect = "non funziona: \(error.localizedDescription)"
+        }
 
         do {
             let found = try await SoundCloudClient.search("music", limit: 5)
