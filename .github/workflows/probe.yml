@@ -15,7 +15,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Regola di scelta nuova, su cinque ricerche
         run: python3 scripts/probe3.py
-      - name: AVPlayer prova il flusso HLS in chiaro
+      - name: Il manifest è in chiaro? i segmenti arrivano?
+        run: python3 scripts/probe4.py
+      - name: AVFoundation carica l'HLS in chiaro
         run: swift scripts/TryPlay.swift "$(cat /tmp/sc_hls.txt 2>/dev/null || echo '')"
-      - name: AVPlayer prova il flusso progressive
+      - name: AVFoundation carica il progressive
         run: swift scripts/TryPlay.swift "$(cat /tmp/sc_prog.txt 2>/dev/null || echo '')"
