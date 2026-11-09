@@ -501,7 +501,7 @@ final class PlayerEngine: NSObject, ObservableObject {
     // MARK: - riproduzione da un indirizzo remoto
 
     /// Riproduce un brano online. Interrompe la coda locale: è un ascolto al volo.
-    func playStream(_ item: RemoteItem, url: URL) {
+    func playStream(_ brano: RemoteItem, url: URL) {
         player?.stop()
         player = nil
         stopTicker()
@@ -512,12 +512,12 @@ final class PlayerEngine: NSObject, ObservableObject {
         detachRemote()
 
         activateSession(true)
-        let item = AVPlayerItem(url: url)
-        let remote = AVPlayer(playerItem: item)
+        let playerItem = AVPlayerItem(url: url)
+        let remote = AVPlayer(playerItem: playerItem)
         remote.automaticallyWaitsToMinimizeStalling = true
         remotePlayer = remote
-        streamingItem = item
-        duration = item.duration
+        streamingItem = brano
+        duration = brano.duration
         currentTime = 0
         artwork = nil
         errorMessage = nil
@@ -544,7 +544,7 @@ final class PlayerEngine: NSObject, ObservableObject {
 
         remoteEndObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
-            object: item,
+            object: playerItem,
             queue: .main
         ) { [weak self] _ in
             guard let self else { return }
@@ -554,7 +554,7 @@ final class PlayerEngine: NSObject, ObservableObject {
         }
 
         // senza questi, un flusso che fallisce lascia girare la rotella all'infinito
-        itemStatusObserver = item.observe(\.status, options: [.new]) { [weak self] observed, _ in
+        itemStatusObserver = playerItem.observe(\.status, options: [.new]) { [weak self] observed, _ in
             guard let self else { return }
             DispatchQueue.main.async {
                 switch observed.status {
@@ -591,7 +591,7 @@ final class PlayerEngine: NSObject, ObservableObject {
         remote.play()
         isPlaying = true
         updateNowPlaying()
-        loadRemoteArtwork(track)
+        loadRemoteArtwork(brano)
     }
 
     /// Se dopo 18 secondi non è partito niente, meglio dirlo che restare a girare.
