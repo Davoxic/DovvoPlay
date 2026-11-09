@@ -28,6 +28,11 @@ final class OnlineStore: ObservableObject {
 
     // MARK: - stato del ponte (resta come riserva per YouTube)
 
+    func refreshSources() async {
+        await PipedClient.refreshInstanceList()
+        await refreshBridge()
+    }
+
     func refreshBridge() async {
         guard BridgeClient.isConfigured else {
             bridgeReady = false
@@ -82,6 +87,28 @@ final class OnlineStore: ObservableObject {
         let found = try await YouTubeClient.search(text, allowBridge: bridgeReady || BridgeClient.isConfigured)
         backend = YouTubeClient.lastBackend
         return found
+    }
+
+    /// Con l'accesso fatto, a ricerca vuota mostriamo i tuoi preferiti.
+    func loadLikes() {
+        searchTask?.cancel()
+        errorText = nil
+        isSearching = true
+        lastQuery = ""
+        searchTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let found = try await SoundCloudClient.likes()
+                if Task.isCancelled { return }
+                self.results = found
+                self.isSearching = false
+                if found.isEmpty { self.errorText = "Nessun brano fra i tuoi preferiti" }
+            } catch {
+                if Task.isCancelled { return }
+                self.isSearching = false
+                self.errorText = error.localizedDescription
+            }
+        }
     }
 
     func clear() {

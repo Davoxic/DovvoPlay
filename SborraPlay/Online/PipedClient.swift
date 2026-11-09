@@ -100,6 +100,7 @@ enum PipedClient {
         var list: [String] = []
         if let working { list.append(working) }
         if let preferred = preferredInstance { list.append(preferred) }
+        list.append(contentsOf: fetchedInstances)
         list.append(contentsOf: defaultInstances)
         var seen = Set<String>()
         return list.filter { seen.insert($0).inserted }
@@ -109,6 +110,34 @@ enum PipedClient {
 
     /// Da chiamare quando l'utente cambia istanza a mano.
     static func resetInstanceCache() { working = nil }
+
+    /// Istanze lette dalla lista ufficiale, che cambia spesso: così l'app si
+    /// aggiorna da sola invece di restare ferma su indirizzi morti.
+    private static var fetchedInstances: [String] = []
+    private static var lastFetch: Date?
+
+    static func refreshInstanceList() async {
+        if let lastFetch, Date().timeIntervalSince(lastFetch) < 6 * 3600 { return }
+        let source = "https://raw.githubusercontent.com/TeamPiped/documentation/main/content/docs/public-instances/index.md"
+        guard let url = URL(string: source),
+              let (data, response) = try? await session.data(from: url),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let text = String(data: data, encoding: .utf8) else { return }
+
+        var found: [String] = []
+        for line in text.components(separatedBy: .newlines) where line.hasPrefix("|") {
+            let cells = line.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
+            for cell in cells where cell.hasPrefix("https://") && !cell.contains(" ") {
+                found.append(cell.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+            }
+        }
+        var seen = Set<String>()
+        let unique = found.filter { seen.insert($0).inserted }
+        if unique.count >= 3 {
+            fetchedInstances = unique
+            lastFetch = Date()
+        }
+    }
 
     /// Prova un'istanza con una ricerca breve.
     static func test(_ base: String) async -> Bool {

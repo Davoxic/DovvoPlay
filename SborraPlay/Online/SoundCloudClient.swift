@@ -64,6 +64,18 @@ enum SoundCloudClient {
         throw ClientError.noClientID
     }
 
+    /// Richiesta verso api-v2 con il token dell'account, se c'è: con l'accesso
+    /// fatto, i brani che da sloggati sono anteprime da 30 secondi tornano interi.
+    private static func apiRequest(_ url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        for (key, value) in SoundCloudCredentials.header {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        request.setValue(UA, forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 20
+        return request
+    }
+
     private static func firstMatch(in text: String, pattern: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern),
               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
@@ -95,7 +107,7 @@ enum SoundCloudClient {
             URLQueryItem(name: "app_locale", value: "it")
         ]
         guard let url = comps.url else { throw ClientError.badResponse }
-        let (data, response) = try await session.data(from: url)
+        let (data, response) = try await session.data(for: apiRequest(url))
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw ClientError.badResponse
         }
@@ -210,13 +222,38 @@ enum SoundCloudClient {
         var comps = URLComponents(string: "https://api-v2.soundcloud.com/tracks/\(numericID)")!
         comps.queryItems = [URLQueryItem(name: "client_id", value: id)]
         guard let url = comps.url else { throw ClientError.noStream }
-        let (data, response) = try await session.data(from: url)
+        let (data, response) = try await session.data(for: apiRequest(url))
         guard let http = response as? HTTPURLResponse, http.statusCode == 200,
               let item = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let parsed = parse(item) else {
             throw ClientError.noStream
         }
         return parsed
+    }
+
+    /// I brani che hai messo "mi piace" sul tuo account.
+    static func likes(limit: Int = 50) async throws -> [OnlineTrack] {
+        guard SoundCloudCredentials.token != nil else { return [] }
+        let id = try await clientID()
+        var comps = URLComponents(string: "https://api-v2.soundcloud.com/me/likes/tracks")!
+        comps.queryItems = [
+            URLQueryItem(name: "client_id", value: id),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        guard let url = comps.url else { throw ClientError.badResponse }
+        let (data, response) = try await session.data(for: apiRequest(url))
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw ClientError.badResponse
+        }
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let collection = root["collection"] as? [[String: Any]] else {
+            throw ClientError.badResponse
+        }
+        return collection.compactMap { entry in
+            // a volte il brano è annidato dentro "track"
+            if let nested = entry["track"] as? [String: Any] { return parse(nested) }
+            return parse(entry)
+        }
     }
 
     // MARK: - stream
@@ -266,7 +303,7 @@ enum SoundCloudClient {
         comps.queryItems = items
         guard let url = comps.url else { throw ClientError.noStream }
 
-        let (data, response) = try await session.data(from: url)
+        let (data, response) = try await session.data(for: apiRequest(url))
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw ClientError.noStream
         }

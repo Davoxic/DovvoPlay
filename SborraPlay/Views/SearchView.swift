@@ -8,6 +8,8 @@ struct SearchView: View {
     @ObservedObject var network = NetworkMonitor.shared
     @State var playlistTarget: OnlineTrack?
     @State var pendingKind: DownloadKind = .audio(.auto)
+    @ObservedObject var auth = SoundCloudAuth.shared
+    @State var showLogin = false
 
     var body: some View {
         NavigationStack {
@@ -36,7 +38,10 @@ struct SearchView: View {
                 online.clear()
                 if !online.query.isEmpty { online.search() }
             }
-            .task { await online.refreshBridge() }
+            .task { await online.refreshSources() }
+            .sheet(isPresented: $showLogin) {
+                SoundCloudLoginView()
+            }
             .sheet(item: $playlistTarget) { track in
                 OnlinePlaylistPicker(track: track) { playlist in
                     online.download(track, kind: pendingKind, into: library, addTo: playlist)
@@ -266,13 +271,40 @@ struct SearchView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 36)
-            Text(online.source == .youtube
-                 ? "YouTube passa dalle istanze Piped: niente PC acceso, niente configurazione."
-                 : "Tocca un risultato per ascoltarlo, la freccia per salvarlo in libreria.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+
+            if online.source == .soundcloud && !auth.isLoggedIn {
+                VStack(spacing: 8) {
+                    Text("Con il tuo account SoundCloud i brani che ora durano 30 secondi partono interi, e qui sotto trovi i tuoi preferiti.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button {
+                        showLogin = true
+                    } label: {
+                        Label("Accedi a SoundCloud", systemImage: "person.crop.circle")
+                            .font(.footnote.weight(.medium))
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.horizontal, 30)
+                .padding(.top, 4)
+            } else if online.source == .soundcloud && auth.isLoggedIn {
+                Button {
+                    online.loadLikes()
+                } label: {
+                    Label("Mostra i tuoi preferiti", systemImage: "heart")
+                        .font(.footnote.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+            } else if online.source == .youtube {
+                Text(online.bridgeReady
+                     ? "Il computer è collegato: le canzoni YouTube passano da lì."
+                     : "YouTube oggi funziona solo col ponte acceso sul computer: sul PC apri SborraPlay e scegli \"Avvia il ponte\".")
+                    .font(.caption)
+                    .foregroundStyle(online.bridgeReady ? .green : .orange)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 34)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.bottom, 70)

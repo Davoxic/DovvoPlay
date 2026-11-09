@@ -10,6 +10,8 @@ struct SettingsView: View {
     @AppStorage("pipedInstance") var pipedInstance = ""
     @ObservedObject var network = NetworkMonitor.shared
     @State var instanceCheck: String?
+    @ObservedObject var scAuth = SoundCloudAuth.shared
+    @State var showSoundCloudLogin = false
     @State var exporting: ExportedFile?
     @State var showBackupImporter = false
     @State var pendingBackup: Data?
@@ -30,6 +32,7 @@ struct SettingsView: View {
             Form {
                 serverSection
                 importSection
+                accountSection
                 streamingSection
                 bridgeSection
                 backupSection
@@ -49,6 +52,9 @@ struct SettingsView: View {
                 }
             }
             .onAppear { server.refreshAddresses() }
+            .sheet(isPresented: $showSoundCloudLogin) {
+                SoundCloudLoginView()
+            }
             .sheet(item: $exporting) { item in
                 ShareSheet(items: [item.url])
             }
@@ -198,6 +204,34 @@ struct SettingsView: View {
             case .failure(let error):
                 library.lastMessage = error.localizedDescription
             }
+        }
+    }
+
+    private var accountSection: some View {
+        Section {
+            if scAuth.isLoggedIn {
+                LabeledContent("Account", value: scAuth.username ?? "connesso")
+                if scAuth.isGoPlus {
+                    Label("Abbonamento Go attivo", systemImage: "checkmark.seal")
+                        .font(.footnote)
+                        .foregroundStyle(.green)
+                }
+                Button(role: .destructive) {
+                    scAuth.signOut()
+                } label: {
+                    Label("Esci da SoundCloud", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+            } else {
+                Button {
+                    showSoundCloudLogin = true
+                } label: {
+                    Label("Accedi a SoundCloud", systemImage: "person.crop.circle")
+                }
+            }
+        } header: {
+            Text("Account SoundCloud")
+        } footer: {
+            Text("Con l'accesso i brani che da sloggato durano 30 secondi tornano interi, e compaiono i tuoi preferiti. I brani col lucchetto restano fuori portata: SoundCloud li protegge con FairPlay, e nessun accesso permette a un'app di terze parti di decifrarli.")
         }
     }
 
