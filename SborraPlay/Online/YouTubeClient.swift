@@ -117,6 +117,24 @@ enum InvidiousClient {
     }
 }
 
+// Se non hai già un errore specifico, usiamo questo per mostrare i messaggi in UI
+enum YouTubeStreamError: Error, LocalizedError {
+    case unplayable(String)
+    case noAudioStreamFound
+    case cipherNotSupported
+
+    var errorDescription: String? {
+        switch self {
+        case .unplayable(let reason):
+            return "Video non riproducibile: \(reason)"
+        case .noAudioStreamFound:
+            return "Nessuno stream audio compatibile (mp4a) trovato. L'AVPlayer non supporta questo formato."
+        case .cipherNotSupported:
+            return "Questo video richiede la decrittazione della firma, operazione non supportata."
+        }
+    }
+}
+
 /// Facciata su YouTube: prova Piped, poi Invidious, poi il ponte sul PC.
 /// Tiene traccia di chi ha risposto, così l'errore dice qualcosa di utile.
 enum YouTubeClient {
@@ -151,38 +169,96 @@ enum YouTubeClient {
         throw YouTubeError.everythingDown("né le istanze Piped né quelle Invidious hanno risposto")
     }
 
-    /// Non basta che un'istanza risponda: il link che restituisce deve anche
-    /// essere accettato dai server di YouTube. Proviamo istanza per istanza
-    /// finché non ne arriva uno che si apre davvero.
+    /// Risolve l'audio usando direttamente le API InnerTube di YouTube (client iOS nativo).
     static func resolveAudio(videoID: String, quality: StreamQuality) async throws -> URL {
-        var sawOptions = false
-
-        for base in PipedClient.instanceList.prefix(6) {
-            guard let bundle = try? await PipedClient.streams(for: videoID, base: base),
-                  !bundle.audio.isEmpty else { continue }
-            sawOptions = true
-            for candidate in ranked(bundle.audio, quality: quality).prefix(2) {
-                if await StreamProbe.isServed(candidate.url) {
-                    lastBackend = "Piped (\(short(base)))"
-                    return candidate.url
-                }
-            }
+        let apiUrl = URL(string: "https://www.youtube.com/youtubei/v1/player")!
+        var request = URLRequest(url: apiUrl)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Un user-agent fittizio ma credibile
+        request.setValue("com.google.ios.youtube/19.29.1 (iPhone14,3; U; CPU iOS 16_4_1 like Mac OS X)", forHTTPHeaderField: "User-Agent")
+        
+        // Spacciandoci per client IOS nativo, YouTube tende a fornire URL diretti 
+        // e non offuscati (evitiamo il JS parser).
+        let payload: [String: Any] = [
+            "context": [
+                "client": [
+                    "clientName": "IOS",
+                    "clientVersion": "19.29.1",
+                    "deviceMake": "Apple",
+                    "deviceModel": "iPhone14,3",
+                    "osName": "iOS",
+                    "osVersion": "16.4.1",
+                    "hl": "it", // Lingua
+                    "gl": "IT"  // Regione
+                ]
+            ],
+            "videoId": videoID
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        
+        let (data, _) = try await URLSession.shared.data(for: request)
+        
+        let decoder = JSONDecoder()
+        let response = try decoder.decode(InnerTubeResponse.self, from: data)
+        
+        // 1. Controllo se il video è bloccato (es. limiti di età o copyright)
+        if let status = response.playabilityStatus?.status, status != "OK" {
+            let reason = response.playabilityStatus?.reason ?? "Motivo sconosciuto"
+            throw YouTubeStreamError.unplayable(reason)
         }
-
-        if let bundle = try? await InvidiousClient.streams(for: videoID), !bundle.audio.isEmpty {
-            sawOptions = true
-            for candidate in ranked(bundle.audio, quality: quality).prefix(2) {
-                if await StreamProbe.isServed(candidate.url) {
-                    lastBackend = "Invidious"
-                    return candidate.url
-                }
-            }
+        
+        guard let streamingData = response.streamingData else {
+            throw YouTubeStreamError.noAudioStreamFound
         }
-
-        lastBackend = "nessuno"
-        throw YouTubeError.everythingDown(sawOptions
-            ? "le istanze rispondono ma YouTube rifiuta i loro link audio"
-            : "nessuna sorgente ha restituito l'audio")
+        
+        // 2. Controllo per le Live: se è una live, YouTube ci dà un URL m3u8 (HLS)
+        // AVPlayer lo digerisce nativamente senza dover fare il parse dei chunk!
+        if let hlsManifest = streamingData.hlsManifestUrl, let liveUrl = URL(string: hlsManifest) {
+            lastBackend = "YouTube Diretto (Live)"
+            return liveUrl
+        }
+        
+        // 3. Uniamo tutti i formati disponibili
+        let allFormats = (streamingData.formats ?? []) + (streamingData.adaptiveFormats ?? [])
+        
+        // 4. Filtriamo SOLO i formati audio che AVPlayer sa leggere (AAC in MP4/M4A)
+        var audioFormats = allFormats.filter { format in
+            let isMp4a = format.mimeType.contains("audio/mp4") || format.mimeType.contains("audio/x-m4a")
+            return isMp4a
+        }
+        
+        if audioFormats.isEmpty {
+            throw YouTubeStreamError.noAudioStreamFound
+        }
+        
+        // 5. Ordiniamo per bitrate (dal più basso al più alto)
+        audioFormats.sort { ($0.bitrate ?? 0) < ($1.bitrate ?? 0) }
+        
+        let selectedFormat: Format
+        
+        // Adatta i "case" a quelli dell'enum StreamQuality (.saver / .high / .auto)
+        switch quality.resolved {
+        case .saver: // risparmio dati -> bitrate più basso
+            selectedFormat = audioFormats.first! 
+        default:   // high/auto -> bitrate più alto
+            selectedFormat = audioFormats.last! 
+        }
+        
+        // 6. Restituiamo l'URL diretto
+        if let streamURLString = selectedFormat.url, let streamURL = URL(string: streamURLString) {
+            lastBackend = "YouTube Diretto"
+            return streamURL
+        }
+        
+        // Se c'è solo signatureCipher/cipher, significherebbe che serve l'engine JS 
+        // (molto raro chiedendo come client IOS, ma gestiamo l'errore per non far girare rotelle a vuoto)
+        if selectedFormat.signatureCipher != nil || selectedFormat.cipher != nil {
+            throw YouTubeStreamError.cipherNotSupported
+        }
+        
+        throw YouTubeStreamError.noAudioStreamFound
     }
 
     /// La qualità richiesta per prima, poi le altre come riserva.
@@ -221,4 +297,31 @@ enum YouTubeClient {
     private static func short(_ base: String) -> String {
         base.replacingOccurrences(of: "https://", with: "")
     }
+}
+
+// MARK: - Strutture private per JSON InnerTube
+
+private struct InnerTubeResponse: Decodable {
+    let streamingData: StreamingData?
+    let playabilityStatus: PlayabilityStatus?
+}
+
+private struct PlayabilityStatus: Decodable {
+    let status: String
+    let reason: String?
+}
+
+private struct StreamingData: Decodable {
+    let formats: [Format]?
+    let adaptiveFormats: [Format]?
+    let hlsManifestUrl: String? // Fondamentale per i flussi Live
+}
+
+private struct Format: Decodable {
+    let itag: Int
+    let url: String?
+    let signatureCipher: String?
+    let cipher: String?
+    let mimeType: String
+    let bitrate: Int?
 }
