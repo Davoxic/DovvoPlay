@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -15,7 +14,10 @@ class AudioPlayerService extends ChangeNotifier {
     _initListeners();
   }
 
-  final AudioPlayer _player = AudioPlayer();
+  final AudioPlayer _player = AudioPlayer(
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+  );
+
   Track? _currentTrack;
   List<Track> _queue = [];
   int _currentIndex = -1;
@@ -48,13 +50,22 @@ class AudioPlayerService extends ChangeNotifier {
       notifyListeners();
     });
 
+    _player.playbackEventStream.listen(
+      (event) {},
+      onError: (Object e, StackTrace st) {
+        print('Errore stream riproduzione: $e');
+        _isBuffering = false;
+        notifyListeners();
+      },
+    );
+
     _player.positionStream.listen((pos) {
       _position = pos;
       notifyListeners();
     });
 
     _player.durationStream.listen((dur) {
-      if (dur != null) {
+      if (dur != null && dur > Duration.zero) {
         _duration = dur;
         notifyListeners();
       }
@@ -103,25 +114,37 @@ class AudioPlayerService extends ChangeNotifier {
 
     try {
       Uri audioUri;
+      Map<String, String>? headers;
+
       if (track.isOnline) {
-        final videoId = track.id.replaceFirst('yt_', '');
-        final file = await YouTubeService.instance.getCachedOrDownloadAudioStream(
-          videoId,
-          track.title,
-        );
+        // 1. Controlla se il brano è già stato scaricato in locale
+        final localFile = await YouTubeService.instance.getLocalDownloadedFile(track.id);
+        if (localFile != null && await localFile.exists()) {
+          audioUri = Uri.file(localFile.path);
+        } else {
+          // 2. Altrimenti recupera lo stream URL istantaneo
+          final videoId = track.id.replaceFirst('yt_', '');
+          final streamUrl = await YouTubeService.instance.getAudioStreamUrl(videoId);
 
-        if (_playRequestId != requestId) {
-          return; // Una nuova riproduzione è stata avviata
-        }
+          if (_playRequestId != requestId) return;
 
-        if (file == null || !await file.exists()) {
-          throw Exception('Impossibile caricare o scaricare lo stream audio per questa canzone.');
+          if (streamUrl == null || streamUrl.isEmpty) {
+            throw Exception('Impossibile estrarre lo stream audio per questa canzone.');
+          }
+
+          audioUri = Uri.parse(streamUrl);
+          headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+            'Referer': 'https://www.youtube.com/',
+          };
         }
-        audioUri = Uri.file(file.path);
       } else if (track.filePath != null) {
         audioUri = Uri.file(track.filePath!);
       } else if (track.streamUrl != null && track.streamUrl!.isNotEmpty) {
         audioUri = Uri.parse(track.streamUrl!);
+        headers = {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        };
       } else {
         throw Exception('Percorso audio non valido.');
       }
@@ -137,7 +160,7 @@ class AudioPlayerService extends ChangeNotifier {
         duration: track.duration > Duration.zero ? track.duration : null,
       );
 
-      final audioSource = AudioSource.uri(audioUri, tag: mediaItem);
+      final audioSource = AudioSource.uri(audioUri, headers: headers, tag: mediaItem);
       await _player.setAudioSource(audioSource);
 
       if (_playRequestId != requestId) return;

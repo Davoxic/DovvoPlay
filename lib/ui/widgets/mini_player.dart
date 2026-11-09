@@ -125,13 +125,13 @@ class MiniPlayer extends StatelessWidget {
                           ),
                         ),
                         if (player.isBuffering)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: SizedBox(
-                              width: 22,
-                              height: 22,
+                          IconButton(
+                            icon: const SizedBox(
+                              width: 20,
+                              height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
                             ),
+                            onPressed: () => player.togglePlayPause(),
                           )
                         else
                           IconButton(
