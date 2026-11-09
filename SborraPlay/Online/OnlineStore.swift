@@ -19,6 +19,9 @@ final class OnlineStore: ObservableObject {
     @Published private(set) var lastQuery = ""
     /// Chi ha risposto all'ultima ricerca YouTube: utile quando qualcosa non va.
     @Published private(set) var backend = "—"
+    /// Brano da aprire nel player YouTube incorporato, quando non c'è
+    /// un flusso audio diretto da dare ad AVPlayer.
+    @Published var embedTrack: OnlineTrack?
     @Published var quality: StreamQuality = StreamQuality.preferred {
         didSet { StreamQuality.preferred = quality }
     }
@@ -143,10 +146,23 @@ final class OnlineStore: ObservableObject {
                 let url = try await self.streamURL(for: track)
                 PlayerEngine.shared.playStream(track, url: url)
             } catch {
-                self.errorText = error.localizedDescription
+                if track.source == .youtube {
+                    // nessun flusso diretto: si apre il player ufficiale di YouTube
+                    self.errorText = nil
+                    self.embedTrack = track
+                } else {
+                    self.errorText = error.localizedDescription
+                }
             }
             self.busy.remove(track.id)
         }
+    }
+
+    /// Apre direttamente il player incorporato, saltando la ricerca del flusso.
+    func openEmbed(_ track: OnlineTrack) {
+        guard track.source == .youtube else { return }
+        errorText = nil
+        embedTrack = track
     }
 
     private func streamURL(for track: OnlineTrack) async throws -> URL {
@@ -160,9 +176,23 @@ final class OnlineStore: ObservableObject {
                 backend = "ponte sul PC"
                 return viaBridge
             }
-            let url = try await YouTubeClient.resolveAudio(videoID: videoID, quality: quality)
+            // Senza ponte le istanze pubbliche quasi sempre non danno niente:
+            // ci diamo sette secondi, poi si passa al player incorporato.
+            let found: URL? = await withTaskGroup(of: URL?.self) { group in
+                group.addTask {
+                    try? await YouTubeClient.resolveAudio(videoID: videoID, quality: self.quality)
+                }
+                group.addTask {
+                    try? await Task.sleep(nanoseconds: 7_000_000_000)
+                    return nil
+                }
+                let first = await group.next() ?? nil
+                group.cancelAll()
+                return first
+            }
+            guard let found else { throw PipedClient.PipedError.noAudio }
             backend = YouTubeClient.lastBackend
-            return url
+            return found
         }
     }
 

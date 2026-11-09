@@ -39,6 +39,9 @@ struct SearchView: View {
                 if !online.query.isEmpty { online.search() }
             }
             .task { await online.refreshSources() }
+            .sheet(item: $online.embedTrack) { track in
+                YouTubePlayerSheet(track: track)
+            }
             .sheet(isPresented: $showLogin) {
                 SoundCloudLoginView()
             }
@@ -208,6 +211,14 @@ struct SearchView: View {
                           systemImage: "play.fill")
                 }
 
+                if track.source == .youtube {
+                    Button {
+                        online.openEmbed(track)
+                    } label: {
+                        Label("Apri nel player YouTube", systemImage: "play.rectangle")
+                    }
+                }
+
                 Divider()
 
                 if track.isDownloaded {
@@ -298,10 +309,10 @@ struct SearchView: View {
                 .buttonStyle(.bordered)
             } else if online.source == .youtube {
                 Text(online.bridgeReady
-                     ? "Il computer è collegato: le canzoni YouTube passano da lì."
-                     : "YouTube oggi funziona solo col ponte acceso sul computer: sul PC apri SborraPlay e scegli \"Avvia il ponte\".")
+                     ? "Il computer è collegato: audio diretto, anche a schermo spento."
+                     : "Senza il computer i brani YouTube si aprono nel player ufficiale incorporato: funziona ovunque, ma deve restare in vista.")
                     .font(.caption)
-                    .foregroundStyle(online.bridgeReady ? .green : .orange)
+                    .foregroundStyle(online.bridgeReady ? .green : .secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 34)
             }
