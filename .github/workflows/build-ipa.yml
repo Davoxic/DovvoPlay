@@ -17,7 +17,7 @@ permissions:
 jobs:
   build:
     name: Build unsigned .ipa
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
       - name: Checkout
