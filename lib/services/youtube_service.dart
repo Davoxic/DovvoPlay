@@ -36,37 +36,34 @@ class YouTubeService {
     }
   }
 
-  /// Recupera l'URL diretto dello stream audio ottimizzato per riproduzione su iOS (AAC/MP4).
-  Future<String?> getAudioStreamUrl(String videoId) async {
-    // 1. Prova prima il manifest standard
+  /// Recupera lo StreamInfo riproducibile su iOS (privilegia AAC in MP4 o Muxed MP4)
+  Future<StreamInfo?> getPlayableStreamInfo(String videoId) async {
+    StreamManifest? manifest;
+
+    // 1. Prova prima il manifest standard (veloce e stabile)
     try {
-      final manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
-      final url = _extractPlayableUrl(manifest);
-      if (url != null) return url;
+      manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
     } catch (e) {
       print('getManifest standard: $e');
     }
 
-    // 2. Fallback su client Android VR e iOS
-    try {
-      final manifest = await yt.videos.streamsClient.getManifest(
-        videoId,
-        ytClients: [
-          YoutubeApiClient.androidVr,
-          YoutubeApiClient.ios,
-        ],
-      ).timeout(const Duration(seconds: 8));
-      final url = _extractPlayableUrl(manifest);
-      if (url != null) return url;
-    } catch (e) {
-      print('getManifest ytClients: $e');
+    // 2. Fallback su client Android VR / iOS
+    if (manifest == null) {
+      try {
+        manifest = await yt.videos.streamsClient.getManifest(
+          videoId,
+          ytClients: [
+            YoutubeApiClient.androidVr,
+            YoutubeApiClient.ios,
+          ],
+        ).timeout(const Duration(seconds: 8));
+      } catch (e) {
+        print('getManifest ytClients: $e');
+      }
     }
 
-    return null;
-  }
+    if (manifest == null) return null;
 
-  /// Seleziona un URL compatibile nativamente con il decoder AVPlayer di iOS (MP4/AAC).
-  String? _extractPlayableUrl(StreamManifest manifest) {
     // 1. Cerca nei flussi audio-only uno stream MP4 / AAC (itag 140 m4a)
     final mp4Audio = manifest.audioOnly.where((s) {
       final containerName = s.container.name.toLowerCase();
@@ -78,34 +75,32 @@ class YouTubeService {
     }).toList();
 
     if (mp4Audio.isNotEmpty) {
-      final chosen = mp4Audio.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
-      return chosen.url.toString();
+      return mp4Audio.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
     }
 
-    // 2. Se non c'è audio-only MP4 (YouTube offre solo Opus/WebM in audioOnly),
-    // usa i flussi muxed MP4: hanno sempre traccia audio AAC decodificabile nativamente da iOS AVPlayer.
+    // 2. Se non c'è audio-only MP4 (YouTube offre solo Opus in audioOnly),
+    // usa i flussi muxed MP4: contengono sempre traccia audio AAC decodificabile nativamente da iOS.
     final mp4Muxed = manifest.muxed.where((s) {
       final containerName = s.container.name.toLowerCase();
       return containerName == 'mp4' || containerName == 'm4a';
     }).toList();
 
     if (mp4Muxed.isNotEmpty) {
-      // Scegli lo stream muxed a risoluzione più leggera (es. 360p) per avvio istantaneo con minimo consumo dati
-      final chosen = mp4Muxed.reduce((a, b) => a.bitrate.bitsPerSecond < b.bitrate.bitsPerSecond ? a : b);
-      return chosen.url.toString();
+      return mp4Muxed.reduce((a, b) => a.bitrate.bitsPerSecond < b.bitrate.bitsPerSecond ? a : b);
     }
 
-    // 3. Fallback su HLS m3u8 se disponibile (nativo iOS)
-    if (manifest.hls.isNotEmpty) {
-      return manifest.hls.first.url.toString();
-    }
-
-    // 4. Fallback estremo su qualsiasi audio disponibile
+    // 3. Fallback estremo su qualsiasi audio disponibile
     if (manifest.audioOnly.isNotEmpty) {
-      return manifest.audioOnly.withHighestBitrate().url.toString();
+      return manifest.audioOnly.withHighestBitrate();
     }
 
     return null;
+  }
+
+  /// Recupera l'URL diretto dello stream audio (se disponibile)
+  Future<String?> getAudioStreamUrl(String videoId) async {
+    final info = await getPlayableStreamInfo(videoId);
+    return info?.url.toString();
   }
 
   /// Controlla se il brano è già stato scaricato in precedenza nella cartella Music
@@ -146,8 +141,8 @@ class YouTubeService {
         return targetFile;
       }
 
-      final streamUrl = await getAudioStreamUrl(videoId);
-      if (streamUrl == null) return null;
+      final streamInfo = await getPlayableStreamInfo(videoId);
+      if (streamInfo == null) return null;
 
       final tempFile = File('${musicDir.path}/${safeName}_$safeId.m4a.tmp');
       if (await tempFile.exists()) {
@@ -156,12 +151,12 @@ class YouTubeService {
 
       final client = http.Client();
       try {
-        final request = http.Request('GET', Uri.parse(streamUrl));
+        final request = http.Request('GET', streamInfo.url);
         request.headers['User-Agent'] =
             'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 
         final response = await client.send(request).timeout(const Duration(seconds: 15));
-        final totalBytes = response.contentLength ?? 0;
+        final totalBytes = response.contentLength ?? streamInfo.size.totalBytes;
         int receivedBytes = 0;
 
         final sink = tempFile.openWrite();

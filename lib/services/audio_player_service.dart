@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import '../models/track.dart';
 import '../models/youtube_track.dart';
+import 'youtube_audio_source.dart';
 import 'youtube_service.dart';
 
 enum PlayerLoopMode { off, all, one }
@@ -117,35 +118,7 @@ class AudioPlayerService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      Uri audioUri;
-
-      if (track.isOnline) {
-        // 1. Controlla se il brano è già stato scaricato in locale
-        final localFile = await YouTubeService.instance.getLocalDownloadedFile(track.id);
-        if (localFile != null && await localFile.exists()) {
-          audioUri = Uri.file(localFile.path);
-        } else {
-          // 2. Altrimenti recupera lo stream URL diretto (MP4/AAC nativo)
-          final videoId = track.id.replaceFirst('yt_', '');
-          final streamUrl = await YouTubeService.instance.getAudioStreamUrl(videoId);
-
-          if (_playRequestId != requestId) return;
-
-          if (streamUrl == null || streamUrl.isEmpty) {
-            throw Exception('Impossibile estrarre lo stream audio per questa canzone.');
-          }
-
-          audioUri = Uri.parse(streamUrl);
-        }
-      } else if (track.filePath != null) {
-        audioUri = Uri.file(track.filePath!);
-      } else if (track.streamUrl != null && track.streamUrl!.isNotEmpty) {
-        audioUri = Uri.parse(track.streamUrl!);
-      } else {
-        throw Exception('Percorso audio non valido.');
-      }
-
-      if (_playRequestId != requestId) return;
+      AudioSource audioSource;
 
       final mediaItem = MediaItem(
         id: track.id,
@@ -156,7 +129,38 @@ class AudioPlayerService extends ChangeNotifier {
         duration: track.duration > Duration.zero ? track.duration : null,
       );
 
-      final audioSource = AudioSource.uri(audioUri, tag: mediaItem);
+      if (track.isOnline) {
+        // 1. Controlla se il brano è già stato scaricato in locale
+        final localFile = await YouTubeService.instance.getLocalDownloadedFile(track.id);
+        if (localFile != null && await localFile.exists()) {
+          audioSource = AudioSource.uri(Uri.file(localFile.path), tag: mediaItem);
+        } else {
+          // 2. Altrimenti usa YouTubeAudioSource basato su StreamAudioSource (streaming progressive affidabile su iOS)
+          final videoId = track.id.replaceFirst('yt_', '');
+          final streamInfo = await YouTubeService.instance.getPlayableStreamInfo(videoId);
+
+          if (_playRequestId != requestId) return;
+
+          if (streamInfo == null) {
+            throw Exception('Nessun flusso audio compatibile trovato per questo video.');
+          }
+
+          audioSource = YouTubeAudioSource(
+            videoId: videoId,
+            streamInfo: streamInfo,
+            tag: mediaItem,
+          );
+        }
+      } else if (track.filePath != null) {
+        audioSource = AudioSource.uri(Uri.file(track.filePath!), tag: mediaItem);
+      } else if (track.streamUrl != null && track.streamUrl!.isNotEmpty) {
+        audioSource = AudioSource.uri(Uri.parse(track.streamUrl!), tag: mediaItem);
+      } else {
+        throw Exception('Percorso audio non valido.');
+      }
+
+      if (_playRequestId != requestId) return;
+
       await _player.setAudioSource(audioSource);
 
       if (_playRequestId != requestId) return;
