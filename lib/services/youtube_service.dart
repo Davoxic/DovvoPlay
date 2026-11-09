@@ -23,7 +23,7 @@ class YouTubeService {
           title: item.title,
           author: item.author,
           duration: item.duration ?? Duration.zero,
-          thumbnailUrl: item.thumbnails.mediumResUrl,
+          thumbnailUrl: item.thumbnails.highResUrl,
           url: item.url,
         ));
       }
@@ -44,7 +44,7 @@ class YouTubeService {
 
       // Su iOS, AVPlayer gestisce nativamente i formati audio m4a/mp4 AAC
       final mp4Streams = audioStreams.where(
-        (s) => s.container.name.toLowerCase() == 'mp4' || s.codec.mimeType.contains('mp4'),
+        (s) => s.container.name.toLowerCase().contains('mp4') || s.audioCodec.toLowerCase().contains('mp4a'),
       ).toList();
 
       final chosen = mp4Streams.isNotEmpty
@@ -70,7 +70,7 @@ class YouTubeService {
       if (audioStreams.isEmpty) return null;
 
       final mp4Streams = audioStreams.where(
-        (s) => s.container.name.toLowerCase() == 'mp4' || s.codec.mimeType.contains('mp4'),
+        (s) => s.container.name.toLowerCase().contains('mp4') || s.audioCodec.toLowerCase().contains('mp4a'),
       ).toList();
 
       final chosen = mp4Streams.isNotEmpty

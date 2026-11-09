@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:io';
 import '../../services/library_service.dart';
 import '../theme.dart';
 
@@ -41,7 +39,7 @@ class SettingsTab extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppTheme.primary.withOpacity(0.18),
+                      AppTheme.primary.withValues(alpha: 0.18),
                       AppTheme.surface,
                     ],
                     begin: Alignment.topLeft,
@@ -171,7 +169,7 @@ class SettingsTab extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: AppTheme.primary.withOpacity(0.15),
+            color: AppTheme.primary.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: AppTheme.primary, size: 20),
