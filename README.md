@@ -1,185 +1,59 @@
 # SborraPlay
 
-Player musicale locale per iPhone + tool da PC per portarci dentro le tue playlist Spotify.
+Player musicale per iPhone scritto in **Flutter / Dart** con ricerca **YouTube** e streaming audio in background + server Wi-Fi per caricare brani da PC.
 
-Due pezzi indipendenti:
+## Caratteristiche principali
 
-| | cosa fa |
-|---|---|
-| **app iOS** (`SborraPlay/`) | riproduce i file audio che hai sul telefono, con copertine, playlist, lock screen e un server Wi-Fi per caricare la musica dal computer via browser |
-| **tool PC** (`tools/`) | legge una playlist Spotify, trova i brani su YouTube, li scarica con yt-dlp, scrive i tag e li manda al telefono |
+- **Ricerca YouTube & Streaming Audio** (`youtube_explode_dart`): cerca qualsiasi brano su YouTube e ascoltalo direttamente in streaming audio leggero (AAC/m4a nativo iOS), funzionante anche a **schermo spento** e con comandi dalla **lock screen** / Centro di Controllo.
+- **Salvataggio Offline**: scarica i brani da YouTube direttamente nella memoria locale dell'app con un tocco.
+- **Libreria & Playlist**: crea playlist, organizza i brani locali e online, visualizza copertine e metadati.
+- **Server Wi-Fi integrato**: attiva il server dall'app, collegati da qualsiasi browser su PC (`http://<ip-iphone>:8080`) e trascina i tuoi file musicali (.mp3, .m4a, .flac, .wav).
+- **Tool PC da riga di comando** (`tools/`): esporta playlist Spotify, scarica e invia automaticamente all'iPhone via rete.
 
 ---
 
 ## 1. Ottenere il file .ipa
 
-Non serve un Mac: la build gira su GitHub Actions, che usa runner macOS gratuiti per i repository pubblici.
+La compilazione avviene automaticamente tramite **GitHub Actions** su runner macOS.
 
-1. Crea un repository su GitHub e caricaci questa cartella:
+1. Fai il push su GitHub sul branch `main`:
    ```bash
-   cd sborraplay
-   git init && git add . && git commit -m "SborraPlay"
-   git branch -M main
-   git remote add origin https://github.com/Davoxic/sonora.git
-   git push -u origin main
+   git add -A
+   git commit -m "Aggiornamento SborraPlay"
+   git push origin HEAD:main
    ```
-2. Vai su **Actions** → `Build IPA (unsigned)`. Parte da sola al push; altrimenti premi **Run workflow**.
-3. A fine build (5-8 minuti) scarica l'artifact **SborraPlay-unsigned-ipa** e scompattalo: dentro c'è `SborraPlay-unsigned.ipa`.
-
-Se invece hai un Mac con Xcode:
-
-```bash
-brew install xcodegen
-xcodegen generate
-open SborraPlay.xcodeproj      # Signing & Capabilities → scegli il tuo team → Run
-```
+2. Il workflow `.github/workflows/build-ipa.yml` si avvia da solo al push:
+   - Configura Flutter e le dipendenze
+   - Prepara il target iOS con permessi di background audio e condivisione file
+   - Compila la release unsigned (`flutter build ios --release --no-codesign`)
+   - Impacchetta l'IPA in `Payload/SborraPlay.app` e zippa in `SborraPlay-unsigned.ipa`
+3. A fine build scarica l'artifact **SborraPlay-unsigned-ipa**.
 
 ### Firmare e installare
 
-L'`.ipa` esce **senza firma**: va firmata con il tuo Apple ID prima di finire sul telefono.
+L'`.ipa` generato è privo di firma (unsigned): va firmato prima dell'installazione:
 
-| strumento | dove gira | note |
+| Strumento | Dove gira | Note |
 |---|---|---|
-| **Sideloadly** | Windows / macOS | il più semplice: trascini l'ipa, metti l'Apple ID, collegi l'iPhone |
-| **AltStore / SideStore** | Windows / macOS / on-device | rinnova la firma da solo quando il telefono è sulla stessa rete |
-| **ESign / Feather** | direttamente su iPhone | serve un certificato |
-| **Xcode** | macOS | Window → Devices and Simulators → trascina l'ipa |
-
-Con un Apple ID gratuito la firma **scade dopo 7 giorni** e puoi avere al massimo 3 app sideloaded: va rinnovata (AltStore lo fa da solo). Con un account sviluppatore a pagamento dura un anno.
-
-Il bundle id è `com.dchietti.sborraplay`: cambialo in `project.yml` se ti serve.
+| **Sideloadly** | Windows / macOS | Il più semplice: trascini l'ipa, inserisci l'Apple ID, colleghi l'iPhone |
+| **AltStore / SideStore** | Windows / macOS / on-device | Rinnova la firma automaticamente |
+| **ESign / Feather** | direttamente su iPhone | Serve un certificato per il sideload |
 
 ---
 
-## 2. Usare l'app
-
-**Formati**: MP3, M4A/AAC, ALAC, WAV, AIFF, CAF, FLAC. iOS non legge OGG, Opus e WMA — vanno convertiti prima.
-
-### Caricare musica dal computer
-1. iPhone e PC sulla stessa rete Wi-Fi.
-2. Nell'app: **Impostazioni → Server Wi-Fi** acceso. Compare un indirizzo tipo `http://192.168.1.42:8080`.
-3. Apri quell'indirizzo nel browser del PC e trascina i file (anche cartelle intere) nella pagina.
-4. La libreria si aggiorna da sola un paio di secondi dopo l'ultimo file.
-
-Tieni l'app in primo piano mentre trasferisci. Il server non ha password ed è raggiungibile da chiunque sia sulla tua rete: spegnilo quando hai finito.
-
-### Altri modi
-- **App File**: Sul mio iPhone → SborraPlay → copia i file lì dentro.
-- **Finder / iTunes**: collega il cavo, scheda File, trascina su SborraPlay.
-- **Impostazioni → Importa da File / iCloud**, anche per i `.m3u`.
-
-### Dove finiscono i file, e cosa si perde
-
-I brani che importi vengono **copiati** dentro l'app: non li rileggo dal percorso d'origine, quindi puoi cancellare gli originali sul computer.
-
-| cosa | dove | si ricostruisce da solo? |
-|---|---|---|
-| file audio | `Documents/Music/` | no (ma li hai anche sul PC) |
-| indice della libreria | `Documents/library.json` | sì, riscansionando |
-| playlist | `Documents/playlists.json` | **no** |
-| copertine delle playlist | `Documents/Covers/` | **no** |
-| copertine dei brani | cache | sì, rileggendo i tag |
-| copie automatiche | `Documents/Backups/` | — |
-
-`Documents/` è visibile dall'app File (Sul mio iPhone → SborraPlay) e dal Finder col cavo, quindi puoi anche copiare tutto a mano.
-
-Reinstallare l'app sopra sé stessa — cosa che farai ogni 7 giorni per rinnovare la firma — **non cancella niente**: per iOS è un aggiornamento. A sparire è tutto solo se disinstalli l'app o se cambi il bundle id.
-
-### Backup
-
-Impostazioni → Backup:
-
-- **Esporta backup** produce un file `SborraPlay-<data>.sborraplay.json` con playlist, copertine, ordinamento, impostazioni e l'elenco dei brani; lo mandi dove vuoi col foglio di condivisione (File, iCloud, AirDrop, Mail).
-- **Importa backup** lo rilegge e ti chiede se unire alle playlist attuali o sostituirle. Le playlist con lo stesso nome vengono fuse, non duplicate.
-- **Copia automatica giornaliera** (attiva di default) salva una copia in `Documents/Backups/` al massimo una volta al giorno e tiene le ultime 5. Da **Copie automatiche** le riapri, le condividi o le ripristini.
-
-Il backup non contiene l'audio: pesa qualche decina di KB più le copertine. I brani li hai già nella cartella del PC da cui li hai caricati.
-
-Dal computer, senza toccare il telefono:
-
-```bash
-sborraplay-dl backup -o ~/Backup            # scarica il backup dall'iPhone
-sborraplay-dl restore ~/Backup/SborraPlay-….sborraplay.json
-sborraplay-dl restore … --replace           # sostituisce invece di unire
-```
-
-Prima di ogni reinstallazione conviene lanciare `sborraplay-dl backup`: dopo il reinstall, `restore` ti rimette playlist e copertine al loro posto.
-
-### API del server (usate dal tool PC)
-```
-GET    /                      pagina di upload
-GET    /api/ping              stato e numero di brani
-GET    /api/library           elenco brani e playlist (JSON)
-PUT    /api/file/<nome>       carica un file (corpo = byte grezzi)
-DELETE /api/file/<nome>       cancella un file
-POST   /api/playlist          {"name": "…", "files": ["a.mp3", …]}
-GET    /api/backup            backup completo in JSON
-POST   /api/restore[?replace=1]   rimanda indietro un backup
-```
-Esempio: `curl -T "brano.mp3" http://192.168.1.42:8080/api/file/brano.mp3`
-
----
-
-## 3. Il tool PC
-
-### Avvio a doppio clic
-
-Nella cartella del progetto ci sono due lanciatori: **`SborraPlay.bat`** (Windows) e
-**`SborraPlay.command`** (macOS, tasto destro → Apri la prima volta).
-
-Doppio clic e basta: al primo avvio si creano da soli un ambiente Python isolato in
-`tools/.venv`, installano le librerie e, se manca ffmpeg, si offrono di installarlo.
-Dalla seconda volta partono subito su un menu:
+## 2. Struttura del progetto
 
 ```
-  1  Scarica una playlist Spotify
-  2  Manda musica gia' scaricata al telefono
-  3  Backup del telefono sul PC
-  4  Rimetti un backup sul telefono
-  5  Guarda cosa c'e' sul telefono
-  6  Cerca il telefono sulla rete
-  7  Aggiorna yt-dlp
+sborraplay/
+├── .github/workflows/build-ipa.yml  # Pipeline CI per creare l'unsigned IPA
+├── assets/                          # Icone e loghi
+├── lib/                             # Codice Dart / Flutter
+│   ├── main.dart
+│   ├── models/                      # Track, Playlist, YouTubeTrack
+│   ├── services/                    # AudioPlayer, YouTubeService, LibraryService, WifiServer
+│   └── ui/                          # Schermate, temi e widget
+├── scripts/                         # Script di configurazione per iOS
+├── tools/                           # Tool Python da PC per Spotify/YouTube download
+├── pubspec.yaml                     # Dipendenze Flutter (youtube_explode_dart, just_audio, ecc.)
+└── README.md
 ```
-
-Dove serve un file o una cartella puoi trascinarli dentro la finestra invece di scrivere
-il percorso. Il link di Spotify si incolla col tasto destro.
-
-### Da riga di comando
-
-
-
-Per chi preferisce il terminale, dettagli completi in [`tools/README.md`](tools/README.md):
-
-```bash
-cd tools
-pip install -r requirements.txt        # yt-dlp, mutagen, zeroconf
-# serve anche ffmpeg nel PATH
-
-./sborraplay-dl discover                                   # trova l'iPhone sulla rete
-./sborraplay-dl playlist https://open.spotify.com/playlist/XXXX
-```
-
-Legge la playlist → cerca ogni brano su YouTube e sceglie il risultato più probabile (durata, titolo, canale) → scarica in MP3 320 → scrive tag e copertina → manda tutto al telefono e crea la playlist dentro l'app.
-
----
-
-## Struttura
-
-```
-SborraPlay/
-  App/            punto di ingresso SwiftUI
-  Models/         Track, Playlist, libreria su disco, lettura metadati, copertine
-  Audio/          PlayerEngine: coda, shuffle, repeat, lock screen, interruzioni
-  Server/         server HTTP (Network.framework) + pagina di upload
-  Views/          libreria, album, artisti, playlist, now playing, impostazioni
-tools/
-  sborraplay_dl/      spotify.py · matcher.py · downloader.py · pusher.py · cli.py
-.github/workflows/build-ipa.yml
-project.yml       spec XcodeGen (il .xcodeproj viene generato, non è versionato)
-```
-
-## Note
-
-- La musica sta in `Documents/Music` dentro il container dell'app: resta lì tra un aggiornamento e l'altro, sparisce se disinstalli l'app.
-- L'indice della libreria è un `library.json`, le playlist un `playlists.json`, le copertine in cache.
-- Scarica solo materiale che hai diritto di scaricare; il tool si limita a cercare ciò che gli indichi.

@@ -1,0 +1,284 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import '../models/playlist.dart';
+import '../models/track.dart';
+
+class LibraryService extends ChangeNotifier {
+  static final LibraryService instance = LibraryService._();
+  LibraryService._();
+
+  List<Track> _tracks = [];
+  List<Playlist> _playlists = [];
+  bool _isLoading = false;
+
+  List<Track> get tracks => _tracks;
+  List<Playlist> get playlists => _playlists;
+  bool get isLoading => _isLoading;
+
+  Future<Directory> get musicDirectory async {
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Directory('${docs.path}/Music');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  Future<File> get _libraryFile async {
+    final docs = await getApplicationDocumentsDirectory();
+    return File('${docs.path}/library.json');
+  }
+
+  Future<File> get _playlistsFile async {
+    final docs = await getApplicationDocumentsDirectory();
+    return File('${docs.path}/playlists.json');
+  }
+
+  Future<void> init() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _loadSavedData();
+      await scanLibrary();
+    } catch (e) {
+      print('Errore caricamento libreria: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadSavedData() async {
+    try {
+      final libFile = await _libraryFile;
+      if (await libFile.exists()) {
+        final content = await libFile.readAsString();
+        final data = jsonDecode(content);
+        if (data is Map && data['tracks'] is List) {
+          _tracks = (data['tracks'] as List)
+              .map((e) => Track.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+      }
+
+      final plFile = await _playlistsFile;
+      if (await plFile.exists()) {
+        final content = await plFile.readAsString();
+        final data = jsonDecode(content);
+        if (data is List) {
+          _playlists = data
+              .map((e) => Playlist.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+      }
+    } catch (e) {
+      print('Errore lettura file indice: $e');
+    }
+  }
+
+  /// Scansiona la cartella Music per rilevare file aggiunti o rimossi
+  Future<void> scanLibrary() async {
+    final dir = await musicDirectory;
+    final validExts = {'.mp3', '.m4a', '.aac', '.wav', '.flac', '.aif', '.aiff', '.caf', '.alac'};
+
+    final foundFiles = <File>[];
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      if (entity is File) {
+        final ext = entity.path.toLowerCase().substring(entity.path.lastIndexOf('.'));
+        if (validExts.contains(ext)) {
+          foundFiles.add(entity);
+        }
+      }
+    }
+
+    final existingMap = {for (var t in _tracks) if (t.filePath != null) t.filePath!: t};
+    final newTracks = <Track>[];
+
+    for (final file in foundFiles) {
+      final path = file.path;
+      if (existingMap.containsKey(path)) {
+        newTracks.add(existingMap[path]!);
+      } else {
+        final name = file.path.split(Platform.pathSeparator).last;
+        final nameWithoutExt = name.substring(0, name.lastIndexOf('.'));
+        int size = 0;
+        try {
+          size = await file.length();
+        } catch (_) {}
+
+        // Prova a splittare "Artista - Titolo"
+        String artist = '';
+        String title = nameWithoutExt;
+        if (nameWithoutExt.contains(' - ')) {
+          final parts = nameWithoutExt.split(' - ');
+          artist = parts[0].trim();
+          title = parts.sublist(1).join(' - ').trim();
+        }
+
+        newTracks.add(Track(
+          id: path,
+          title: title,
+          artist: artist,
+          filePath: path,
+          fileSize: size,
+          duration: Duration.zero,
+        ));
+      }
+    }
+
+    // Conserva anche tracce online marcate esplicitamente o nei preferiti
+    for (final t in _tracks) {
+      if (t.isOnline && !newTracks.any((x) => x.id == t.id)) {
+        newTracks.add(t);
+      }
+    }
+
+    _tracks = newTracks;
+    await saveLibrary();
+    notifyListeners();
+  }
+
+  Future<void> saveLibrary() async {
+    try {
+      final file = await _libraryFile;
+      final map = {
+        'version': 1,
+        'updated_at': DateTime.now().toIso8601String(),
+        'tracks': _tracks.map((e) => e.toJson()).toList(),
+      };
+      await file.writeAsString(jsonEncode(map));
+    } catch (e) {
+      print('Errore salvataggio library.json: $e');
+    }
+  }
+
+  Future<void> savePlaylists() async {
+    try {
+      final file = await _playlistsFile;
+      await file.writeAsString(jsonEncode(_playlists.map((e) => e.toJson()).toList()));
+    } catch (e) {
+      print('Errore salvataggio playlists.json: $e');
+    }
+  }
+
+  Future<Playlist> createPlaylist(String name, [List<String>? trackIds]) async {
+    final id = 'pl_${DateTime.now().millisecondsSinceEpoch}';
+    final pl = Playlist(id: id, name: name, trackIds: trackIds ?? []);
+    _playlists.add(pl);
+    await savePlaylists();
+    notifyListeners();
+    return pl;
+  }
+
+  Future<void> renamePlaylist(String id, String newName) async {
+    final pl = _playlists.firstWhere((p) => p.id == id, orElse: () => Playlist(id: '', name: ''));
+    if (pl.id.isNotEmpty) {
+      pl.name = newName;
+      pl.updatedAt = DateTime.now();
+      await savePlaylists();
+      notifyListeners();
+    }
+  }
+
+  Future<void> deletePlaylist(String id) async {
+    _playlists.removeWhere((p) => p.id == id);
+    await savePlaylists();
+    notifyListeners();
+  }
+
+  Future<void> addTrackToPlaylist(String playlistId, String trackId) async {
+    final pl = _playlists.firstWhere((p) => p.id == playlistId, orElse: () => Playlist(id: '', name: ''));
+    if (pl.id.isNotEmpty && !pl.trackIds.contains(trackId)) {
+      pl.trackIds.add(trackId);
+      pl.updatedAt = DateTime.now();
+      await savePlaylists();
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeTrackFromPlaylist(String playlistId, String trackId) async {
+    final pl = _playlists.firstWhere((p) => p.id == playlistId, orElse: () => Playlist(id: '', name: ''));
+    if (pl.id.isNotEmpty) {
+      pl.trackIds.remove(trackId);
+      pl.updatedAt = DateTime.now();
+      await savePlaylists();
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteTrack(Track track) async {
+    if (track.filePath != null) {
+      try {
+        final f = File(track.filePath!);
+        if (await f.exists()) {
+          await f.delete();
+        }
+      } catch (e) {
+        print('Errore cancellazione file: $e');
+      }
+    }
+    _tracks.removeWhere((t) => t.id == track.id);
+    for (final pl in _playlists) {
+      pl.trackIds.remove(track.id);
+    }
+    await saveLibrary();
+    await savePlaylists();
+    notifyListeners();
+  }
+
+  Track? getTrackById(String id) {
+    try {
+      return _tracks.firstWhere((t) => t.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<Track> getTracksForPlaylist(Playlist playlist) {
+    return playlist.trackIds
+        .map((id) => getTrackById(id))
+        .whereType<Track>()
+        .toList();
+  }
+
+  String exportBackupJson() {
+    final backup = {
+      'app': 'SborraPlay',
+      'version': '1.0.0',
+      'exported_at': DateTime.now().toIso8601String(),
+      'tracks': _tracks.map((t) => t.toJson()).toList(),
+      'playlists': _playlists.map((p) => p.toJson()).toList(),
+    };
+    return const JsonEncoder.withIndent('  ').convert(backup);
+  }
+
+  Future<void> importBackupJson(String jsonString, {bool replace = false}) async {
+    final data = jsonDecode(jsonString);
+    if (data is! Map) return;
+
+    if (replace) {
+      _playlists.clear();
+    }
+
+    if (data['playlists'] is List) {
+      for (final item in data['playlists']) {
+        final p = Playlist.fromJson(Map<String, dynamic>.from(item));
+        final existingIdx = _playlists.indexWhere((x) => x.name.toLowerCase() == p.name.toLowerCase());
+        if (existingIdx >= 0) {
+          // Unisci i brani
+          for (final tId in p.trackIds) {
+            if (!_playlists[existingIdx].trackIds.contains(tId)) {
+              _playlists[existingIdx].trackIds.add(tId);
+            }
+          }
+        } else {
+          _playlists.add(p);
+        }
+      }
+    }
+    await savePlaylists();
+    notifyListeners();
+  }
+}

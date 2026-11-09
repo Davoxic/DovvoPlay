@@ -17,55 +17,56 @@ permissions:
 jobs:
   build:
     name: Build unsigned .ipa
-    runs-on: macos-latest
+    runs-on: macos-14
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.0'
+          channel: 'stable'
+          cache: true
+
       - name: Show toolchain
         run: |
+          flutter --version
           xcodebuild -version
           sw_vers
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Ensure iOS platform files
+        run: |
+          cp pubspec.yaml pubspec.yaml.bak
+          flutter create . --org com.dchietti --project-name sborraplay --platforms ios
+          cp pubspec.yaml.bak pubspec.yaml
+          rm pubspec.yaml.bak
 
-      - name: Generate Xcode project
-        run: xcodegen generate --spec project.yml
+      - name: Install dependencies
+        run: flutter pub get
 
-      - name: Build (Release, no code signing)
+      - name: Configure iOS project (signing disabled & permissions)
+        run: python3 scripts/configure_ios.py
+
+      - name: Build iOS (Release, no code signing)
         run: |
           set -o pipefail
-          xcodebuild \
-            -project SborraPlay.xcodeproj \
-            -scheme SborraPlay \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
-            ONLY_ACTIVE_ARCH=NO \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            DEVELOPMENT_TEAM="" \
-            clean build
+          export LANG=en_US.UTF-8
+          flutter build ios --release --no-codesign
 
       - name: Package into .ipa
         run: |
           set -euo pipefail
-          APP_PATH="build/Build/Products/Release-iphoneos/SborraPlay.app"
+          APP_PATH="build/ios/iphoneos/Runner.app"
           if [ ! -d "$APP_PATH" ]; then
-            echo "::error::SborraPlay.app non trovata in $APP_PATH"
+            echo "::error::Runner.app non trovata in $APP_PATH"
             find build -name "*.app" -maxdepth 6 -print || true
             exit 1
           fi
           rm -rf Payload SborraPlay-unsigned.ipa
           mkdir -p Payload
-          cp -R "$APP_PATH" Payload/
-          # rimuove eventuali firme/placeholder lasciati dal build
+          cp -R "$APP_PATH" Payload/SborraPlay.app
           rm -rf "Payload/SborraPlay.app/_CodeSignature" "Payload/SborraPlay.app/embedded.mobileprovision"
           zip -qry SborraPlay-unsigned.ipa Payload
           ls -lh SborraPlay-unsigned.ipa
