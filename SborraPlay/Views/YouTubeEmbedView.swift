@@ -105,7 +105,7 @@ struct YouTubeEmbedView: UIViewRepresentable {
 /// incorporabili.
 struct YouTubePlayerSheet: View {
     let track: OnlineTrack
-    var alternatives: [OnlineTrack] = []
+    @ObservedObject var online: OnlineStore
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.openURL) var openURL
@@ -116,8 +116,10 @@ struct YouTubePlayerSheet: View {
 
     private var coda: [OnlineTrack] {
         var out = [track]
-        for candidato in YouTubePlayerSheet.ordina(alternatives, come: track)
-        where candidato.id != track.id {
+        let tutte = online.embedAlternatives + online.results.filter { $0.source == .youtube }
+        var viste = Set([track.id])
+        for candidato in YouTubePlayerSheet.ordina(tutte, come: track)
+        where viste.insert(candidato.id).inserted {
             out.append(candidato)
         }
         return out
@@ -157,7 +159,7 @@ struct YouTubePlayerSheet: View {
                     } else {
                         HStack(spacing: 6) {
                             Text(stato)
-                            if indice > 0 {
+                            if coda.count > 1 {
                                 Text("· versione \(indice + 1) di \(coda.count)")
                             }
                         }

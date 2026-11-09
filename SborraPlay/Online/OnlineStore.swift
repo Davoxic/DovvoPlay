@@ -22,6 +22,9 @@ final class OnlineStore: ObservableObject {
     /// Brano da aprire nel player YouTube incorporato, quando non c'è
     /// un flusso audio diretto da dare ad AVPlayer.
     @Published var embedTrack: OnlineTrack?
+    /// Altre versioni dello stesso brano, cercate apposta: servono quando
+    /// l'etichetta ha vietato l'incorporamento del video principale.
+    @Published var embedAlternatives: [OnlineTrack] = []
     @Published var quality: StreamQuality = StreamQuality.preferred {
         didSet { StreamQuality.preferred = quality }
     }
@@ -150,6 +153,7 @@ final class OnlineStore: ObservableObject {
                     // nessun flusso diretto: si apre il player ufficiale di YouTube
                     self.errorText = nil
                     self.embedTrack = track
+                    self.loadEmbedAlternatives(for: track)
                 } else {
                     self.errorText = error.localizedDescription
                 }
@@ -163,6 +167,42 @@ final class OnlineStore: ObservableObject {
         guard track.source == .youtube else { return }
         errorText = nil
         embedTrack = track
+        loadEmbedAlternatives(for: track)
+    }
+
+    /// Cerca le versioni "Topic" e gli audio ufficiali dello stesso brano.
+    /// Parte subito, così quando il primo video risulta bloccato le alternative
+    /// sono già pronte e il passaggio è immediato.
+    func loadEmbedAlternatives(for track: OnlineTrack) {
+        embedAlternatives = []
+        let artista = track.artist
+            .replacingOccurrences(of: " - Topic", with: "")
+            .replacingOccurrences(of: "VEVO", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        let titolo = track.title
+
+        Task { [weak self] in
+            guard let self else { return }
+            var raccolte: [OnlineTrack] = []
+            var viste = Set<String>([track.id])
+
+            let ricerche = [
+                "\(artista) \(titolo) topic",
+                "\(artista) \(titolo) official audio",
+                "\(artista) \(titolo)"
+            ]
+            for query in ricerche {
+                guard let trovate = try? await PipedClient.search(query, limit: 15) else { continue }
+                for candidata in trovate where viste.insert(candidata.id).inserted {
+                    raccolte.append(candidata)
+                }
+                // appena abbiamo un "Topic" possiamo smettere: è quello buono
+                if raccolte.contains(where: { $0.artist.lowercased().hasSuffix("- topic") }) { break }
+            }
+            if !raccolte.isEmpty {
+                self.embedAlternatives = raccolte
+            }
+        }
     }
 
     private func streamURL(for track: OnlineTrack) async throws -> URL {

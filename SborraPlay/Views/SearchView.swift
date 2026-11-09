@@ -40,8 +40,7 @@ struct SearchView: View {
             }
             .task { await online.refreshSources() }
             .sheet(item: $online.embedTrack) { track in
-                YouTubePlayerSheet(track: track,
-                                   alternatives: online.results.filter { $0.source == .youtube })
+                YouTubePlayerSheet(track: track, online: online)
             }
             .sheet(isPresented: $showLogin) {
                 SoundCloudLoginView()
