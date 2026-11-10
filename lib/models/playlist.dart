@@ -17,6 +17,24 @@ class Playlist {
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
+  Playlist copyWith({
+    String? id,
+    String? name,
+    List<String>? trackIds,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? coverPath,
+  }) {
+    return Playlist(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      trackIds: trackIds ?? List.from(this.trackIds),
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      coverPath: coverPath ?? this.coverPath,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,

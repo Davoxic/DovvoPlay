@@ -173,7 +173,8 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               children: [
                 TrackArtwork(
                   url: track.thumbnailUrl,
-                  size: 48,
+                  width: 48,
+                  height: 48,
                   borderRadius: 10,
                 ),
                 Container(

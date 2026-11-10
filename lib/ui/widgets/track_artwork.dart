@@ -11,15 +11,17 @@ class TrackArtwork extends StatelessWidget {
   final IconData placeholderIcon;
   final BoxFit fit;
 
-  const TrackArtwork({
+  TrackArtwork({
     super.key,
     required this.url,
-    required this.width,
-    required this.height,
+    double? width,
+    double? height,
+    double? size,
     this.borderRadius = 10,
     this.placeholderIcon = Icons.music_note_rounded,
     this.fit = BoxFit.cover,
-  });
+  })  : width = size ?? width ?? 48,
+        height = size ?? height ?? 48;
 
   @override
   Widget build(BuildContext context) {
