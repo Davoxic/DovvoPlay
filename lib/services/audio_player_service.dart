@@ -1,12 +1,29 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'dart:math';
+import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import '../models/track.dart';
 import '../models/youtube_track.dart';
+import 'stats_service.dart';
 import 'youtube_service.dart';
 
 enum PlayerLoopMode { off, all, one }
+
+enum ShuffleMode {
+  off('Disattivo', Icons.shuffle_rounded, 'Ordine sequenziale'),
+  magic('Magico', Icons.auto_awesome_rounded, 'Mix intelligente tra preferite, medie e da riscoprire'),
+  standard('Casuale 100%', Icons.shuffle_rounded, 'Mescola tutti i brani casualmente'),
+  mostPlayed('Hit Parade', Icons.local_fire_department_rounded, 'Priorità ai brani più ascoltati e ripetuti'),
+  leastPlayed('Riscopri', Icons.explore_rounded, 'Ascolta le canzoni mai o meno ascoltate'),
+  mediumPlayed('Equilibrato', Icons.balance_rounded, 'Canzoni nella fascia media di ascolto'),
+  recent('Freschi & Recenti', Icons.history_rounded, 'Brani recenti o aggiunti ultimamente');
+
+  final String label;
+  final IconData icon;
+  final String description;
+  const ShuffleMode(this.label, this.icon, this.description);
+}
 
 class AudioPlayerService extends ChangeNotifier {
   static final AudioPlayerService instance = AudioPlayerService._();
@@ -20,12 +37,13 @@ class AudioPlayerService extends ChangeNotifier {
 
   Track? _currentTrack;
   List<Track> _queue = [];
+  List<Track> _originalQueue = [];
   int _currentIndex = -1;
   bool _isBuffering = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   PlayerLoopMode _loopMode = PlayerLoopMode.off;
-  bool _isShuffle = false;
+  ShuffleMode _shuffleMode = ShuffleMode.off;
   int _playRequestId = 0;
   String? _lastErrorMessage;
 
@@ -38,7 +56,8 @@ class AudioPlayerService extends ChangeNotifier {
   Duration get position => _position;
   Duration get duration => _duration;
   PlayerLoopMode get loopMode => _loopMode;
-  bool get isShuffle => _isShuffle;
+  ShuffleMode get shuffleMode => _shuffleMode;
+  bool get isShuffle => _shuffleMode != ShuffleMode.off;
   String? get lastErrorMessage => _lastErrorMessage;
 
   void _initListeners() {
@@ -76,6 +95,10 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   void _onTrackCompleted() {
+    if (_currentTrack != null) {
+      StatsService.instance.recordTrackCompleted(_currentTrack!);
+    }
+
     if (_loopMode == PlayerLoopMode.one) {
       _player.seek(Duration.zero);
       _player.play();
@@ -96,14 +119,20 @@ class AudioPlayerService extends ChangeNotifier {
     final requestId = ++_playRequestId;
 
     if (newQueue != null) {
+      _originalQueue = List.from(newQueue);
       _queue = List.from(newQueue);
-      _currentIndex = _queue.indexWhere((t) => t.id == track.id);
-      if (_currentIndex == -1) {
-        _queue.insert(0, track);
-        _currentIndex = 0;
+      if (_shuffleMode != ShuffleMode.off) {
+        _applyShuffleLogic(_shuffleMode, keepCurrentTrack: track);
+      } else {
+        _currentIndex = _queue.indexWhere((t) => t.id == track.id);
+        if (_currentIndex == -1) {
+          _queue.insert(0, track);
+          _currentIndex = 0;
+        }
       }
     } else if (!_queue.any((t) => t.id == track.id)) {
       _queue.add(track);
+      _originalQueue.add(track);
       _currentIndex = _queue.length - 1;
     } else {
       _currentIndex = _queue.indexWhere((t) => t.id == track.id);
@@ -115,6 +144,9 @@ class AudioPlayerService extends ChangeNotifier {
     _isBuffering = true;
     _lastErrorMessage = null;
     notifyListeners();
+
+    // Registra statistiche di avvio riproduzione
+    StatsService.instance.recordTrackStart(track);
 
     try {
       final mediaItem = MediaItem(
@@ -250,17 +282,176 @@ class AudioPlayerService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleShuffle() {
-    _isShuffle = !_isShuffle;
-    if (_isShuffle && _queue.length > 1) {
-      final current = _currentTrack;
-      _queue.shuffle();
-      if (current != null) {
-        _queue.removeWhere((t) => t.id == current.id);
-        _queue.insert(0, current);
-        _currentIndex = 0;
+  // --- LOGICA SHUFFLE AVANZATA & SHUFFLE MAGICO ---
+
+  void setShuffleMode(ShuffleMode mode, {List<Track>? baseList}) {
+    _shuffleMode = mode;
+    if (baseList != null && baseList.isNotEmpty) {
+      _originalQueue = List.from(baseList);
+      _queue = List.from(baseList);
+    }
+
+    if (_shuffleMode == ShuffleMode.off) {
+      if (_originalQueue.isNotEmpty) {
+        _queue = List.from(_originalQueue);
+        if (_currentTrack != null) {
+          _currentIndex = _queue.indexWhere((t) => t.id == _currentTrack!.id);
+          if (_currentIndex == -1) _currentIndex = 0;
+        }
       }
+    } else {
+      _applyShuffleLogic(_shuffleMode, keepCurrentTrack: _currentTrack);
     }
     notifyListeners();
+  }
+
+  void cycleShuffleMode() {
+    final values = ShuffleMode.values;
+    final nextIdx = (values.indexOf(_shuffleMode) + 1) % values.length;
+    setShuffleMode(values[nextIdx]);
+  }
+
+  void toggleShuffle() {
+    if (_shuffleMode == ShuffleMode.off) {
+      setShuffleMode(ShuffleMode.magic);
+    } else {
+      setShuffleMode(ShuffleMode.off);
+    }
+  }
+
+  /// Applica l'algoritmo di riordinamento a seconda della modalità scelta
+  void _applyShuffleLogic(ShuffleMode mode, {Track? keepCurrentTrack}) {
+    if (_queue.length <= 1) return;
+
+    final pool = List<Track>.from(_originalQueue.isNotEmpty ? _originalQueue : _queue);
+    final stats = StatsService.instance;
+    final rand = Random();
+
+    List<Track> result = [];
+
+    switch (mode) {
+      case ShuffleMode.off:
+        result = pool;
+        break;
+
+      case ShuffleMode.standard:
+        result = List.from(pool)..shuffle(rand);
+        break;
+
+      case ShuffleMode.magic:
+        // Algoritmo Shuffle Magico:
+        // Divide in 3 categorie (Top preferite, Medie, Meno ascoltate / Mai sentite)
+        // e le interfaccia con pesatura intelligente, evitando due canzoni dello stesso artista di seguito
+        final sortedByPlays = List<Track>.from(pool)
+          ..sort((a, b) => stats.getPlayCount(b.id).compareTo(stats.getPlayCount(a.id)));
+
+        final count = sortedByPlays.length;
+        final topCut = (count * 0.25).ceil().clamp(1, count);
+        final medCut = (count * 0.70).ceil().clamp(topCut, count);
+
+        final topTier = sortedByPlays.sublist(0, topCut)..shuffle(rand);
+        final medTier = sortedByPlays.sublist(topCut, medCut)..shuffle(rand);
+        final leastTier = sortedByPlays.sublist(medCut)..shuffle(rand);
+
+        final combined = <Track>[];
+        while (topTier.isNotEmpty || medTier.isNotEmpty || leastTier.isNotEmpty) {
+          if (topTier.isNotEmpty) combined.add(topTier.removeLast());
+          if (medTier.isNotEmpty) combined.add(medTier.removeLast());
+          if (leastTier.isNotEmpty) combined.add(leastTier.removeLast());
+          if (medTier.isNotEmpty) combined.add(medTier.removeLast());
+        }
+
+        // Anti-consecutive artist smoothing
+        result = _smoothArtistCollisions(combined);
+        break;
+
+      case ShuffleMode.mostPlayed:
+        // Priorità ai brani più ascoltati con un tocco di casualità
+        final list = List<Track>.from(pool);
+        list.sort((a, b) {
+          final countA = stats.getPlayCount(a.id) * 10 + stats.getRepeatCount(a.id) * 5 + rand.nextInt(5);
+          final countB = stats.getPlayCount(b.id) * 10 + stats.getRepeatCount(b.id) * 5 + rand.nextInt(5);
+          return countB.compareTo(countA);
+        });
+        result = list;
+        break;
+
+      case ShuffleMode.leastPlayed:
+        // Priorità assoluta a brani mai ascoltati o meno ascoltati
+        final list = List<Track>.from(pool);
+        list.sort((a, b) {
+          final countA = stats.getPlayCount(a.id) * 10 + rand.nextInt(4);
+          final countB = stats.getPlayCount(b.id) * 10 + rand.nextInt(4);
+          return countA.compareTo(countB);
+        });
+        result = list;
+        break;
+
+      case ShuffleMode.mediumPlayed:
+        // Brani nella fascia media
+        final list = List<Track>.from(pool);
+        list.sort((a, b) => stats.getPlayCount(b.id).compareTo(stats.getPlayCount(a.id)));
+        final start = (list.length * 0.20).floor();
+        final end = (list.length * 0.80).ceil();
+        final middle = list.sublist(start.clamp(0, list.length), end.clamp(0, list.length))..shuffle(rand);
+        final remaining = list.where((t) => !middle.contains(t)).toList()..shuffle(rand);
+        result = [...middle, ...remaining];
+        break;
+
+      case ShuffleMode.recent:
+        // Canzoni aggiunte o ascoltate di recente
+        final list = List<Track>.from(pool);
+        list.sort((a, b) {
+          final timeA = stats.getStat(a.id)?.lastPlayedAt ?? a.addedAt;
+          final timeB = stats.getStat(b.id)?.lastPlayedAt ?? b.addedAt;
+          return timeB.compareTo(timeA);
+        });
+        // Aggiungi un leggero jitter per non renderlo identico ogni volta
+        for (int i = 0; i < list.length - 1; i += 2) {
+          if (rand.nextBool()) {
+            final tmp = list[i];
+            list[i] = list[i + 1];
+            list[i + 1] = tmp;
+          }
+        }
+        result = list;
+        break;
+    }
+
+    // Assicura che la canzone attualmente in riproduzione rimanga al primo posto
+    if (keepCurrentTrack != null) {
+      result.removeWhere((t) => t.id == keepCurrentTrack.id);
+      result.insert(0, keepCurrentTrack);
+      _currentIndex = 0;
+    }
+
+    _queue = result;
+  }
+
+  List<Track> _smoothArtistCollisions(List<Track> list) {
+    if (list.length <= 2) return list;
+    final smoothed = <Track>[list.first];
+    final remaining = List<Track>.from(list.sublist(1));
+
+    while (remaining.isNotEmpty) {
+      final lastArtist = smoothed.last.displayArtist.toLowerCase();
+      int foundIndex = -1;
+
+      for (int i = 0; i < remaining.length; i++) {
+        if (remaining[i].displayArtist.toLowerCase() != lastArtist) {
+          foundIndex = i;
+          break;
+        }
+      }
+
+      if (foundIndex != -1) {
+        smoothed.add(remaining.removeAt(foundIndex));
+      } else {
+        // Nessun artista diverso disponibile
+        smoothed.addAll(remaining);
+        break;
+      }
+    }
+    return smoothed;
   }
 }

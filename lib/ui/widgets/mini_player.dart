@@ -20,22 +20,29 @@ class MiniPlayer extends StatelessWidget {
             ? (player.position.inMilliseconds / player.duration.inMilliseconds).clamp(0.0, 1.0)
             : 0.0;
 
+        void openNowPlaying() {
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              pageBuilder: (context, anim1, anim2) => const NowPlayingScreen(),
+              transitionsBuilder: (context, anim1, anim2, child) {
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 1),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+                  child: child,
+                );
+              },
+            ),
+          );
+        }
+
         return GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
-              PageRouteBuilder(
-                pageBuilder: (context, anim1, anim2) => const NowPlayingScreen(),
-                transitionsBuilder: (context, anim1, anim2, child) {
-                  return SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 1),
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
-                    child: child,
-                  );
-                },
-              ),
-            );
+          onTap: openNowPlaying,
+          onVerticalDragEnd: (details) {
+            if (details.primaryVelocity != null && details.primaryVelocity! < -100) {
+              openNowPlaying();
+            }
           },
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

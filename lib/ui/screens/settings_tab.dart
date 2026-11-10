@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/library_service.dart';
 import '../theme.dart';
+import 'stats_screen.dart';
 
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key});
@@ -71,7 +72,17 @@ class SettingsTab extends StatelessWidget {
               const SizedBox(height: 24),
 
               // Sezione Azioni Libreria
-              _buildSectionHeader('GESTIONE MUSICA'),
+              _buildSectionHeader('GESTIONE MUSICA & STATISTICHE'),
+              _buildSettingTile(
+                icon: Icons.insights_rounded,
+                title: 'Statistiche e Abitudini d\'Ascolto',
+                subtitle: 'Brani più ascoltati, più ripetuti, meno ascoltati e tempo totale',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StatsScreen()),
+                  );
+                },
+              ),
               _buildSettingTile(
                 icon: Icons.sync_rounded,
                 title: 'Aggiorna / Risansiona Libreria',
