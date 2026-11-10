@@ -144,6 +144,60 @@ class DailyMoodOutcome {
   });
 }
 
+class PeriodStat {
+  final String label;
+  final int listeningSeconds;
+  final int skipsCount;
+  final int briefCount;
+  final int halfCount;
+  final int completedCount;
+  final Map<String, int> trackPlays;
+  final Map<String, int> trackSkips;
+
+  const PeriodStat({
+    required this.label,
+    required this.listeningSeconds,
+    required this.skipsCount,
+    required this.briefCount,
+    required this.halfCount,
+    required this.completedCount,
+    required this.trackPlays,
+    required this.trackSkips,
+  });
+
+  int get totalInteractions => skipsCount + briefCount + halfCount + completedCount;
+
+  DailyMoodOutcome getMood() {
+    if (totalInteractions == 0) {
+      return const DailyMoodOutcome(
+        title: 'Nessun ascolto registrato',
+        message: 'Nessun dato registrato per questo intervallo di tempo.',
+        icon: Icons.headphones_rounded,
+        color: Color(0xFF64B5F6),
+        isPositive: true,
+      );
+    }
+    final realListening = halfCount + completedCount;
+    if (skipsCount > realListening) {
+      return const DailyMoodOutcome(
+        title: 'Non te n\'è andata bene una! 🙃',
+        message: 'In questo intervallo gli skip superano i brani ascoltati.',
+        icon: Icons.sentiment_dissatisfied_rounded,
+        color: Color(0xFFFF5252),
+        isPositive: false,
+      );
+    } else {
+      return const DailyMoodOutcome(
+        title: 'Tutto a gonfie vele, grande! 🔥',
+        message: 'Sessioni di ascolto piene e pochissimi brani skippati!',
+        icon: Icons.local_fire_department_rounded,
+        color: Color(0xFFFFD700),
+        isPositive: true,
+      );
+    }
+  }
+}
+
 class StatsService extends ChangeNotifier {
   static final StatsService instance = StatsService._();
   StatsService._() {
@@ -394,6 +448,87 @@ class StatsService extends ChangeNotifier {
         isPositive: true,
       );
     }
+  }
+
+  // --- STATISTICHE PERIODICHE (GIORNO / MESE / ANNO) ---
+
+  PeriodStat getStatForDay(DateTime date) {
+    final key = DateFormat('yyyy-MM-dd').format(date);
+    final day = _days[key] ?? DayStat(dateKey: key);
+    final formatted = DateFormat('d MMMM yyyy').format(date);
+    return PeriodStat(
+      label: formatted,
+      listeningSeconds: day.listeningSeconds,
+      skipsCount: day.skipsCount,
+      briefCount: day.briefCount,
+      halfCount: day.halfCount,
+      completedCount: day.completedCount,
+      trackPlays: Map.from(day.trackPlays),
+      trackSkips: Map.from(day.trackSkips),
+    );
+  }
+
+  PeriodStat getStatForMonth(int year, int month) {
+    final prefix = '$year-${month.toString().padLeft(2, '0')}';
+    int sec = 0, skips = 0, brief = 0, half = 0, completed = 0;
+    final Map<String, int> plays = {};
+    final Map<String, int> skps = {};
+
+    for (var entry in _days.entries) {
+      if (entry.key.startsWith(prefix)) {
+        final d = entry.value;
+        sec += d.listeningSeconds;
+        skips += d.skipsCount;
+        brief += d.briefCount;
+        half += d.halfCount;
+        completed += d.completedCount;
+        d.trackPlays.forEach((k, v) => plays[k] = (plays[k] ?? 0) + v);
+        d.trackSkips.forEach((k, v) => skps[k] = (skps[k] ?? 0) + v);
+      }
+    }
+
+    final formatted = DateFormat('MMMM yyyy').format(DateTime(year, month));
+    return PeriodStat(
+      label: formatted,
+      listeningSeconds: sec,
+      skipsCount: skips,
+      briefCount: brief,
+      halfCount: half,
+      completedCount: completed,
+      trackPlays: plays,
+      trackSkips: skps,
+    );
+  }
+
+  PeriodStat getStatForYear(int year) {
+    final prefix = '$year-';
+    int sec = 0, skips = 0, brief = 0, half = 0, completed = 0;
+    final Map<String, int> plays = {};
+    final Map<String, int> skps = {};
+
+    for (var entry in _days.entries) {
+      if (entry.key.startsWith(prefix)) {
+        final d = entry.value;
+        sec += d.listeningSeconds;
+        skips += d.skipsCount;
+        brief += d.briefCount;
+        half += d.halfCount;
+        completed += d.completedCount;
+        d.trackPlays.forEach((k, v) => plays[k] = (plays[k] ?? 0) + v);
+        d.trackSkips.forEach((k, v) => skps[k] = (skps[k] ?? 0) + v);
+      }
+    }
+
+    return PeriodStat(
+      label: 'Anno $year',
+      listeningSeconds: sec,
+      skipsCount: skips,
+      briefCount: brief,
+      halfCount: half,
+      completedCount: completed,
+      trackPlays: plays,
+      trackSkips: skps,
+    );
   }
 
   // --- STATISTICHE SETTIMANALI ---

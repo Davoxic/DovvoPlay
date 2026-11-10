@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../models/track.dart';
+import '../../services/animation_theme_service.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
+import '../../services/stats_service.dart';
 import '../theme.dart';
 import '../widgets/animated_track_transition.dart';
+import '../widgets/equalizer_sheet.dart';
 import '../widgets/track_artwork.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -222,15 +225,93 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                 ),
                               ],
                             ),
-                            IconButton(
-                              icon: Icon(Icons.playlist_add_rounded, size: 26, color: AppTheme.textPrimary),
-                              tooltip: 'Aggiungi a playlist',
-                              onPressed: () => _showAddToPlaylistSheet(context, track),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.tune_rounded, size: 22, color: AppTheme.primary),
+                                  tooltip: 'Equalizzatore audio',
+                                  onPressed: () => EqualizerSheet.show(context),
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.playlist_add_rounded, size: 26, color: AppTheme.textPrimary),
+                                  tooltip: 'Aggiungi a playlist',
+                                  onPressed: () => _showAddToPlaylistSheet(context, track),
+                                ),
+                              ],
                             ),
                           ],
                         ),
 
                         const Spacer(flex: 1),
+
+                        // Logo/Badge Transizione Animata: Tappabile & Swipabile al volo
+                        ListenableBuilder(
+                          listenable: AnimationThemeService.instance,
+                          builder: (context, _) {
+                            final anim = AnimationThemeService.instance.currentTheme;
+                            return GestureDetector(
+                              onTap: () {
+                                AnimationThemeService.instance.cycleNext();
+                              },
+                              onHorizontalDragEnd: (details) {
+                                if (details.primaryVelocity != null && details.primaryVelocity! < 0) {
+                                  AnimationThemeService.instance.cycleNext();
+                                } else {
+                                  AnimationThemeService.instance.cyclePrevious();
+                                }
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceCard,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: AppTheme.goldBorder),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.goldGlow.withOpacity(0.12),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(anim.icon, size: 14, color: AppTheme.primary),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      anim.name,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primary.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        'TAP/SWIPE',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.5,
+                                          color: AppTheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
 
                         // Artwork con Animazione Selezionabile (16+ Temi di Transizione)
                         Hero(
@@ -395,15 +476,44 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            // Shuffle Button interattivo con selezione modalità
-                            IconButton(
-                              icon: Icon(
-                                player.shuffleMode.icon,
-                                color: player.isShuffle ? AppTheme.primary : AppTheme.textSecondary,
-                                size: 24,
-                              ),
-                              tooltip: 'Modalità Shuffle: ${player.shuffleMode.label}',
-                              onPressed: () => _showShuffleModeSheet(context, player),
+                            // Shuffle Button interattivo con selezione modalità e minuti ascoltati oggi
+                            ListenableBuilder(
+                              listenable: StatsService.instance,
+                              builder: (context, _) {
+                                final todayMins = StatsService.instance.todayStat.totalDurationSeconds ~/ 60;
+                                return GestureDetector(
+                                  onTap: () => _showShuffleModeSheet(context, player),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: player.isShuffle ? AppTheme.primary.withOpacity(0.18) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: player.isShuffle ? AppTheme.primary : Colors.white12,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          player.shuffleMode.icon,
+                                          color: player.isShuffle ? AppTheme.primary : AppTheme.textSecondary,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${todayMins}m oggi',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: player.isShuffle ? AppTheme.primary : AppTheme.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                             IconButton(
                               icon: Icon(Icons.skip_previous_rounded, size: 36, color: AppTheme.textPrimary),

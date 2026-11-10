@@ -10,6 +10,18 @@ import '../theme.dart';
 import '../widgets/track_tile.dart';
 import 'stats_screen.dart';
 
+enum TrackSortMode {
+  none('Nessuno', Icons.sort_rounded),
+  duration('Durata', Icons.timer_outlined),
+  playCount('Ascolti Totali', Icons.local_fire_department_rounded),
+  artist('Artista', Icons.person_rounded),
+  alphabetical('A-Z', Icons.sort_by_alpha_rounded);
+
+  final String label;
+  final IconData icon;
+  const TrackSortMode(this.label, this.icon);
+}
+
 class LibraryTab extends StatefulWidget {
   const LibraryTab({super.key});
 
@@ -21,6 +33,7 @@ class _LibraryTabState extends State<LibraryTab> {
   final TextEditingController _filterCtrl = TextEditingController();
   String _filterText = '';
   String _activeCategory = 'all'; // 'all', 'top', 'least', 'recent'
+  TrackSortMode _sortMode = TrackSortMode.none;
 
   @override
   void dispose() {
@@ -320,6 +333,28 @@ class _LibraryTabState extends State<LibraryTab> {
               t.artist.toLowerCase().contains(_filterText.toLowerCase());
         }).toList();
 
+        final sortedTracks = List<Track>.from(filteredTracks);
+        switch (_sortMode) {
+          case TrackSortMode.duration:
+            sortedTracks.sort((a, b) => b.duration.compareTo(a.duration));
+            break;
+          case TrackSortMode.playCount:
+            sortedTracks.sort((a, b) {
+              final aSec = stats.getTrackStat(a.id)?.totalDurationSeconds ?? 0;
+              final bSec = stats.getTrackStat(b.id)?.totalDurationSeconds ?? 0;
+              return bSec.compareTo(aSec);
+            });
+            break;
+          case TrackSortMode.artist:
+            sortedTracks.sort((a, b) => a.displayArtist.toLowerCase().compareTo(b.displayArtist.toLowerCase()));
+            break;
+          case TrackSortMode.alphabetical:
+            sortedTracks.sort((a, b) => a.displayTitle.toLowerCase().compareTo(b.displayTitle.toLowerCase()));
+            break;
+          case TrackSortMode.none:
+            break;
+        }
+
         return Scaffold(
           backgroundColor: AppTheme.background,
           appBar: AppBar(
@@ -361,7 +396,17 @@ class _LibraryTabState extends State<LibraryTab> {
               IconButton(
                 icon: Icon(ViewModeService.instance.currentInfo.icon, color: AppTheme.primary),
                 tooltip: 'Cambia layout (${ViewModeService.instance.currentInfo.name})',
-                onPressed: () => _showViewModePicker(context),
+                onPressed: () {
+                  ViewModeService.instance.cycleNextMode();
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      duration: const Duration(milliseconds: 900),
+                      content: Text('Layout: ${ViewModeService.instance.currentInfo.name}'),
+                      backgroundColor: AppTheme.surfaceCard,
+                    ),
+                  );
+                },
               ),
               IconButton(
                 icon: Icon(Icons.analytics_rounded, color: AppTheme.primary),
@@ -371,11 +416,6 @@ class _LibraryTabState extends State<LibraryTab> {
                     MaterialPageRoute(builder: (_) => const StatsScreen()),
                   );
                 },
-              ),
-              IconButton(
-                icon: Icon(Icons.file_upload_outlined, color: AppTheme.secondary),
-                tooltip: 'Importa file audio',
-                onPressed: _pickFiles,
               ),
             ],
           ),
@@ -410,18 +450,32 @@ class _LibraryTabState extends State<LibraryTab> {
                                   ),
                                 ],
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.auto_awesome_rounded, color: Colors.black, size: 20),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Shuffle Magico',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
+                                  const Icon(Icons.auto_awesome_rounded, color: Colors.black, size: 20),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        'Shuffle Magico',
+                                        style: TextStyle(
+                                          color: Colors.black,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${stats.todayStat.totalDurationSeconds ~/ 60}m ascoltati oggi',
+                                        style: const TextStyle(
+                                          color: Colors.black87,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -514,6 +568,65 @@ class _LibraryTabState extends State<LibraryTab> {
                     ),
                   ),
 
+                // Barra Ordinamento Canzoni (Durata / Ascolti / Artista / Alfabetico / Niente)
+                if (lib.tracks.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 32,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6, top: 7),
+                          child: Text(
+                            'ORDINA:',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                        ...TrackSortMode.values.map((mode) {
+                          final isSelected = _sortMode == mode;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              avatar: Icon(
+                                mode.icon,
+                                size: 12,
+                                color: isSelected ? Colors.black : AppTheme.primary,
+                              ),
+                              label: Text(
+                                mode.label,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? Colors.black : AppTheme.textPrimary,
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: AppTheme.primary,
+                              backgroundColor: AppTheme.surfaceCard,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(
+                                  color: isSelected ? AppTheme.primary : AppTheme.goldBorder,
+                                ),
+                              ),
+                              onSelected: (val) {
+                                if (val) setState(() => _sortMode = mode);
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 6),
 
                 // Sezione Tracce Dinamica in base al ViewMode
@@ -565,7 +678,7 @@ class _LibraryTabState extends State<LibraryTab> {
                             ),
                           ),
                         )
-                      : _buildTracksContainer(filteredTracks, viewMode),
+                      : _buildTracksContainer(sortedTracks, viewMode),
                 ),
               ],
             ),

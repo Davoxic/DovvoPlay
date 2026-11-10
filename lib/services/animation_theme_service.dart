@@ -169,4 +169,16 @@ class AnimationThemeService extends ChangeNotifier {
       await prefs.setString(_prefKey, type.name);
     } catch (_) {}
   }
+
+  void cycleNext() {
+    final idx = animations.indexWhere((a) => a.type == _selectedType);
+    final nextIdx = (idx + 1) % animations.length;
+    setAnimationType(animations[nextIdx].type);
+  }
+
+  void cyclePrevious() {
+    final idx = animations.indexWhere((a) => a.type == _selectedType);
+    final prevIdx = (idx - 1 + animations.length) % animations.length;
+    setAnimationType(animations[prevIdx].type);
+  }
 }

@@ -9,6 +9,7 @@ import '../../services/theme_service.dart';
 import '../../services/update_service.dart';
 import '../../services/view_mode_service.dart';
 import '../theme.dart';
+import '../widgets/equalizer_sheet.dart';
 import 'pc_companion_screen.dart';
 import 'stats_screen.dart';
 import 'wifi_tab.dart';
@@ -442,6 +443,15 @@ class SettingsTab extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const WifiTab()),
                   );
                 },
+              ),
+              _buildFeatureTile(
+                icon: Icons.tune_rounded,
+                iconGradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFF9100)]),
+                title: 'Equalizzatore Audio',
+                subtitle: '5 bande frequenza (-12dB a +12dB) e preset (Bass Boost, Rock, Pop...)',
+                badgeText: 'AUDIO EQ',
+                badgeColor: AppTheme.primary,
+                onTap: () => EqualizerSheet.show(context),
               ),
 
               const SizedBox(height: 20),

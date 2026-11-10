@@ -113,4 +113,10 @@ class ViewModeService extends ChangeNotifier {
       await prefs.setString(_prefKey, mode.name);
     } catch (_) {}
   }
+
+  void cycleNextMode() {
+    final idx = modes.indexWhere((m) => m.mode == _currentMode);
+    final nextIdx = (idx + 1) % modes.length;
+    setViewMode(modes[nextIdx].mode);
+  }
 }
