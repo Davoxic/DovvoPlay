@@ -109,6 +109,36 @@ class StatsService extends ChangeNotifier {
     }
   }
 
+  /// Salva e notifica per aggiornamenti esterni (es. ripristino backup)
+  Future<void> saveAndNotify() async {
+    await _saveStats();
+    notifyListeners();
+  }
+
+  /// Ripristina o unisce una statistica da un backup
+  void restoreOrMergeStat(TrackStat importedStat) {
+    final existing = _stats[importedStat.trackId];
+    if (existing != null) {
+      existing.playCount = existing.playCount > importedStat.playCount
+          ? existing.playCount
+          : importedStat.playCount;
+      existing.repeatCount = existing.repeatCount > importedStat.repeatCount
+          ? existing.repeatCount
+          : importedStat.repeatCount;
+      existing.completionCount = existing.completionCount > importedStat.completionCount
+          ? existing.completionCount
+          : importedStat.completionCount;
+      existing.totalDurationSeconds = existing.totalDurationSeconds > importedStat.totalDurationSeconds
+          ? existing.totalDurationSeconds
+          : importedStat.totalDurationSeconds;
+      if (importedStat.lastPlayedAt.isAfter(existing.lastPlayedAt)) {
+        existing.lastPlayedAt = importedStat.lastPlayedAt;
+      }
+    } else {
+      _stats[importedStat.trackId] = importedStat;
+    }
+  }
+
   /// Registra l'avvio della riproduzione di una traccia
   void recordTrackStart(Track track) {
     final now = DateTime.now();

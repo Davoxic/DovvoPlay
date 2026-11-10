@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:audio_session/audio_session.dart';
+import 'services/backup_service.dart';
 import 'services/library_service.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme.dart';
@@ -31,6 +32,11 @@ Future<void> main() async {
 
   // Inizializza e carica la libreria locale
   await LibraryService.instance.init();
+
+  // Verifica e ripristina automaticamente backup dopo aggiornamenti se presente
+  try {
+    await BackupService.instance.autoRestoreIfEmpty();
+  } catch (_) {}
 
   runApp(const SborraPlayApp());
 }

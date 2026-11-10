@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/backup_service.dart';
 import '../../services/library_service.dart';
 import '../theme.dart';
 import 'stats_screen.dart';
@@ -97,24 +100,74 @@ class SettingsTab extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // Sezione Backup
-              _buildSectionHeader('BACKUP E RIPRISTINO'),
+              // Sezione Backup Completo & Ripristino
+              _buildSectionHeader('SALVATAGGIO & BACKUP COMPLETO'),
               _buildSettingTile(
                 icon: Icons.upload_file_rounded,
-                title: 'Esporta Backup Playlist',
-                subtitle: 'Copia negli appunti il backup JSON di tutte le playlist',
-                onTap: () {
-                  final jsonStr = lib.exportBackupJson();
-                  Clipboard.setData(ClipboardData(text: jsonStr));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Backup JSON copiato negli appunti!')),
-                  );
+                title: 'Esporta Backup Completo (File & Appunti)',
+                subtitle: 'Salva statistiche, abitudini d\'ascolto, cronologia e playlist in un file JSON',
+                onTap: () async {
+                  try {
+                    final file = await BackupService.instance.exportToFile();
+                    final jsonStr = BackupService.instance.createBackupJsonString();
+                    await Clipboard.setData(ClipboardData(text: jsonStr));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Backup salvato su file e copiato negli appunti!\n(${file.path.split('/').last})'),
+                          backgroundColor: AppTheme.secondary,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Errore salvataggio backup: $e'), backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  }
                 },
               ),
               _buildSettingTile(
-                icon: Icons.download_for_offline_rounded,
-                title: 'Importa Backup Playlist',
-                subtitle: 'Ripristina playlist da un testo JSON o file di backup',
+                icon: Icons.folder_open_rounded,
+                title: 'Ripristina Backup da File (.json)',
+                subtitle: 'Scegli il file di backup salvato per ripristinare tutti i tuoi ascolti e playlist',
+                onTap: () async {
+                  try {
+                    final res = await FilePicker.platform.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['json'],
+                    );
+                    if (res != null && res.files.single.path != null) {
+                      final file = File(res.files.single.path!);
+                      final result = await BackupService.instance.importFromFile(file);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              result.success
+                                  ? 'Ripristinati ${result.restoredStats} ascolti/statistiche e ${result.restoredPlaylists} playlist!'
+                                  : result.message,
+                            ),
+                            backgroundColor: result.success ? AppTheme.secondary : Colors.redAccent,
+                          ),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Errore apertura file: $e'), backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  }
+                },
+              ),
+              _buildSettingTile(
+                icon: Icons.content_paste_rounded,
+                title: 'Ripristina Backup da Testo o Appunti',
+                subtitle: 'Incolla il contenuto JSON copiato in precedenza',
                 onTap: () => _showImportBackupDialog(context),
               ),
 
@@ -231,15 +284,18 @@ class SettingsTab extends StatelessWidget {
             onPressed: () async {
               final str = textCtrl.text.trim();
               if (str.isNotEmpty) {
-                try {
-                  await LibraryService.instance.importBackupJson(str);
-                  Navigator.pop(ctx);
+                final result = await BackupService.instance.importFromJsonString(str);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Backup importato con successo!')),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Errore formato JSON: $e')),
+                    SnackBar(
+                      content: Text(
+                        result.success
+                            ? 'Ripristinati ${result.restoredStats} ascolti e ${result.restoredPlaylists} playlist!'
+                            : result.message,
+                      ),
+                      backgroundColor: result.success ? AppTheme.secondary : Colors.redAccent,
+                    ),
                   );
                 }
               }

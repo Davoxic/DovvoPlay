@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../services/audio_player_service.dart';
 import '../screens/now_playing_screen.dart';
 import '../theme.dart';
+import 'track_artwork.dart';
 
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
@@ -79,29 +79,11 @@ class MiniPlayer extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: track.thumbnailUrl != null
-                              ? CachedNetworkImage(
-                                  imageUrl: track.thumbnailUrl!,
-                                  width: 44,
-                                  height: 44,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (c, u, e) => Container(
-                                    width: 44,
-                                    height: 44,
-                                    color: AppTheme.primary.withOpacity(0.2),
-                                    child: const Icon(Icons.music_note, color: AppTheme.primary),
-                                  ),
-                                )
-                              : Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    gradient: AppTheme.primaryGradient,
-                                  ),
-                                  child: const Icon(Icons.music_note_rounded, color: Colors.white, size: 24),
-                                ),
+                        TrackArtwork(
+                          url: track.thumbnailUrl,
+                          width: 44,
+                          height: 44,
+                          borderRadius: 8,
                         ),
                         const SizedBox(width: 12),
                         Expanded(

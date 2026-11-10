@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
+import '../../services/backup_service.dart';
 import '../../services/library_service.dart';
 import '../../services/stats_service.dart';
 import '../theme.dart';
+import '../widgets/track_artwork.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -170,27 +171,10 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
             leading: Stack(
               alignment: Alignment.topLeft,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: track.thumbnailUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: track.thumbnailUrl!,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          errorWidget: (c, u, e) => Container(
-                            width: 48,
-                            height: 48,
-                            color: AppTheme.surfaceLight,
-                            child: const Icon(Icons.music_note_rounded, color: AppTheme.textSecondary),
-                          ),
-                        )
-                      : Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(gradient: AppTheme.primaryGradient),
-                          child: const Icon(Icons.music_note_rounded, color: Colors.white, size: 24),
-                        ),
+                TrackArtwork(
+                  url: track.thumbnailUrl,
+                  size: 48,
+                  borderRadius: 10,
                 ),
                 Container(
                   padding: const EdgeInsets.all(2),
@@ -261,6 +245,23 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     return Scaffold(
       appBar: AppBar(
         title: const Text('Statistiche d\'Ascolto'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: 'Esporta Statistiche & Backup',
+            onPressed: () async {
+              final file = await BackupService.instance.exportToFile();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Backup salvato: ${file.path.split('/').last}'),
+                    backgroundColor: AppTheme.secondary,
+                  ),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: ListenableBuilder(
         listenable: Listenable.merge([StatsService.instance, LibraryService.instance]),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/playlist.dart';
 import '../models/track.dart';
+import 'metadata_service.dart';
 
 class LibraryService extends ChangeNotifier {
   static final LibraryService instance = LibraryService._();
@@ -78,9 +79,15 @@ class LibraryService extends ChangeNotifier {
     }
   }
 
-  /// Scansiona la cartella Music per rilevare file aggiunti o rimossi
+  /// Scansiona la cartella Music per rilevare file aggiunti, rimossi e estrarre copertine/metadati ID3
   Future<void> scanLibrary() async {
     final dir = await musicDirectory;
+    final docs = await getApplicationDocumentsDirectory();
+    final coversDir = Directory('${docs.path}/Covers');
+    if (!await coversDir.exists()) {
+      await coversDir.create(recursive: true);
+    }
+
     final validExts = {'.mp3', '.m4a', '.aac', '.wav', '.flac', '.aif', '.aiff', '.caf', '.alac'};
 
     final foundFiles = <File>[];
@@ -101,35 +108,50 @@ class LibraryService extends ChangeNotifier {
 
     for (final file in foundFiles) {
       final path = file.path;
-      if (existingMap.containsKey(path)) {
-        newTracks.add(existingMap[path]!);
-      } else {
-        final name = file.path.split(Platform.pathSeparator).last;
-        final dotIdx = name.lastIndexOf('.');
-        final nameWithoutExt = dotIdx != -1 ? name.substring(0, dotIdx) : name;
-        int size = 0;
-        try {
-          size = await file.length();
-        } catch (_) {}
+      final existing = existingMap[path];
 
-        // Prova a splittare "Artista - Titolo"
-        String artist = '';
-        String title = nameWithoutExt;
-        if (nameWithoutExt.contains(' - ')) {
-          final parts = nameWithoutExt.split(' - ');
-          artist = parts[0].trim();
+      // Se già esiste e ha già copertina salvata, mantienilo per velocità
+      if (existing != null && existing.thumbnailUrl != null && existing.thumbnailUrl!.isNotEmpty) {
+        newTracks.add(existing);
+        continue;
+      }
+
+      // Estrai metadati ID3 / M4A / FLAC e copertina incorporata
+      final meta = await MetadataService.instance.extractMetadata(file, coversDir);
+
+      final name = file.path.split(Platform.pathSeparator).last;
+      final dotIdx = name.lastIndexOf('.');
+      final nameWithoutExt = dotIdx != -1 ? name.substring(0, dotIdx) : name;
+
+      String artist = (meta.artist != null && meta.artist!.isNotEmpty) ? meta.artist! : (existing?.artist ?? '');
+      String title = (meta.title != null && meta.title!.isNotEmpty) ? meta.title! : (existing?.title ?? nameWithoutExt);
+      String album = (meta.album != null && meta.album!.isNotEmpty) ? meta.album! : (existing?.album ?? '');
+      String? cover = meta.coverPath ?? existing?.thumbnailUrl;
+
+      // Se i metadati ID3 non contenevano artista, prova a splittare "Artista - Titolo"
+      if (artist.isEmpty && nameWithoutExt.contains(' - ')) {
+        final parts = nameWithoutExt.split(' - ');
+        artist = parts[0].trim();
+        if (title == nameWithoutExt) {
           title = parts.sublist(1).join(' - ').trim();
         }
-
-        newTracks.add(Track(
-          id: path,
-          title: title,
-          artist: artist,
-          filePath: path,
-          fileSize: size,
-          duration: Duration.zero,
-        ));
       }
+
+      int size = 0;
+      try {
+        size = await file.length();
+      } catch (_) {}
+
+      newTracks.add(Track(
+        id: path,
+        title: title.isNotEmpty ? title : nameWithoutExt,
+        artist: artist.isNotEmpty ? artist : 'Artista sconosciuto',
+        album: album,
+        filePath: path,
+        fileSize: size,
+        thumbnailUrl: cover,
+        duration: meta.duration ?? existing?.duration ?? Duration.zero,
+      ));
     }
 
     // Conserva anche tracce online marcate esplicitamente o nei preferiti

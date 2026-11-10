@@ -3,6 +3,7 @@ import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
 import '../theme.dart';
+import 'track_artwork.dart';
 
 class TrackTile extends StatelessWidget {
   final Track track;
@@ -40,21 +41,31 @@ class TrackTile extends StatelessWidget {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            gradient: isCurrent ? AppTheme.primaryGradient : null,
-            color: isCurrent ? null : const Color(0x1AFFFFFF),
-          ),
-          child: Icon(
-            isPlaying
-                ? Icons.volume_up_rounded
-                : (isCurrent ? Icons.pause_rounded : (track.isOnline ? Icons.public_rounded : Icons.music_note_rounded)),
-            color: isCurrent ? Colors.white : AppTheme.primary,
-            size: 22,
-          ),
+        leading: Stack(
+          alignment: Alignment.center,
+          children: [
+            TrackArtwork(
+              url: track.thumbnailUrl,
+              width: 46,
+              height: 46,
+              borderRadius: 10,
+              placeholderIcon: track.isOnline ? Icons.public_rounded : Icons.music_note_rounded,
+            ),
+            if (isCurrent)
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.black.withOpacity(0.45),
+                ),
+                child: Icon(
+                  isPlaying ? Icons.volume_up_rounded : Icons.pause_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+          ],
         ),
         title: Text(
           track.displayTitle,

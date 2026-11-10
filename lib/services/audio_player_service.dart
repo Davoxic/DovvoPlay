@@ -75,7 +75,12 @@ class AudioPlayerService extends ChangeNotifier {
       (event) {},
       onError: (Object e, StackTrace st) {
         print('Errore stream riproduzione: $e');
-        _lastErrorMessage = 'Errore riproduzione iOS ($e)';
+        final s = e.toString();
+        if (s.contains('(-1)') || s.toLowerCase().contains('unknown error')) {
+          _lastErrorMessage = 'Riproduzione interrotta o errore di rete. Tocca per riprovare.';
+        } else {
+          _lastErrorMessage = 'Errore riproduzione ($e)';
+        }
         _isBuffering = false;
         notifyListeners();
       },
@@ -149,21 +154,28 @@ class AudioPlayerService extends ChangeNotifier {
     StatsService.instance.recordTrackStart(track);
 
     try {
+      Uri? artUri;
+      if (track.thumbnailUrl != null && track.thumbnailUrl!.isNotEmpty) {
+        artUri = track.thumbnailUrl!.startsWith('http')
+            ? Uri.tryParse(track.thumbnailUrl!)
+            : Uri.file(track.thumbnailUrl!.replaceFirst('file://', ''));
+      }
+
       final mediaItem = MediaItem(
         id: track.id,
         album: track.album.isNotEmpty ? track.album : (track.isOnline ? 'YouTube' : 'SborraPlay'),
         title: track.displayTitle,
         artist: track.displayArtist,
-        artUri: track.thumbnailUrl != null ? Uri.tryParse(track.thumbnailUrl!) : null,
+        artUri: artUri,
         duration: track.duration > Duration.zero ? track.duration : null,
       );
 
       if (track.isOnline) {
         final videoId = track.id.replaceFirst('yt_', '');
 
-        // 1. Controlla se la canzone è già scaricata o in cache locale
+        // 1. Controlla se la canzone è già scaricata o in cache locale completa
         final localFile = await YouTubeService.instance.getLocalAudioFile(track.id);
-        if (localFile != null && await localFile.exists()) {
+        if (localFile != null && await localFile.exists() && await localFile.length() > 50000) {
           final audioSource = AudioSource.uri(Uri.file(localFile.path), tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
@@ -171,28 +183,31 @@ class AudioPlayerService extends ChangeNotifier {
           return;
         }
 
-        // 2. Prova prima lo stream HLS (.m3u8) nativo per iOS (zero download del file, streaming istantaneo)
-        final hlsUrl = await YouTubeService.instance.getHlsStreamUrl(videoId);
+        // 2. Ottieni lo stream AAC puro compatibile iOS (itag 140 m4a / muxed mp4)
+        final streamInfo = await YouTubeService.instance.getPlayableStreamInfo(videoId);
         if (_playRequestId != requestId) return;
 
-        if (hlsUrl != null && hlsUrl.isNotEmpty) {
+        if (streamInfo != null) {
+          // Prova prima lo streaming diretto immediato (avvio in < 1 secondo)
           try {
-            final audioSource = AudioSource.uri(Uri.parse(hlsUrl), tag: mediaItem);
+            final audioSource = AudioSource.uri(streamInfo.url, tag: mediaItem);
             await _player.setAudioSource(audioSource);
             if (_playRequestId != requestId) return;
             await _player.play();
+
+            // Salva asincronamente in cache in background senza bloccare la riproduzione
+            unawaited(YouTubeService.instance.downloadToCache(videoId, track.title));
             return;
-          } catch (hlsErr) {
-            print('Streaming HLS non riuscito ($hlsErr), procedo al download in cache...');
+          } catch (directErr) {
+            print('Streaming diretto fallito ($directErr), procedo al caching locale con youtube_explode...');
           }
         }
 
-        // 3. Fallback: scarica i chunk audio AAC (.m4a) in cache con youtube_explode
-        // (completamente immune al blocco 403 Forbidden di Google Video CDN)
+        // 3. Fallback: scarica i chunk audio AAC (.m4a) in cache locale via youtube_explode
         final cached = await YouTubeService.instance.downloadToCache(videoId, track.title);
         if (_playRequestId != requestId) return;
 
-        if (cached != null && await cached.exists()) {
+        if (cached != null && await cached.exists() && await cached.length() > 50000) {
           final audioSource = AudioSource.uri(Uri.file(cached.path), tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
@@ -215,7 +230,12 @@ class AudioPlayerService extends ChangeNotifier {
         throw Exception('Percorso audio non valido.');
       }
     } catch (e, stack) {
-      _lastErrorMessage = e.toString().replaceFirst('Exception: ', '');
+      final s = e.toString();
+      if (s.contains('(-1)') || s.toLowerCase().contains('unknown error')) {
+        _lastErrorMessage = 'Errore connessione audio. Riprova con un altro brano.';
+      } else {
+        _lastErrorMessage = s.replaceFirst('Exception: ', '');
+      }
       print('Errore riproduzione: $e\n$stack');
     } finally {
       if (_playRequestId == requestId) {

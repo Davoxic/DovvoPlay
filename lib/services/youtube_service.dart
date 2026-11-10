@@ -75,85 +75,65 @@ class YouTubeService {
     }
   }
 
-  /// Recupera l'URL dello stream nativo HLS (.m3u8) per iOS se disponibile
-  Future<String?> getHlsStreamUrl(String videoId) async {
-    try {
-      final manifest = await yt.videos.streamsClient.getManifest(
-        videoId,
-        ytClients: [
-          YoutubeApiClient.ios,
-          YoutubeApiClient.safari,
-        ],
-      ).timeout(const Duration(seconds: 7));
-
-      if (manifest.hls.isNotEmpty) {
-        final hls = manifest.hls.first;
-        return hls.url.toString();
-      }
-    } catch (e) {
-      print('getHlsStreamUrl info: $e');
-    }
-    return null;
-  }
-
-  /// Recupera lo StreamInfo riproducibile su iOS (privilegia AAC in MP4 o Muxed MP4)
+  /// Recupera lo StreamInfo rigorosamente compatibile con iOS (AAC in container MP4/M4A)
+  /// CRITICO: Non restituisce MAI flussi WebM/Opus perché AVPlayer su iOS non li decodifica e lancia fatalmente (-1) unknown error.
   Future<StreamInfo?> getPlayableStreamInfo(String videoId) async {
     StreamManifest? manifest;
 
-    // 1. Prova prima con client iOS e Safari (generano stream compatibili AAC/MP4 per AVPlayer)
+    // 1. Prova prima il manifest standard (fornisce itag 140 AAC 128kbps m4a e flussi muxed MP4)
     try {
-      manifest = await yt.videos.streamsClient.getManifest(
-        videoId,
-        ytClients: [
-          YoutubeApiClient.ios,
-          YoutubeApiClient.safari,
-          YoutubeApiClient.androidVr,
-        ],
-      ).timeout(const Duration(seconds: 8));
+      manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 9));
     } catch (e) {
-      print('getManifest ytClients: $e');
+      print('getManifest standard: $e');
     }
 
-    // 2. Fallback su manifest standard
+    // 2. Se fallisce, prova con client mobile alternativi
     if (manifest == null) {
       try {
-        manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
+        manifest = await yt.videos.streamsClient.getManifest(
+          videoId,
+          ytClients: [
+            YoutubeApiClient.androidVr,
+            YoutubeApiClient.tv,
+          ],
+        ).timeout(const Duration(seconds: 9));
       } catch (e) {
-        print('getManifest standard: $e');
+        print('getManifest ytClients alternative: $e');
       }
     }
 
     if (manifest == null) return null;
 
-    // 1. Cerca nei flussi audio-only uno stream MP4 / AAC (itag 140 m4a)
+    // 1. Cerca PRIMA nei flussi audio-only uno stream MP4 / AAC (itag 140 m4a 128kbps)
     final mp4Audio = manifest.audioOnly.where((s) {
       final containerName = s.container.name.toLowerCase();
       final codec = s.audioCodec.toLowerCase();
-      return containerName == 'mp4' ||
-             containerName == 'm4a' ||
-             codec.contains('mp4a') ||
-             codec.contains('aac');
+      final mime = s.codec.mimeType.toLowerCase();
+      final isMp4Container = containerName == 'mp4' || containerName == 'm4a';
+      final isAacCodec = codec.contains('mp4a') || codec.contains('aac') || mime.contains('mp4a');
+      final isWebm = containerName.contains('webm') || codec.contains('opus') || mime.contains('opus');
+      return isMp4Container && isAacCodec && !isWebm;
     }).toList();
 
     if (mp4Audio.isNotEmpty) {
       return mp4Audio.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
     }
 
-    // 2. Se non c'è audio-only MP4, usa i flussi muxed MP4 (audio AAC nativo per iOS)
+    // 2. Se non c'è audio-only MP4 puro, usa i flussi muxed MP4 (audio AAC nativo hardware per iOS)
     final mp4Muxed = manifest.muxed.where((s) {
       final containerName = s.container.name.toLowerCase();
-      return containerName == 'mp4' || containerName == 'm4a';
+      final codec = s.audioCodec.toLowerCase();
+      final isMp4Container = containerName == 'mp4' || containerName == 'm4a';
+      final isNotWebm = !codec.contains('opus');
+      return isMp4Container && isNotWebm;
     }).toList();
 
     if (mp4Muxed.isNotEmpty) {
+      // Prendi il muxed più leggero per risparmiare banda e bufferizzare istantaneamente
       return mp4Muxed.reduce((a, b) => a.bitrate.bitsPerSecond < b.bitrate.bitsPerSecond ? a : b);
     }
 
-    // 3. Fallback: qualunque audio-only disponibile
-    if (manifest.audioOnly.isNotEmpty) {
-      return manifest.audioOnly.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
-    }
-
+    // Ritorna null se esistono solo flussi WebM/Opus per evitare il crash di AVPlayer
     return null;
   }
 

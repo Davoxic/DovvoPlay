@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
 import '../theme.dart';
+import '../widgets/track_artwork.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
@@ -247,21 +247,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                 ),
                               ],
                             ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(28),
-                              child: track.thumbnailUrl != null
-                                  ? CachedNetworkImage(
-                                      imageUrl: track.thumbnailUrl!,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (c, u, e) => Container(
-                                        decoration: BoxDecoration(gradient: AppTheme.primaryGradient),
-                                        child: const Icon(Icons.music_note_rounded, size: 80, color: Colors.white),
-                                      ),
-                                    )
-                                  : Container(
-                                      decoration: BoxDecoration(gradient: AppTheme.primaryGradient),
-                                      child: const Icon(Icons.music_note_rounded, size: 80, color: Colors.white),
-                                    ),
+                            child: TrackArtwork(
+                              url: track.thumbnailUrl,
+                              width: MediaQuery.of(context).size.width * 0.78,
+                              height: MediaQuery.of(context).size.width * 0.78,
+                              borderRadius: 28,
                             ),
                           ),
                         ),
