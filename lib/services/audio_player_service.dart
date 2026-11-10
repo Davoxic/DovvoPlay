@@ -49,6 +49,8 @@ class AudioPlayerService extends ChangeNotifier {
   bool _hasReached50Percent = false;
   Duration _maxPositionReached = Duration.zero;
 
+  Timer? _secondTicker;
+
   AudioPlayer get player => _player;
   Track? get currentTrack => _currentTrack;
   List<Track> get queue => _queue;
@@ -63,6 +65,14 @@ class AudioPlayerService extends ChangeNotifier {
   String? get lastErrorMessage => _lastErrorMessage;
 
   void _initListeners() {
+    // Ticker secondo per secondo per le statistiche reali
+    _secondTicker?.cancel();
+    _secondTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_player.playing && _currentTrack != null) {
+        StatsService.instance.addListeningSeconds(_currentTrack!, seconds: 1);
+      }
+    });
+
     _player.playerStateStream.listen((state) {
       _isBuffering = state.processingState == ProcessingState.buffering ||
                      state.processingState == ProcessingState.loading;
@@ -93,28 +103,6 @@ class AudioPlayerService extends ChangeNotifier {
       if (pos > _maxPositionReached) {
         _maxPositionReached = pos;
       }
-
-      // Regola del 50%: una canzone è considerata ascoltata solo se
-      // riprodotta per almeno il 50% della sua durata effettiva.
-      // Se skippata prima, non viene conteggiata come ascolto.
-      if (!_hasReached50Percent && _currentTrack != null) {
-        final totalDur = _duration > Duration.zero
-            ? _duration
-            : (_currentTrack!.duration > Duration.zero ? _currentTrack!.duration : Duration.zero);
-
-        if (totalDur > Duration.zero) {
-          final halfDuration = Duration(milliseconds: totalDur.inMilliseconds ~/ 2);
-          if (pos >= halfDuration || _maxPositionReached >= halfDuration) {
-            _hasReached50Percent = true;
-            StatsService.instance.recordTrackPlayed(_currentTrack!);
-          }
-        } else if (pos >= const Duration(seconds: 30)) {
-          // Fallback per streaming live o brani con durata temporaneamente non disponibile
-          _hasReached50Percent = true;
-          StatsService.instance.recordTrackPlayed(_currentTrack!);
-        }
-      }
-
       notifyListeners();
     });
 
@@ -126,19 +114,27 @@ class AudioPlayerService extends ChangeNotifier {
     });
   }
 
+  void _recordCurrentTrackStats() {
+    if (_currentTrack == null) return;
+    final totalDur = _duration > Duration.zero
+        ? _duration
+        : (_currentTrack!.duration > Duration.zero ? _currentTrack!.duration : Duration.zero);
+
+    double percent = 0.0;
+    if (totalDur.inMilliseconds > 0) {
+      percent = (_maxPositionReached.inMilliseconds / totalDur.inMilliseconds) * 100.0;
+    } else if (_maxPositionReached.inSeconds > 20) {
+      percent = 80.0;
+    }
+    StatsService.instance.recordTrackByPercentage(_currentTrack!, percent.clamp(0.0, 100.0));
+  }
+
   void _onTrackCompleted() {
     if (_currentTrack != null) {
-      if (!_hasReached50Percent) {
-        _hasReached50Percent = true;
-        StatsService.instance.recordTrackPlayed(_currentTrack!);
-      }
-      StatsService.instance.recordTrackCompleted(_currentTrack!);
+      StatsService.instance.recordTrackByPercentage(_currentTrack!, 100.0);
     }
 
     if (_loopMode == PlayerLoopMode.one) {
-      // In loop continuo, azzera i flag così che anche la successiva ripetizione
-      // debba raggiungere almeno il 50% per essere ri-conteggiata!
-      _hasReached50Percent = false;
       _maxPositionReached = Duration.zero;
       _player.seek(Duration.zero);
       _player.play();
@@ -158,15 +154,11 @@ class AudioPlayerService extends ChangeNotifier {
   Future<void> playTrack(Track track, {List<Track>? newQueue}) async {
     final requestId = ++_playRequestId;
 
-    // Se c'era una traccia attiva ed è stata cambiata prima di raggiungere il 50%,
-    // viene considerata "skippata e basta" e non incrementa gli ascolti
+    // Registra le statistiche con percentuale di ascolto del brano precedente
     if (_currentTrack != null && _currentTrack!.id != track.id) {
-      if (!_hasReached50Percent) {
-        StatsService.instance.recordTrackSkipped(_currentTrack!);
-      }
+      _recordCurrentTrackStats();
     }
 
-    _hasReached50Percent = false;
     _maxPositionReached = Duration.zero;
 
     if (newQueue != null) {

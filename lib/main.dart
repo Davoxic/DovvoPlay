@@ -3,6 +3,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:audio_session/audio_session.dart';
 import 'services/backup_service.dart';
 import 'services/library_service.dart';
+import 'services/theme_service.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme.dart';
 
@@ -46,11 +47,16 @@ class SborraPlayApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SborraPlay',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: const HomeScreen(),
+    return ListenableBuilder(
+      listenable: ThemeService.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'SborraPlay',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme,
+          home: const HomeScreen(),
+        );
+      },
     );
   }
 }

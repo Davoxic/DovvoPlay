@@ -5,6 +5,7 @@ import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
 import '../../services/stats_service.dart';
+import '../../services/view_mode_service.dart';
 import '../theme.dart';
 import '../widgets/track_tile.dart';
 import 'stats_screen.dart';
@@ -59,6 +60,96 @@ class _LibraryTabState extends State<LibraryTab> {
     }
   }
 
+  void _showViewModePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final current = ViewModeService.instance.currentMode;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'Stile di Visualizzazione Libreria',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: ViewModeService.modes.map((info) {
+                      final isSelected = info.mode == current;
+                      return ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        tileColor: isSelected ? AppTheme.primary.withOpacity(0.18) : Colors.transparent,
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppTheme.primary : AppTheme.surfaceLight,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            info.icon,
+                            color: isSelected ? Colors.black : AppTheme.textPrimary,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          info.name,
+                          style: TextStyle(
+                            color: isSelected ? AppTheme.primary : AppTheme.textPrimary,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          info.description,
+                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
+                            : null,
+                        onTap: () {
+                          ViewModeService.instance.setViewMode(info.mode);
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showMagicShufflePicker(BuildContext context, List<Track> tracks) {
     if (tracks.isEmpty) return;
 
@@ -107,7 +198,7 @@ class _LibraryTabState extends State<LibraryTab> {
                         ctx,
                         tracks,
                         ShuffleMode.magic,
-                        '🔮 Shuffle Magico Oro',
+                        '🔮 Shuffle Magico',
                         'Mix perfetto: bilancia le tue preferite, le medie e le perle dimenticate',
                         AppTheme.primary,
                       ),
@@ -203,10 +294,15 @@ class _LibraryTabState extends State<LibraryTab> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([LibraryService.instance, StatsService.instance]),
+      listenable: Listenable.merge([
+        LibraryService.instance,
+        StatsService.instance,
+        ViewModeService.instance,
+      ]),
       builder: (context, _) {
         final lib = LibraryService.instance;
         final stats = StatsService.instance;
+        final viewMode = ViewModeService.instance.currentMode;
 
         // Filtro per categoria
         List<Track> baseTracks = lib.tracks;
@@ -263,6 +359,11 @@ class _LibraryTabState extends State<LibraryTab> {
             ),
             actions: [
               IconButton(
+                icon: Icon(ViewModeService.instance.currentInfo.icon, color: AppTheme.primary),
+                tooltip: 'Cambia layout (${ViewModeService.instance.currentInfo.name})',
+                onPressed: () => _showViewModePicker(context),
+              ),
+              IconButton(
                 icon: const Icon(Icons.analytics_rounded, color: AppTheme.primary),
                 tooltip: 'Statistiche d\'ascolto',
                 onPressed: () {
@@ -286,7 +387,7 @@ class _LibraryTabState extends State<LibraryTab> {
             },
             child: Column(
               children: [
-                // Schede Rapide: Shuffle Magico Oro & Statistiche
+                // Schede Rapide: Shuffle Magico & Statistiche
                 if (lib.tracks.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -301,11 +402,11 @@ class _LibraryTabState extends State<LibraryTab> {
                               decoration: BoxDecoration(
                                 gradient: AppTheme.primaryGradient,
                                 borderRadius: BorderRadius.circular(16),
-                                boxShadow: const [
+                                boxShadow: [
                                   BoxShadow(
-                                    color: Color(0x33FFD700),
+                                    color: AppTheme.primary.withOpacity(0.25),
                                     blurRadius: 12,
-                                    offset: Offset(0, 4),
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
@@ -394,7 +495,7 @@ class _LibraryTabState extends State<LibraryTab> {
                     ),
                   ),
 
-                // Chip filtri rapidi (Tutti, Più ascoltate, Riscopri, Recenti)
+                // Chip filtri rapidi
                 if (lib.tracks.isNotEmpty)
                   SizedBox(
                     height: 36,
@@ -404,7 +505,7 @@ class _LibraryTabState extends State<LibraryTab> {
                       children: [
                         _buildFilterChip('all', 'Tutti i brani', Icons.music_note_rounded),
                         const SizedBox(width: 8),
-                        _buildFilterChip('top', '🔥 Più ascoltate', Icons.local_fire_department_rounded),
+                        _buildFilterChip('top', '🔥 Più ascoltate (70-100%)', Icons.local_fire_department_rounded),
                         const SizedBox(width: 8),
                         _buildFilterChip('least', '💎 Da riscoprire', Icons.explore_rounded),
                         const SizedBox(width: 8),
@@ -415,7 +516,7 @@ class _LibraryTabState extends State<LibraryTab> {
 
                 const SizedBox(height: 6),
 
-                // Lista Brani
+                // Sezione Tracce Dinamica in base al ViewMode
                 Expanded(
                   child: lib.tracks.isEmpty
                       ? Center(
@@ -464,20 +565,66 @@ class _LibraryTabState extends State<LibraryTab> {
                             ),
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.only(bottom: 90, top: 4),
-                          itemCount: filteredTracks.length,
-                          itemBuilder: (context, idx) {
-                            return TrackTile(
-                              track: filteredTracks[idx],
-                              queue: filteredTracks,
-                            );
-                          },
-                        ),
+                      : _buildTracksContainer(filteredTracks, viewMode),
                 ),
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTracksContainer(List<Track> tracks, LibraryViewMode viewMode) {
+    if (viewMode == LibraryViewMode.gridCovers) {
+      return GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.82,
+        ),
+        itemCount: tracks.length,
+        itemBuilder: (context, idx) {
+          return TrackTile(
+            track: tracks[idx],
+            queue: tracks,
+            mode: viewMode,
+            index: idx,
+          );
+        },
+      );
+    } else if (viewMode == LibraryViewMode.gridCompact) {
+      return GridView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 110),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 0.74,
+        ),
+        itemCount: tracks.length,
+        itemBuilder: (context, idx) {
+          return TrackTile(
+            track: tracks[idx],
+            queue: tracks,
+            mode: viewMode,
+            index: idx,
+          );
+        },
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 110, top: 4),
+      itemCount: tracks.length,
+      itemBuilder: (context, idx) {
+        return TrackTile(
+          track: tracks[idx],
+          queue: tracks,
+          mode: viewMode,
+          index: idx,
         );
       },
     );

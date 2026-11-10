@@ -39,6 +39,17 @@ class MiniPlayer extends StatelessWidget {
 
         return GestureDetector(
           onTap: openNowPlaying,
+          onHorizontalDragEnd: (details) {
+            if (details.primaryVelocity != null) {
+              if (details.primaryVelocity! < -150) {
+                // Swipe da destra verso sinistra: Brano successivo (Avanti)
+                player.next();
+              } else if (details.primaryVelocity! > 150) {
+                // Swipe da sinistra verso destra: Brano precedente (Indietro)
+                player.previous();
+              }
+            }
+          },
           onVerticalDragEnd: (details) {
             if (details.primaryVelocity != null && details.primaryVelocity! < -100) {
               openNowPlaying();

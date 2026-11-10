@@ -2,9 +2,13 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/animation_theme_service.dart';
 import '../../services/backup_service.dart';
 import '../../services/library_service.dart';
+import '../../services/theme_service.dart';
+import '../../services/view_mode_service.dart';
 import '../theme.dart';
+import 'pc_companion_screen.dart';
 import 'stats_screen.dart';
 import 'wifi_tab.dart';
 import 'youtube_tab.dart';
@@ -24,13 +28,268 @@ class SettingsTab extends StatelessWidget {
     return '${d.toStringAsFixed(1)} ${suffixes[i]}';
   }
 
+  void _showThemeSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final current = ThemeService.instance.currentTheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'Temi Visivi & Palette Colori',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: ThemeService.themes.map((vt) {
+                      final isSelected = vt.id == current.id;
+                      return ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        tileColor: isSelected ? vt.primary.withOpacity(0.18) : Colors.transparent,
+                        leading: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: vt.primaryGradient,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+                          ),
+                        ),
+                        title: Text(
+                          vt.name,
+                          style: TextStyle(
+                            color: isSelected ? vt.primary : AppTheme.textPrimary,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          vt.description,
+                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded, color: vt.primary, size: 22)
+                            : null,
+                        onTap: () {
+                          ThemeService.instance.setTheme(vt.id);
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAnimationSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final current = AnimationThemeService.instance.selectedType;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'Temi di Animazione tra Canzoni',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: AnimationThemeService.animations.map((a) {
+                      final isSelected = a.type == current;
+                      return ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        tileColor: isSelected ? AppTheme.primary.withOpacity(0.18) : Colors.transparent,
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppTheme.primary : AppTheme.surfaceLight,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(a.icon, color: isSelected ? Colors.black : AppTheme.textPrimary, size: 20),
+                        ),
+                        title: Text(
+                          a.name,
+                          style: TextStyle(
+                            color: isSelected ? AppTheme.primary : AppTheme.textPrimary,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          a.description,
+                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
+                            : null,
+                        onTap: () {
+                          AnimationThemeService.instance.setAnimationType(a.type);
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showViewModeSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final current = ViewModeService.instance.currentMode;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'Layout & Stile Visualizzazione',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: ViewModeService.modes.map((info) {
+                      final isSelected = info.mode == current;
+                      return ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        tileColor: isSelected ? AppTheme.primary.withOpacity(0.18) : Colors.transparent,
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppTheme.primary : AppTheme.surfaceLight,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(info.icon, color: isSelected ? Colors.black : AppTheme.textPrimary, size: 20),
+                        ),
+                        title: Text(
+                          info.name,
+                          style: TextStyle(
+                            color: isSelected ? AppTheme.primary : AppTheme.textPrimary,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          info.description,
+                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
+                            : null,
+                        onTap: () {
+                          ViewModeService.instance.setViewMode(info.mode);
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: LibraryService.instance,
+      listenable: Listenable.merge([
+        LibraryService.instance,
+        ThemeService.instance,
+        AnimationThemeService.instance,
+        ViewModeService.instance,
+      ]),
       builder: (context, _) {
         final lib = LibraryService.instance;
         final totalSize = lib.tracks.fold<int>(0, (acc, t) => acc + (t.fileSize ?? 0));
+        final theme = ThemeService.instance.currentTheme;
+        final anim = AnimationThemeService.instance.currentTheme;
+        final view = ViewModeService.instance.currentInfo;
 
         return Scaffold(
           backgroundColor: AppTheme.background,
@@ -65,15 +324,15 @@ class SettingsTab extends StatelessWidget {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(color: AppTheme.primary, width: 1.5),
-                            color: const Color(0x22FFD700),
+                            color: AppTheme.primary.withOpacity(0.18),
                           ),
                           child: const Icon(Icons.star_rounded, color: AppTheme.primary, size: 22),
                         ),
                         const SizedBox(width: 12),
-                        const Column(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'SBORRAPLAY GOLD',
                               style: TextStyle(
                                 fontSize: 11,
@@ -83,8 +342,8 @@ class SettingsTab extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              'OLED Black Edition',
-                              style: TextStyle(
+                              theme.name,
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.textPrimary,
@@ -100,15 +359,15 @@ class SettingsTab extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0x1AD4AF37)),
+                        border: Border.all(color: AppTheme.goldBorder.withOpacity(0.4)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _buildStatItem('Brani', '${lib.tracks.length}'),
-                          Container(width: 1, height: 28, color: const Color(0x22D4AF37)),
+                          Container(width: 1, height: 28, color: AppTheme.goldBorder.withOpacity(0.3)),
                           _buildStatItem('Playlist', '${lib.playlists.length}'),
-                          Container(width: 1, height: 28, color: const Color(0x22D4AF37)),
+                          Container(width: 1, height: 28, color: AppTheme.goldBorder.withOpacity(0.3)),
                           _buildStatItem('Spazio', _formatBytes(totalSize)),
                         ],
                       ),
@@ -119,8 +378,44 @@ class SettingsTab extends StatelessWidget {
 
               const SizedBox(height: 24),
 
+              // SEZIONE PERSONALIZZAZIONE & TEMI
+              _buildSectionHeader('PERSONALIZZAZIONE & TEMI'),
+              _buildSettingTile(
+                icon: Icons.palette_rounded,
+                title: 'Temi Visivi & Palette Colori (12+ Temi)',
+                subtitle: 'Attuale: ${theme.name} • Gradienti e fissi OLED',
+                onTap: () => _showThemeSelector(context),
+              ),
+              _buildSettingTile(
+                icon: Icons.animation_rounded,
+                title: 'Temi di Animazione Brani (16+ Effetti)',
+                subtitle: 'Attuale: ${anim.name} • Esplosione, Fade, Caduta, Cubo 3D',
+                onTap: () => _showAnimationSelector(context),
+              ),
+              _buildSettingTile(
+                icon: Icons.view_quilt_rounded,
+                title: 'Stile di Visualizzazione Libreria (8 Layout)',
+                subtitle: 'Attuale: ${view.name} • Griglie, CD, Vinili, Cassette',
+                onTap: () => _showViewModeSelector(context),
+              ),
+
+              const SizedBox(height: 20),
+
               // SEZIONE FONTI & TRASFERIMENTO
-              _buildSectionHeader('FONTI & TRASFERIMENTO'),
+              _buildSectionHeader('FONTI, TRASFERIMENTO & PC SYNC'),
+              _buildFeatureTile(
+                icon: Icons.laptop_windows_rounded,
+                iconGradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
+                title: 'PC Companion & Sorgenti Web',
+                subtitle: 'Collega il PC via Wi-Fi, converti playlist Spotify e scarica da YouTube / SoundCloud',
+                badgeText: 'LAN BACKEND',
+                badgeColor: const Color(0xFF3B82F6),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PcCompanionScreen()),
+                  );
+                },
+              ),
               _buildFeatureTile(
                 icon: Icons.youtube_searched_for_rounded,
                 iconGradient: const LinearGradient(colors: [Color(0xFFFF4B4B), Color(0xFFFF8A00)]),
@@ -155,7 +450,7 @@ class SettingsTab extends StatelessWidget {
               _buildSettingTile(
                 icon: Icons.insights_rounded,
                 title: 'Statistiche e Abitudini d\'Ascolto',
-                subtitle: 'Classifica ascolti reali (≥50%), brani in loop, skip e tempo totale',
+                subtitle: 'Classifica completa (70-100%), skip (0-15%), minuti settimanali ed esito del giorno',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const StatsScreen()),
@@ -260,8 +555,8 @@ class SettingsTab extends StatelessWidget {
               _buildSectionHeader('INFORMAZIONI APP'),
               _buildSettingTile(
                 icon: Icons.info_outline_rounded,
-                title: 'SborraPlay Gold v1.0.0',
-                subtitle: 'Tema Oro & Nero OLED • Riproduzione Locale & YouTube',
+                title: 'SborraPlay Gold v2.0.0',
+                subtitle: 'Temi Multipli • Animazioni di Transizione • PC LAN Sync',
                 onTap: null,
               ),
               _buildSettingTile(
@@ -327,11 +622,11 @@ class SettingsTab extends StatelessWidget {
         gradient: AppTheme.goldSurfaceGradient,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppTheme.goldBorder, width: 1.1),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x10FFD700),
+            color: AppTheme.primary.withOpacity(0.08),
             blurRadius: 12,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -408,7 +703,7 @@ class SettingsTab extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.surfaceCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x1CD4AF37)),
+        border: Border.all(color: AppTheme.goldBorder.withOpacity(0.5)),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -416,9 +711,9 @@ class SettingsTab extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: const Color(0x18FFD700),
+            color: AppTheme.primary.withOpacity(0.12),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0x28FFD700)),
+            border: Border.all(color: AppTheme.goldBorder),
           ),
           child: Icon(icon, color: AppTheme.primary, size: 20),
         ),

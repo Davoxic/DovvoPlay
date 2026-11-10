@@ -3,6 +3,7 @@ import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
 import '../theme.dart';
+import '../widgets/animated_track_transition.dart';
 import '../widgets/track_artwork.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -231,28 +232,31 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
 
                         const Spacer(flex: 1),
 
-                        // Artwork
+                        // Artwork con Animazione Selezionabile (16+ Temi di Transizione)
                         Hero(
                           tag: 'current_artwork',
-                          child: Container(
-                            width: MediaQuery.of(context).size.width * 0.78,
-                            height: MediaQuery.of(context).size.width * 0.78,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(color: AppTheme.goldBorder, width: 1.5),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x33FFD700),
-                                  blurRadius: 36,
-                                  offset: Offset(0, 14),
-                                ),
-                              ],
-                            ),
-                            child: TrackArtwork(
-                              url: track.thumbnailUrl,
+                          child: AnimatedTrackTransition(
+                            trackKey: track.id,
+                            child: Container(
                               width: MediaQuery.of(context).size.width * 0.78,
                               height: MediaQuery.of(context).size.width * 0.78,
-                              borderRadius: 28,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(color: AppTheme.goldBorder, width: 1.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.primary.withOpacity(0.2),
+                                    blurRadius: 36,
+                                    offset: const Offset(0, 14),
+                                  ),
+                                ],
+                              ),
+                              child: TrackArtwork(
+                                url: track.thumbnailUrl,
+                                width: MediaQuery.of(context).size.width * 0.78,
+                                height: MediaQuery.of(context).size.width * 0.78,
+                                borderRadius: 28,
+                              ),
                             ),
                           ),
                         ),

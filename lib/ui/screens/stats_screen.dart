@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
@@ -20,13 +21,59 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
+    _tabCtrl = TabController(length: 5, vsync: this);
   }
 
   @override
   void dispose() {
     _tabCtrl.dispose();
     super.dispose();
+  }
+
+  void _showResetConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx1) {
+        return _ResetStepDialog(
+          step: 1,
+          title: 'SEI VERAMENTE SICURO?',
+          message: 'Stai per cancellare tutte le statistiche di ascolto, i minuti settimanali, le classifiche e i dati storici.',
+          buttonText: 'CONFERMA PASSAGGIO 1 (RESET)',
+          onConfirmed: () {
+            Navigator.pop(ctx1);
+            _showFinalResetConfirmationDialog(context);
+          },
+        );
+      },
+    );
+  }
+
+  void _showFinalResetConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx2) {
+        return _ResetStepDialog(
+          step: 2,
+          title: 'ULTIMA CONFERMA: AZIONE IRREVERSIBILE!',
+          message: 'Tutti i dati registrati secondo per secondo andranno persi per sempre. Sei assolutamente certo di voler procedere?',
+          buttonText: 'ELIMINA DEFINITIVAMENTE TUTTO',
+          onConfirmed: () async {
+            Navigator.pop(ctx2);
+            await StatsService.instance.resetAllStats();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tutte le statistiche sono state azzerate con successo.'),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            }
+          },
+        );
+      },
+    );
   }
 
   Widget _buildKpiCard(String title, String value, IconData icon, Color color) {
@@ -75,6 +122,103 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     );
   }
 
+  Widget _buildDailyMoodBanner(DailyMoodOutcome mood) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: mood.color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: mood.color.withOpacity(0.5), width: 1.2),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: mood.color.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(mood.icon, color: mood.color, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  mood.title,
+                  style: TextStyle(
+                    color: mood.color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  mood.message,
+                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownRow(DayStat today, StatsService stats) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.goldBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'FASCE D\'ASCOLTO OGGI',
+            style: TextStyle(fontSize: 10, letterSpacing: 1.1, fontWeight: FontWeight.bold, color: AppTheme.secondary),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildTierBadge('70-100%', '${today.completedCount}', 'Complete', Colors.greenAccent),
+              _buildTierBadge('35-70%', '${today.halfCount}', 'A Metà', Colors.blueAccent),
+              _buildTierBadge('15-35%', '${today.briefCount}', 'Poco', Colors.orangeAccent),
+              _buildTierBadge('0-15%', '${today.skipsCount}', 'Skippate', Colors.redAccent),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTierBadge(String pct, String count, String label, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.18),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withOpacity(0.6)),
+          ),
+          child: Text(
+            count,
+            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        Text(pct, style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
+      ],
+    );
+  }
+
   Widget _buildTrackList(List<Track> tracks, String badgeType, {required VoidCallback onPlayAll}) {
     if (tracks.isEmpty) {
       return Center(
@@ -91,7 +235,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               ),
               const SizedBox(height: 4),
               const Text(
-                'Ascolta qualche brano per vedere i tuoi dati aggiornati!',
+                'Ascolta qualche brano per vedere i tuoi dati aggiornati secondo per secondo!',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
               ),
@@ -140,13 +284,14 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
 
         if (badgeType == 'plays') {
           final count = stats.getPlayCount(track.id);
-          final stat = stats.getStat(track.id);
-          final skips = stat?.skipCount ?? 0;
-          badgeText = skips > 0
-              ? '$count ascolti (≥50%) • $skips skip'
-              : '$count ${count == 1 ? 'ascolto (≥50%)' : 'ascolti (≥50%)'}';
+          badgeText = '$count ${count == 1 ? 'ascolto (≥70%)' : 'ascolti (≥70%)'}';
           badgeIcon = Icons.local_fire_department_rounded;
           badgeColor = Colors.orangeAccent;
+        } else if (badgeType == 'skips') {
+          final count = stats.getSkipCount(track.id);
+          badgeText = '$count ${count == 1 ? 'skip (0-15%)' : 'skip (0-15%)'}';
+          badgeIcon = Icons.skip_next_rounded;
+          badgeColor = Colors.redAccent;
         } else if (badgeType == 'repeats') {
           final count = stats.getRepeatCount(track.id);
           badgeText = '$count ${count == 1 ? 'ripetizione' : 'ripetizioni'}';
@@ -248,9 +393,15 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text('Statistiche d\'Ascolto'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent),
+            tooltip: 'Azzera tutte le statistiche',
+            onPressed: () => _showResetConfirmationDialog(context),
+          ),
           IconButton(
             icon: const Icon(Icons.share_rounded),
             tooltip: 'Esporta Statistiche & Backup',
@@ -273,8 +424,11 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         builder: (context, _) {
           final stats = StatsService.instance;
           final allTracks = LibraryService.instance.tracks;
+          final today = stats.todayStat;
+          final mood = stats.getDailyMood();
 
-          final mostPlayed = stats.getMostPlayedTracks(allTracks);
+          final top5 = stats.getTop5PlayedTracks(allTracks);
+          final mostSkipped = stats.getMostSkippedTracks(allTracks);
           final mostRepeated = stats.getMostRepeatedTracks(allTracks);
           final leastPlayed = stats.getLeastPlayedTracks(allTracks);
           final recentlyPlayed = stats.getRecentlyPlayedTracks(allTracks);
@@ -283,73 +437,47 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
             children: [
               // Grid KPI riepilogativi
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
                 child: Column(
                   children: [
+                    // Mood del giorno
+                    _buildDailyMoodBanner(mood),
+                    const SizedBox(height: 10),
+
+                    // Fasce d'ascolto oggi (Complete, Metà, Poco, Skippate)
+                    _buildBreakdownRow(today, stats),
+                    const SizedBox(height: 10),
+
+                    // Metric Cards
                     Row(
                       children: [
                         Expanded(
                           child: _buildKpiCard(
-                            'Tempo Ascolto',
+                            'Tempo Reale',
                             stats.formatDurationSummary(),
                             Icons.timer_rounded,
                             AppTheme.primary,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _buildKpiCard(
-                            'Ascolti Reali (≥50%)',
-                            '${stats.totalPlaysCount}',
-                            Icons.headphones_rounded,
+                            'Settimana',
+                            '${stats.getWeeklyMinutes()} min',
+                            Icons.calendar_view_week_rounded,
                             Colors.blueAccent,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _buildKpiCard(
-                            'Brani in Loop',
-                            '${stats.totalRepeatsCount}',
-                            Icons.repeat_one_rounded,
-                            Colors.orangeAccent,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _buildKpiCard(
-                            'Skippate (<50%)',
-                            '${stats.totalSkipsCount}',
-                            Icons.skip_next_rounded,
-                            Colors.redAccent.shade200,
+                            'Top Artista',
+                            stats.topArtist,
+                            Icons.person_rounded,
+                            Colors.purpleAccent,
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.goldBorder),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.verified_rounded, size: 14, color: AppTheme.primary),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Regola 50%: un brano è conteggiato solo se ascoltato per oltre metà durata, altrimenti è considerato skippato.',
-                              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ],
                 ),
@@ -367,7 +495,8 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                 unselectedLabelColor: AppTheme.textSecondary,
                 tabAlignment: TabAlignment.start,
                 tabs: const [
-                  Tab(icon: Icon(Icons.local_fire_department_rounded, size: 18), text: 'Più Ascoltate'),
+                  Tab(icon: Icon(Icons.star_rounded, size: 18), text: 'Top 5 Ascoltate (70-100%)'),
+                  Tab(icon: Icon(Icons.skip_next_rounded, size: 18), text: 'Più Skippate (0-15%)'),
                   Tab(icon: Icon(Icons.repeat_rounded, size: 18), text: 'Più Ripetute'),
                   Tab(icon: Icon(Icons.explore_rounded, size: 18), text: 'Da Riscoprire'),
                   Tab(icon: Icon(Icons.history_rounded, size: 18), text: 'Recenti'),
@@ -380,12 +509,22 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                   controller: _tabCtrl,
                   children: [
                     _buildTrackList(
-                      mostPlayed,
+                      top5,
                       'plays',
                       onPlayAll: () {
-                        AudioPlayerService.instance.setShuffleMode(ShuffleMode.mostPlayed, baseList: mostPlayed);
-                        if (mostPlayed.isNotEmpty) {
-                          AudioPlayerService.instance.playTrack(mostPlayed.first);
+                        AudioPlayerService.instance.setShuffleMode(ShuffleMode.mostPlayed, baseList: top5);
+                        if (top5.isNotEmpty) {
+                          AudioPlayerService.instance.playTrack(top5.first);
+                        }
+                      },
+                    ),
+                    _buildTrackList(
+                      mostSkipped,
+                      'skips',
+                      onPlayAll: () {
+                        AudioPlayerService.instance.setShuffleMode(ShuffleMode.standard, baseList: mostSkipped);
+                        if (mostSkipped.isNotEmpty) {
+                          AudioPlayerService.instance.playTrack(mostSkipped.first);
                         }
                       },
                     ),
@@ -426,6 +565,129 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
           );
         },
       ),
+    );
+  }
+}
+
+class _ResetStepDialog extends StatefulWidget {
+  final int step;
+  final String title;
+  final String message;
+  final String buttonText;
+  final VoidCallback onConfirmed;
+
+  const _ResetStepDialog({
+    required this.step,
+    required this.title,
+    required this.message,
+    required this.buttonText,
+    required this.onConfirmed,
+  });
+
+  @override
+  State<_ResetStepDialog> createState() => _ResetStepDialogState();
+}
+
+class _ResetStepDialogState extends State<_ResetStepDialog> {
+  int _secondsLeft = 5;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_secondsLeft > 0) {
+        setState(() => _secondsLeft--);
+      } else {
+        _timer?.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canProceed = _secondsLeft == 0;
+
+    return AlertDialog(
+      backgroundColor: const Color(0xFF140707),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: Colors.redAccent, width: 2),
+      ),
+      title: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              widget.title,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.message,
+            style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, height: 1.4),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.timer_rounded, color: Colors.redAccent, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  canProceed
+                      ? 'Attesa completata. Tasto sbloccato.'
+                      : 'Attendi obbligatoriamente $_secondsLeft secondi...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: canProceed ? Colors.greenAccent : Colors.redAccent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actionsAlignment: MainAxisAlignment.spaceBetween,
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: canProceed ? widget.onConfirmed : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.redAccent,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: Colors.redAccent.withOpacity(0.3),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text(
+            canProceed ? widget.buttonText : 'Attendi (${_secondsLeft}s)...',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+        ),
+      ],
     );
   }
 }
