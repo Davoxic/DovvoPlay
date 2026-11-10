@@ -46,7 +46,7 @@ class AudioPlayerService extends ChangeNotifier {
   ShuffleMode _shuffleMode = ShuffleMode.off;
   int _playRequestId = 0;
   String? _lastErrorMessage;
-  Duration _maxPositionReached = Duration.zero;
+  final Stopwatch _trackListenWatch = Stopwatch();
 
   Timer? _secondTicker;
 
@@ -67,7 +67,7 @@ class AudioPlayerService extends ChangeNotifier {
     // Ticker secondo per secondo per le statistiche reali
     _secondTicker?.cancel();
     _secondTicker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_player.playing && _currentTrack != null) {
+      if (_player.playing && _currentTrack != null && !_isBuffering) {
         StatsService.instance.addListeningSeconds(_currentTrack!, seconds: 1);
       }
     });
@@ -75,6 +75,16 @@ class AudioPlayerService extends ChangeNotifier {
     _player.playerStateStream.listen((state) {
       _isBuffering = state.processingState == ProcessingState.buffering ||
                      state.processingState == ProcessingState.loading;
+
+      if (_player.playing && !_isBuffering && _currentTrack != null) {
+        if (!_trackListenWatch.isRunning) {
+          _trackListenWatch.start();
+        }
+      } else {
+        if (_trackListenWatch.isRunning) {
+          _trackListenWatch.stop();
+        }
+      }
 
       if (state.processingState == ProcessingState.completed) {
         _onTrackCompleted();
@@ -99,9 +109,6 @@ class AudioPlayerService extends ChangeNotifier {
 
     _player.positionStream.listen((pos) {
       _position = pos;
-      if (pos > _maxPositionReached) {
-        _maxPositionReached = pos;
-      }
       notifyListeners();
     });
 
@@ -115,26 +122,44 @@ class AudioPlayerService extends ChangeNotifier {
 
   void _recordCurrentTrackStats() {
     if (_currentTrack == null) return;
+    _trackListenWatch.stop();
+    final listenedMs = _trackListenWatch.elapsedMilliseconds;
+    _trackListenWatch.reset();
+
+    // Se non è stato ascoltato nulla (0 ms), non registrare
+    if (listenedMs <= 0) return;
+
     final totalDur = _duration > Duration.zero
         ? _duration
         : (_currentTrack!.duration > Duration.zero ? _currentTrack!.duration : Duration.zero);
 
     double percent = 0.0;
     if (totalDur.inMilliseconds > 0) {
-      percent = (_maxPositionReached.inMilliseconds / totalDur.inMilliseconds) * 100.0;
-    } else if (_maxPositionReached.inSeconds > 20) {
-      percent = 80.0;
+      // Calcolo percentuale basato ESCLUSIVAMENTE sui millisecondi effettivi di ascolto
+      percent = (listenedMs / totalDur.inMilliseconds) * 100.0;
+    } else {
+      final sec = listenedMs ~/ 1000;
+      if (sec >= 120) {
+        percent = 85.0;
+      } else if (sec >= 60) {
+        percent = 50.0;
+      } else if (sec >= 20) {
+        percent = 25.0;
+      } else {
+        percent = 5.0;
+      }
     }
     StatsService.instance.recordTrackByPercentage(_currentTrack!, percent.clamp(0.0, 100.0));
   }
 
   void _onTrackCompleted() {
     if (_currentTrack != null) {
-      StatsService.instance.recordTrackByPercentage(_currentTrack!, 100.0);
+      _recordCurrentTrackStats();
     }
 
     if (_loopMode == PlayerLoopMode.one) {
-      _maxPositionReached = Duration.zero;
+      _trackListenWatch.reset();
+      _trackListenWatch.start();
       _player.seek(Duration.zero);
       _player.play();
     } else if (hasNext) {
@@ -154,11 +179,10 @@ class AudioPlayerService extends ChangeNotifier {
     final requestId = ++_playRequestId;
 
     // Registra le statistiche con percentuale di ascolto del brano precedente
-    if (_currentTrack != null && _currentTrack!.id != track.id) {
+    if (_currentTrack != null) {
       _recordCurrentTrackStats();
     }
-
-    _maxPositionReached = Duration.zero;
+    _trackListenWatch.reset();
 
     if (newQueue != null) {
       _originalQueue = List.from(newQueue);
