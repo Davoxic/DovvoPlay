@@ -174,6 +174,10 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
   }
 
   Widget _buildPcStatusCard(PcSyncService sync) {
+    if (sync.pcHost.isNotEmpty && (_ipCtrl.text.isEmpty || sync.isConnected)) {
+      if (_ipCtrl.text != sync.pcHost) _ipCtrl.text = sync.pcHost;
+      if (_portCtrl.text != sync.pcPort.toString()) _portCtrl.text = sync.pcPort.toString();
+    }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -265,12 +269,17 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Salva', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                child: const Text('Connetti', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
               ),
             ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Nota: il PC deve essere connesso allo stesso Wi-Fi dell\'iPhone e la porta 8080 sbloccata nel Firewall.',
+            style: TextStyle(fontSize: 10, color: AppTheme.textSecondary.withOpacity(0.8)),
           ),
           const SizedBox(height: 10),
           SizedBox(

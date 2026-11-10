@@ -75,18 +75,38 @@ class PcSyncService extends ChangeNotifier {
   }
 
   Future<void> setHostAndPort(String host, int port) async {
-    _pcHost = host.trim();
+    String cleanHost = host.trim();
+    // Rimuovi prefissi protocollo http:// o https://
+    if (cleanHost.startsWith('http://')) cleanHost = cleanHost.substring(7);
+    if (cleanHost.startsWith('https://')) cleanHost = cleanHost.substring(8);
+    // Rimuovi percorsi trailing es. /ping o /
+    if (cleanHost.contains('/')) {
+      cleanHost = cleanHost.split('/').first.trim();
+    }
+    // Se l'utente ha scritto IP:PORTA (es. 192.168.1.174:8080)
+    if (cleanHost.contains(':')) {
+      final parts = cleanHost.split(':');
+      cleanHost = parts[0].trim();
+      if (parts.length > 1) {
+        final parsedPort = int.tryParse(parts[1].trim());
+        if (parsedPort != null && parsedPort > 0) port = parsedPort;
+      }
+    }
+
+    _pcHost = cleanHost;
     _pcPort = port;
     notifyListeners();
+
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefHostKey, _pcHost);
       await prefs.setInt(_prefPortKey, _pcPort);
     } catch (_) {}
+
     await testConnection();
   }
 
-  /// Esegue un ping di verifica verso l'indirizzo configurato
+  /// Esegue un ping di verifica verso l'indirizzo configurato con feedback dettagliato
   Future<bool> testConnection() async {
     if (_pcHost.isEmpty) {
       _isConnected = false;
@@ -95,77 +115,109 @@ class PcSyncService extends ChangeNotifier {
       return false;
     }
 
+    _statusMessage = 'Verifica connessione con $_pcHost:$_pcPort...';
+    notifyListeners();
+
     try {
       final uri = Uri.parse('$baseUrl/ping');
-      final res = await http.get(uri).timeout(const Duration(seconds: 3));
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         _isConnected = true;
-        _statusMessage = 'Connesso a PC ($_pcHost:$_pcPort)';
+        _statusMessage = 'Connesso al PC ($_pcHost:$_pcPort) 🟢';
         notifyListeners();
         return true;
+      } else {
+        _isConnected = false;
+        _statusMessage = 'Il PC ha risposto con codice HTTP ${res.statusCode}';
+        notifyListeners();
+        return false;
       }
-    } catch (_) {}
+    } on SocketException catch (e) {
+      _isConnected = false;
+      final msg = e.message.toLowerCase();
+      if (msg.contains('refused') || e.osError?.errorCode == 61) {
+        _statusMessage = 'Connessione rifiutata: il server non è attivo su porta $_pcPort o l\'IP è errato.';
+      } else if (msg.contains('unreachable') || msg.contains('host is down')) {
+        _statusMessage = 'Host non raggiungibile: assicurati che iPhone e PC siano sullo stesso Wi-Fi.';
+      } else {
+        _statusMessage = 'Errore di rete: ${e.message}';
+      }
+    } on TimeoutException {
+      _isConnected = false;
+      _statusMessage = 'Timeout (4s): il PC non risponde. Assicurati che server.py sia avviato e che Windows Firewall non blocchi la porta $_pcPort.';
+    } catch (e) {
+      _isConnected = false;
+      _statusMessage = 'Errore: $e';
+    }
 
-    _isConnected = false;
-    _statusMessage = 'PC non raggiungibile su $_pcHost:$_pcPort';
     notifyListeners();
     return false;
   }
 
-  /// Scansiona la subnet locale (es. 192.168.1.x o 192.168.0.x) alla ricerca del server PC
+  /// Scansiona l'intera subnet locale (es. 192.168.1.1 - 254) alla ricerca del server PC
   Future<String?> discoverPcOnLan({int port = 8080}) async {
     _isSearching = true;
-    _statusMessage = 'Ricerca PC sulla rete Wi-Fi in corso...';
+    _statusMessage = 'Ricerca automatica PC su rete locale (porta $port)...';
     notifyListeners();
 
     try {
-      // 1. Trova l'IP locale del dispositivo
-      final interfaces = await NetworkInterface.list(
-        includeLoopback: false,
-        type: InternetAddressType.IPv4,
-      );
+      final subnets = <String>{};
 
-      String? subnetPrefix;
-      for (final iface in interfaces) {
-        for (final addr in iface.addresses) {
-          final ip = addr.address;
-          if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
-            final parts = ip.split('.');
-            if (parts.length == 4) {
-              subnetPrefix = '${parts[0]}.${parts[1]}.${parts[2]}';
-              break;
+      // 1. Trova l'IP locale del dispositivo
+      try {
+        final interfaces = await NetworkInterface.list(
+          includeLoopback: false,
+          type: InternetAddressType.IPv4,
+        );
+        for (final iface in interfaces) {
+          for (final addr in iface.addresses) {
+            final ip = addr.address;
+            if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+              final parts = ip.split('.');
+              if (parts.length == 4) {
+                subnets.add('${parts[0]}.${parts[1]}.${parts[2]}');
+              }
             }
           }
         }
-        if (subnetPrefix != null) break;
+      } catch (_) {}
+
+      if (subnets.isEmpty) {
+        subnets.addAll(['192.168.1', '192.168.0', '192.168.178']);
       }
 
-      subnetPrefix ??= '192.168.1';
-
-      // 2. Prova subito i candidati più probabili (.1, .2.. .50) in parallelo
-      final futures = <Future<String?>>[];
-      for (int i = 1; i <= 60; i++) {
-        final targetIp = '$subnetPrefix.$i';
-        futures.add(() async {
-          try {
-            final uri = Uri.parse('http://$targetIp:$port/ping');
-            final res = await http.get(uri).timeout(const Duration(milliseconds: 1400));
-            if (res.statusCode == 200) {
-              return targetIp;
-            }
-          } catch (_) {}
-          return null;
-        }());
-      }
-
-      final results = await Future.wait(futures);
-      for (final ip in results) {
-        if (ip != null) {
-          await setHostAndPort(ip, port);
+      for (final subnet in subnets) {
+        // Range 1: Range DHCP più diffuso (100 -> 200) dove si posiziona tipicamente il PC
+        final dhcpHosts = List.generate(101, (i) => 100 + i);
+        final found1 = await _probeSubnet(subnet, dhcpHosts, port, 1200);
+        if (found1 != null) {
+          await setHostAndPort(found1, port);
           _isSearching = false;
-          _statusMessage = 'PC trovato: $ip:$port!';
+          _statusMessage = 'PC trovato: $found1:$port! 🟢';
           notifyListeners();
-          return ip;
+          return found1;
+        }
+
+        // Range 2: Range numerico basso (1 -> 99)
+        final lowHosts = List.generate(99, (i) => 1 + i);
+        final found2 = await _probeSubnet(subnet, lowHosts, port, 1200);
+        if (found2 != null) {
+          await setHostAndPort(found2, port);
+          _isSearching = false;
+          _statusMessage = 'PC trovato: $found2:$port! 🟢';
+          notifyListeners();
+          return found2;
+        }
+
+        // Range 3: Range numerico alto (201 -> 254)
+        final highHosts = List.generate(54, (i) => 201 + i);
+        final found3 = await _probeSubnet(subnet, highHosts, port, 1200);
+        if (found3 != null) {
+          await setHostAndPort(found3, port);
+          _isSearching = false;
+          _statusMessage = 'PC trovato: $found3:$port! 🟢';
+          notifyListeners();
+          return found3;
         }
       }
     } catch (e) {
@@ -178,6 +230,30 @@ class PcSyncService extends ChangeNotifier {
       notifyListeners();
     }
     return null;
+  }
+
+  /// Effettua probe parallelo su una lista di host con terminazione rapida al primo successo
+  Future<String?> _probeSubnet(String subnet, List<int> hosts, int port, int timeoutMs) async {
+    final completer = Completer<String?>();
+    int pending = hosts.length;
+
+    for (final h in hosts) {
+      final target = '$subnet.$h';
+      final uri = Uri.parse('http://$target:$port/ping');
+      http.get(uri).timeout(Duration(milliseconds: timeoutMs)).then((res) {
+        if (!completer.isCompleted && res.statusCode == 200) {
+          completer.complete(target);
+        } else {
+          pending--;
+          if (pending <= 0 && !completer.isCompleted) completer.complete(null);
+        }
+      }).catchError((_) {
+        pending--;
+        if (pending <= 0 && !completer.isCompleted) completer.complete(null);
+      });
+    }
+
+    return completer.future;
   }
 
   /// Invia una richiesta di download al backend PC per YouTube, Spotify o SoundCloud
