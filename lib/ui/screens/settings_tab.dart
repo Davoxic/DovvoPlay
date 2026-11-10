@@ -6,6 +6,7 @@ import '../../services/animation_theme_service.dart';
 import '../../services/backup_service.dart';
 import '../../services/library_service.dart';
 import '../../services/theme_service.dart';
+import '../../services/update_service.dart';
 import '../../services/view_mode_service.dart';
 import '../theme.dart';
 import 'pc_companion_screen.dart';
@@ -551,6 +552,12 @@ class SettingsTab extends StatelessWidget {
 
               const SizedBox(height: 20),
 
+              // SEZIONE AGGIORNAMENTI DA GITHUB
+              _buildSectionHeader('AGGIORNAMENTI DA GITHUB'),
+              _buildUpdateCard(context),
+
+              const SizedBox(height: 20),
+
               // SEZIONE INFORMAZIONI
               _buildSectionHeader('INFORMAZIONI APP'),
               _buildSettingTile(
@@ -564,6 +571,164 @@ class SettingsTab extends StatelessWidget {
                 title: '100% Locale e Privato',
                 subtitle: 'Nessun account richiesto, nessun tracciamento dei tuoi dati',
                 onTap: null,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildUpdateCard(BuildContext context) {
+    final updateService = UpdateService.instance;
+    return ListenableBuilder(
+      listenable: updateService,
+      builder: (context, _) {
+        final rel = updateService.latestRelease;
+        final isDownloading = updateService.isDownloading;
+        final isChecking = updateService.isChecking;
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceCard,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: rel != null && rel.isNewer ? AppTheme.primary : AppTheme.goldBorder,
+              width: rel != null && rel.isNewer ? 1.5 : 1.0,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.goldGlow,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.system_update_rounded, color: AppTheme.primary, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Versione Installata: v${UpdateService.currentVersion}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          rel != null
+                              ? (rel.isNewer
+                                  ? '🎉 Nuova versione ${rel.tagName} disponibile!'
+                                  : '✓ Sei all\'ultima versione disponibile')
+                              : 'Tocca per verificare se ci sono aggiornamenti',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: rel != null && rel.isNewer ? AppTheme.primary : AppTheme.textSecondary,
+                            fontWeight: rel != null && rel.isNewer ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (rel != null && rel.body.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    rel.body,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
+                  ),
+                ),
+              ],
+              if (isDownloading) ...[
+                const SizedBox(height: 14),
+                LinearProgressIndicator(
+                  value: updateService.downloadProgress > 0 ? updateService.downloadProgress : null,
+                  color: AppTheme.primary,
+                  backgroundColor: Colors.white12,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  updateService.downloadStatus,
+                  style: TextStyle(fontSize: 11, color: AppTheme.secondary),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.textPrimary,
+                        side: BorderSide(color: AppTheme.goldBorder),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: isChecking
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.refresh_rounded, size: 16),
+                      label: Text(isChecking ? 'Verifico...' : 'Verifica Ora'),
+                      onPressed: isChecking || isDownloading
+                          ? null
+                          : () async {
+                              final res = await updateService.checkForUpdates();
+                              if (context.mounted && res != null && !res.isNewer) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Hai già l\'ultima versione installata (${res.tagName})!'),
+                                    backgroundColor: AppTheme.secondary,
+                                  ),
+                                );
+                              }
+                            },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.file_download_rounded, size: 16),
+                      label: const Text('Scarica & Firma'),
+                      onPressed: isDownloading
+                          ? null
+                          : () async {
+                              final releaseToDownload = rel ?? await updateService.checkForUpdates();
+                              if (releaseToDownload == null) return;
+
+                              final file = await updateService.downloadIpa(releaseToDownload);
+                              if (file != null && context.mounted) {
+                                await updateService.shareIpa(file);
+                              }
+                            },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
