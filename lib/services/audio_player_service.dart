@@ -46,7 +46,6 @@ class AudioPlayerService extends ChangeNotifier {
   ShuffleMode _shuffleMode = ShuffleMode.off;
   int _playRequestId = 0;
   String? _lastErrorMessage;
-  bool _hasReached50Percent = false;
   Duration _maxPositionReached = Duration.zero;
 
   Timer? _secondTicker;
@@ -221,32 +220,24 @@ class AudioPlayerService extends ChangeNotifier {
           return;
         }
 
-        // 2. Ottieni lo stream AAC puro compatibile iOS (itag 140 m4a / muxed mp4)
-        final streamInfo = await YouTubeService.instance.getPlayableStreamInfo(videoId);
-        if (_playRequestId != requestId) return;
-
-        if (streamInfo != null) {
-          // Prova prima lo streaming diretto immediato (avvio in < 1 secondo)
-          try {
-            final audioSource = AudioSource.uri(streamInfo.url, tag: mediaItem);
-            await _player.setAudioSource(audioSource);
-            if (_playRequestId != requestId) return;
-            await _player.play();
-
-            // Salva asincronamente in cache in background senza bloccare la riproduzione
-            unawaited(YouTubeService.instance.downloadToCache(videoId, track.title));
-            return;
-          } catch (directErr) {
-            print('Streaming diretto fallito ($directErr), procedo al caching locale con youtube_explode...');
-          }
-        }
-
-        // 3. Fallback: scarica i chunk audio AAC (.m4a) in cache locale via youtube_explode
+        // 2. Scarica in cache locale via youtube_explode (evita 403 e (-1) unknown error di iOS AVPlayer)
         final cached = await YouTubeService.instance.downloadToCache(videoId, track.title);
         if (_playRequestId != requestId) return;
 
         if (cached != null && await cached.exists() && await cached.length() > 50000) {
           final audioSource = AudioSource.uri(Uri.file(cached.path), tag: mediaItem);
+          await _player.setAudioSource(audioSource);
+          if (_playRequestId != requestId) return;
+          await _player.play();
+          return;
+        }
+
+        // 3. Fallback: tenta lo stream diretto se il download in cache ha fallito
+        final streamInfo = await YouTubeService.instance.getPlayableStreamInfo(videoId);
+        if (_playRequestId != requestId) return;
+
+        if (streamInfo != null) {
+          final audioSource = AudioSource.uri(streamInfo.url, tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
           await _player.play();

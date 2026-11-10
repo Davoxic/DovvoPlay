@@ -87,8 +87,8 @@ class _LibraryTabState extends State<LibraryTab> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     'Stile di Visualizzazione Libreria',
                     style: TextStyle(
@@ -129,10 +129,10 @@ class _LibraryTabState extends State<LibraryTab> {
                         ),
                         subtitle: Text(
                           info.description,
-                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                         ),
                         trailing: isSelected
-                            ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
+                            ? Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
                             : null,
                         onTap: () {
                           ViewModeService.instance.setViewMode(info.mode);
@@ -178,8 +178,8 @@ class _LibraryTabState extends State<LibraryTab> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     'Scegli il tuo Shuffle Magico',
                     style: TextStyle(
@@ -271,8 +271,8 @@ class _LibraryTabState extends State<LibraryTab> {
         ),
         child: Icon(mode.icon, color: color, size: 20),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary, fontSize: 14)),
-      subtitle: Text(subtitle, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary, fontSize: 14)),
+      subtitle: Text(subtitle, style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
       onTap: () {
         Navigator.pop(ctx);
         final player = AudioPlayerService.instance;
@@ -348,7 +348,7 @@ class _LibraryTabState extends State<LibraryTab> {
                   ),
                   child: Text(
                     '${lib.tracks.length}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppTheme.primary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -364,7 +364,7 @@ class _LibraryTabState extends State<LibraryTab> {
                 onPressed: () => _showViewModePicker(context),
               ),
               IconButton(
-                icon: const Icon(Icons.analytics_rounded, color: AppTheme.primary),
+                icon: Icon(Icons.analytics_rounded, color: AppTheme.primary),
                 tooltip: 'Statistiche d\'ascolto',
                 onPressed: () {
                   Navigator.of(context).push(
@@ -373,7 +373,7 @@ class _LibraryTabState extends State<LibraryTab> {
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.file_upload_outlined, color: AppTheme.secondary),
+                icon: Icon(Icons.file_upload_outlined, color: AppTheme.secondary),
                 tooltip: 'Importa file audio',
                 onPressed: _pickFiles,
               ),
@@ -447,13 +447,13 @@ class _LibraryTabState extends State<LibraryTab> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.bar_chart_rounded, color: AppTheme.primary, size: 20),
+                                  Icon(Icons.bar_chart_rounded, color: AppTheme.primary, size: 20),
                                   const SizedBox(width: 6),
                                   Text(
                                     stats.totalListeningSeconds > 0
                                         ? stats.formatDurationSummary()
                                         : 'Insight',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: AppTheme.textPrimary,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
@@ -475,21 +475,21 @@ class _LibraryTabState extends State<LibraryTab> {
                     child: TextField(
                       controller: _filterCtrl,
                       onChanged: (val) => setState(() => _filterText = val),
-                      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                      style: TextStyle(color: AppTheme.textPrimary, fontSize: 14),
                       decoration: InputDecoration(
                         hintText: 'Cerca tra i brani locali...',
-                        hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                        prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppTheme.primary),
+                        hintStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                        prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppTheme.primary),
                         filled: true,
                         fillColor: AppTheme.surfaceCard,
                         contentPadding: const EdgeInsets.symmetric(vertical: 10),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: AppTheme.goldBorder),
+                          borderSide: BorderSide(color: AppTheme.goldBorder),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                          borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
                         ),
                       ),
                     ),
@@ -533,15 +533,15 @@ class _LibraryTabState extends State<LibraryTab> {
                                     shape: BoxShape.circle,
                                     border: Border.all(color: AppTheme.goldBorder, width: 1.5),
                                   ),
-                                  child: const Icon(Icons.library_music_rounded, size: 40, color: AppTheme.primary),
+                                  child: Icon(Icons.library_music_rounded, size: 40, color: AppTheme.primary),
                                 ),
                                 const SizedBox(height: 18),
-                                const Text(
+                                Text(
                                   'Nessun brano salvato',
                                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                                 ),
                                 const SizedBox(height: 8),
-                                const Text(
+                                Text(
                                   'Carica file dal computer via Wi-Fi\no scarica brani da YouTube nella sezione Impostazioni!',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),

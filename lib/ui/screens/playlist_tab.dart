@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/playlist.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
 import '../theme.dart';
@@ -22,7 +21,7 @@ class PlaylistTab extends StatelessWidget {
             title: const Text('Playlist'),
             actions: [
               IconButton(
-                icon: const Icon(Icons.add_rounded, color: AppTheme.primary, size: 28),
+                icon: Icon(Icons.add_rounded, color: AppTheme.primary, size: 28),
                 tooltip: 'Crea nuova playlist',
                 onPressed: () => _showCreatePlaylistDialog(context),
               ),
@@ -71,7 +70,7 @@ class PlaylistTab extends StatelessWidget {
                         ),
                         title: Text(
                           pl.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppTheme.textPrimary,
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -81,7 +80,7 @@ class PlaylistTab extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             '$count ${count == 1 ? 'brano' : 'brani'}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppTheme.secondary,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -93,7 +92,7 @@ class PlaylistTab extends StatelessWidget {
                           children: [
                             if (count > 0)
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.play_circle_fill_rounded,
                                   color: AppTheme.primary,
                                   size: 34,
@@ -106,7 +105,7 @@ class PlaylistTab extends StatelessWidget {
                                   }
                                 },
                               ),
-                            const Icon(
+                            Icon(
                               Icons.chevron_right_rounded,
                               color: AppTheme.textSecondary,
                               size: 22,
@@ -154,14 +153,14 @@ class PlaylistTab extends StatelessWidget {
               border: Border.all(color: AppTheme.primary, width: 1.5),
               color: const Color(0x22FFD700),
             ),
-            child: const Icon(Icons.library_music_rounded, color: AppTheme.primary, size: 26),
+            child: Icon(Icons.library_music_rounded, color: AppTheme.primary, size: 26),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'LE TUE RACCOLTE',
                   style: TextStyle(
                     fontSize: 11,
@@ -173,7 +172,7 @@ class PlaylistTab extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '$totalPlaylists ${totalPlaylists == 1 ? 'Playlist creata' : 'Playlist create'}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.textPrimary,
@@ -216,14 +215,14 @@ class PlaylistTab extends StatelessWidget {
                 ),
                 border: Border.all(color: AppTheme.goldBorder, width: 1),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.queue_music_rounded,
                 size: 64,
                 color: AppTheme.primary,
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Nessuna Playlist',
               style: TextStyle(
                 fontSize: 20,
@@ -232,7 +231,7 @@ class PlaylistTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Organizza i tuoi brani preferiti creando raccolte personalizzate.',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -274,26 +273,26 @@ class PlaylistTab extends StatelessWidget {
         backgroundColor: AppTheme.surfaceCard,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppTheme.goldBorder, width: 1.2),
+          side: BorderSide(color: AppTheme.goldBorder, width: 1.2),
         ),
-        title: const Text(
+        title: Text(
           'Nuova Playlist',
           style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
         ),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          style: const TextStyle(color: AppTheme.textPrimary),
+          style: TextStyle(color: AppTheme.textPrimary),
           decoration: InputDecoration(
             hintText: 'Nome della playlist...',
-            hintStyle: const TextStyle(color: AppTheme.textMuted),
+            hintStyle: TextStyle(color: AppTheme.textMuted),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.goldBorder),
+              borderSide: BorderSide(color: AppTheme.goldBorder),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+              borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
             ),
             filled: true,
             fillColor: Colors.black,
@@ -302,7 +301,7 @@ class PlaylistTab extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(

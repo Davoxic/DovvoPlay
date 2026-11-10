@@ -77,7 +77,7 @@ class _YouTubeTabState extends State<YouTubeTab> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppTheme.goldBorder, width: 1.1),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(Icons.headset_rounded, color: AppTheme.primary, size: 24),
                 SizedBox(width: 12),
@@ -98,16 +98,16 @@ class _YouTubeTabState extends State<YouTubeTab> {
               controller: _searchCtrl,
               textInputAction: TextInputAction.search,
               onSubmitted: _performSearch,
-              style: const TextStyle(color: AppTheme.textPrimary),
+              style: TextStyle(color: AppTheme.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Cerca brano o artista su YouTube...',
-                hintStyle: const TextStyle(color: AppTheme.textMuted),
+                hintStyle: TextStyle(color: AppTheme.textMuted),
                 filled: true,
                 fillColor: AppTheme.surfaceCard,
-                prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary),
+                prefixIcon: Icon(Icons.search_rounded, color: AppTheme.primary),
                 suffixIcon: _searchCtrl.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, color: AppTheme.textSecondary),
+                        icon: Icon(Icons.clear_rounded, color: AppTheme.textSecondary),
                         onPressed: () {
                           _searchCtrl.clear();
                           setState(() {});
@@ -117,11 +117,11 @@ class _YouTubeTabState extends State<YouTubeTab> {
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AppTheme.goldBorder),
+                  borderSide: BorderSide(color: AppTheme.goldBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                  borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
                 ),
               ),
             ),
@@ -139,9 +139,9 @@ class _YouTubeTabState extends State<YouTubeTab> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ActionChip(
-                    label: Text(tag, style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary)),
+                    label: Text(tag, style: TextStyle(fontSize: 12, color: AppTheme.textPrimary)),
                     backgroundColor: AppTheme.surfaceLight,
-                    side: const BorderSide(color: AppTheme.goldBorder),
+                    side: BorderSide(color: AppTheme.goldBorder),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                     onPressed: () {
                       _searchCtrl.text = tag;
@@ -158,7 +158,7 @@ class _YouTubeTabState extends State<YouTubeTab> {
           // Risultati o Loading
           Expanded(
             child: _isLoading
-                ? const Center(
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -211,12 +211,12 @@ class _YouTubeTabState extends State<YouTubeTab> {
                               children: [
                                 Icon(Icons.youtube_searched_for_rounded, size: 64, color: AppTheme.primary.withOpacity(0.4)),
                                 const SizedBox(height: 14),
-                                const Text(
+                                Text(
                                   'Cerca le tue canzoni preferite',
                                   style: TextStyle(color: AppTheme.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 4),
-                                const Text(
+                                Text(
                                   'I brani vengono riprodotti in streaming audio AAC immediato',
                                   style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                                 ),

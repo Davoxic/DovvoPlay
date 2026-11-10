@@ -104,7 +104,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.textPrimary,
@@ -112,7 +112,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                 ),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                 ),
               ],
             ),
@@ -157,7 +157,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                 const SizedBox(height: 3),
                 Text(
                   mood.message,
-                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
+                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
                 ),
               ],
             ),
@@ -178,7 +178,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'FASCE D\'ASCOLTO OGGI',
             style: TextStyle(fontSize: 10, letterSpacing: 1.1, fontWeight: FontWeight.bold, color: AppTheme.secondary),
           ),
@@ -213,8 +213,8 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
           ),
         ),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-        Text(pct, style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
+        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        Text(pct, style: TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
       ],
     );
   }
@@ -229,12 +229,12 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
             children: [
               Icon(Icons.bar_chart_rounded, size: 56, color: AppTheme.primary.withOpacity(0.3)),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Nessuna statistica disponibile',
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 15, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Ascolta qualche brano per vedere i tuoi dati aggiornati secondo per secondo!',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
@@ -259,7 +259,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               children: [
                 Text(
                   '${tracks.length} brani',
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
                 ElevatedButton.icon(
                   onPressed: onPlayAll,
@@ -343,7 +343,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               track.displayTitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+              style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
             ),
             subtitle: Row(
               children: [
@@ -352,7 +352,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                     track.displayArtist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                   ),
                 ),
                 Container(
@@ -376,7 +376,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               ],
             ),
             trailing: IconButton(
-              icon: const Icon(Icons.play_circle_fill_rounded, color: AppTheme.primary, size: 30),
+              icon: Icon(Icons.play_circle_fill_rounded, color: AppTheme.primary, size: 30),
               onPressed: () {
                 AudioPlayerService.instance.playTrack(track, newQueue: tracks);
               },
@@ -638,7 +638,7 @@ class _ResetStepDialogState extends State<_ResetStepDialog> {
         children: [
           Text(
             widget.message,
-            style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, height: 1.4),
+            style: TextStyle(color: AppTheme.textPrimary, fontSize: 13, height: 1.4),
           ),
           const SizedBox(height: 16),
           Container(
@@ -671,7 +671,7 @@ class _ResetStepDialogState extends State<_ResetStepDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
+          child: Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
         ),
         ElevatedButton(
           onPressed: canProceed ? widget.onConfirmed : null,

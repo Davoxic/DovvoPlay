@@ -60,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
           unselectedLabelStyle: const TextStyle(fontSize: 11),
           type: BottomNavigationBarType.fixed,
           elevation: 0,
-          items: const [
+          items: [
             BottomNavigationBarItem(
               icon: Icon(Icons.queue_music_rounded),
               activeIcon: Icon(Icons.queue_music_rounded, color: AppTheme.primary),

@@ -52,7 +52,6 @@ class TrackTile extends StatelessWidget {
       case LibraryViewMode.minimalTypography:
         return _buildMinimalTypography(context, isCurrent, isPlaying, playerService);
       case LibraryViewMode.modernCards:
-      default:
         return _buildModernCard(context, isCurrent, isPlaying, playerService);
     }
   }
@@ -116,7 +115,7 @@ class TrackTile extends StatelessWidget {
           '${track.displayArtist}${track.isOnline ? " • YouTube" : ""}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppTheme.textSecondary,
             fontSize: 13,
           ),
@@ -126,7 +125,7 @@ class TrackTile extends StatelessWidget {
           children: [
             Text(
               _formatDuration(track.duration),
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppTheme.textSecondary,
                 fontSize: 12,
               ),
@@ -182,7 +181,7 @@ class TrackTile extends StatelessWidget {
                     track.displayArtist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                   ),
                 ],
               ),
@@ -192,7 +191,7 @@ class TrackTile extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               _formatDuration(track.duration),
-              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
             ),
             _buildOptionsButton(context),
           ],
@@ -353,7 +352,7 @@ class TrackTile extends StatelessWidget {
                     'CD AUDIO • ${track.displayArtist}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11, letterSpacing: 0.5),
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, letterSpacing: 0.5),
                   ),
                 ],
               ),
@@ -435,12 +434,12 @@ class TrackTile extends StatelessWidget {
                     'LP 33 RPM • ${track.displayArtist}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                   ),
                 ],
               ),
             ),
-            Text(_formatDuration(track.duration), style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+            Text(_formatDuration(track.duration), style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
             _buildOptionsButton(context),
           ],
         ),
@@ -497,7 +496,7 @@ class TrackTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(_formatDuration(track.duration), style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                Text(_formatDuration(track.duration), style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
                 _buildOptionsButton(context),
               ],
             ),
@@ -576,7 +575,7 @@ class TrackTile extends StatelessWidget {
                     track.displayArtist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                   ),
                 ],
               ),
@@ -586,7 +585,7 @@ class TrackTile extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               _formatDuration(track.duration),
-              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
             ),
             _buildOptionsButton(context),
           ],
@@ -597,7 +596,7 @@ class TrackTile extends StatelessWidget {
 
   Widget _buildOptionsButton(BuildContext context) {
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textSecondary, size: 20),
+      icon: Icon(Icons.more_vert_rounded, color: AppTheme.textSecondary, size: 20),
       color: AppTheme.surfaceLight,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (val) {
@@ -608,7 +607,7 @@ class TrackTile extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'playlist',
           child: Row(
             children: [
@@ -648,7 +647,7 @@ class TrackTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Aggiungi a playlist',
                 style: TextStyle(
                   fontSize: 18,
@@ -658,8 +657,8 @@ class TrackTile extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               if (playlists.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text('Nessuna playlist creata.', style: TextStyle(color: AppTheme.textSecondary)),
                 )
               else
@@ -671,12 +670,12 @@ class TrackTile extends StatelessWidget {
                       final pl = playlists[i];
                       final alreadyIn = pl.trackIds.contains(track.id);
                       return ListTile(
-                        leading: const Icon(Icons.playlist_play_rounded, color: AppTheme.primary),
-                        title: Text(pl.name, style: const TextStyle(color: AppTheme.textPrimary)),
-                        subtitle: Text('${pl.trackIds.length} brani', style: const TextStyle(color: AppTheme.textSecondary)),
+                        leading: Icon(Icons.playlist_play_rounded, color: AppTheme.primary),
+                        title: Text(pl.name, style: TextStyle(color: AppTheme.textPrimary)),
+                        subtitle: Text('${pl.trackIds.length} brani', style: TextStyle(color: AppTheme.textSecondary)),
                         trailing: alreadyIn
-                            ? const Icon(Icons.check_rounded, color: AppTheme.primary)
-                            : const Icon(Icons.add_rounded, color: AppTheme.textSecondary),
+                            ? Icon(Icons.check_rounded, color: AppTheme.primary)
+                            : Icon(Icons.add_rounded, color: AppTheme.textSecondary),
                         onTap: () async {
                           if (alreadyIn) {
                             await LibraryService.instance.removeTrackFromPlaylist(pl.id, track.id);

@@ -98,7 +98,7 @@ class _YouTubeTileState extends State<YouTubeTile> {
                   width: 72,
                   height: 54,
                   color: const Color(0x1AFFFFFF),
-                  child: const Center(
+                  child: Center(
                     child: SizedBox(
                       width: 18,
                       height: 18,
@@ -110,7 +110,7 @@ class _YouTubeTileState extends State<YouTubeTile> {
                   width: 72,
                   height: 54,
                   color: const Color(0x1AFFFFFF),
-                  child: const Icon(Icons.music_video_rounded, color: AppTheme.textSecondary),
+                  child: Icon(Icons.music_video_rounded, color: AppTheme.textSecondary),
                 ),
               ),
             ),
@@ -143,14 +143,14 @@ class _YouTubeTileState extends State<YouTubeTile> {
           padding: const EdgeInsets.only(top: 4),
           child: Row(
             children: [
-              const Icon(Icons.verified_rounded, size: 12, color: AppTheme.secondary),
+              Icon(Icons.verified_rounded, size: 12, color: AppTheme.secondary),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   widget.track.author,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                 ),
               ),
             ],
@@ -174,12 +174,12 @@ class _YouTubeTileState extends State<YouTubeTile> {
               )
             else
               IconButton(
-                icon: const Icon(Icons.download_rounded, color: AppTheme.textSecondary, size: 20),
+                icon: Icon(Icons.download_rounded, color: AppTheme.textSecondary, size: 20),
                 tooltip: 'Salva brano offline',
                 onPressed: _downloadOffline,
               ),
             if (isBuffering)
-              const SizedBox(
+              SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),

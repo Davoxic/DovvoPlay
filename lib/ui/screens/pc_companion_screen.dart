@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/pc_sync_service.dart';
 import '../../services/soundcloud_service.dart';
@@ -159,9 +158,9 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
 
               // RISULTATI RICERCA
               if (_isSearchingSources)
-                const Center(
+                Center(
                   child: Padding(
-                    padding: EdgeInsets.all(28.0),
+                    padding: const EdgeInsets.all(28.0),
                     child: CircularProgressIndicator(color: AppTheme.primary),
                   ),
                 )
@@ -211,11 +210,11 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
                   children: [
                     Text(
                       sync.isConnected ? 'PC Companion Connesso' : 'Ricerca Server PC su Rete',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.textPrimary),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.textPrimary),
                     ),
                     Text(
                       sync.statusMessage,
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
@@ -229,14 +228,14 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
                 flex: 3,
                 child: TextField(
                   controller: _ipCtrl,
-                  style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                  style: TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                   decoration: InputDecoration(
                     labelText: 'IP Computer (LAN)',
-                    labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                    labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                     hintText: '192.168.1.50',
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.goldBorder)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.goldBorder)),
                   ),
                 ),
               ),
@@ -246,14 +245,14 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
                 child: TextField(
                   controller: _portCtrl,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                  style: TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                   decoration: InputDecoration(
                     labelText: 'Porta',
-                    labelStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                    labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                     hintText: '8080',
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.goldBorder)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.goldBorder)),
                   ),
                 ),
               ),
@@ -281,7 +280,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
                   ? null
                   : () => sync.discoverPcOnLan(port: int.tryParse(_portCtrl.text) ?? 8080),
               icon: sync.isSearching
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary))
+                  ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary))
                   : const Icon(Icons.radar_rounded, size: 16),
               label: Text(
                 sync.isSearching ? 'Scansione subnet in corso...' : 'Trova PC automaticamente (Ping su rete)',
@@ -289,7 +288,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppTheme.primary,
-                side: const BorderSide(color: AppTheme.goldBorder),
+                side: BorderSide(color: AppTheme.goldBorder),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
@@ -310,10 +309,10 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.playlist_add_check_circle_rounded, color: Color(0xFF1DB954), size: 22),
-              SizedBox(width: 10),
+              const Icon(Icons.playlist_add_check_circle_rounded, color: Color(0xFF1DB954), size: 22),
+              const SizedBox(width: 10),
               Text(
                 'Importa Playlist Spotify',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
@@ -321,22 +320,22 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Incolla il link di una playlist o album Spotify per importarla e salvarla nella tua libreria.',
             style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _playlistUrlCtrl,
-            style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+            style: TextStyle(color: AppTheme.textPrimary, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'https://open.spotify.com/playlist/...',
-              hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+              hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
               prefixIcon: const Icon(Icons.link_rounded, size: 20, color: Color(0xFF1DB954)),
               filled: true,
               fillColor: Colors.black,
               contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.goldBorder)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.goldBorder)),
             ),
           ),
           const SizedBox(height: 10),
@@ -348,7 +347,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
                   _delegatePlaylistToPc
                       ? 'Delega elaborazione al server PC'
                       : 'Analisi locale & ricerca automatica',
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary),
+                  style: TextStyle(fontSize: 12, color: AppTheme.textPrimary),
                 ),
               ),
               Switch(
@@ -363,7 +362,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
               padding: const EdgeInsets.only(top: 6, bottom: 8),
               child: Text(
                 _playlistStatusText,
-                style: const TextStyle(fontSize: 12, color: AppTheme.primary, fontStyle: FontStyle.italic),
+                style: TextStyle(fontSize: 12, color: AppTheme.primary, fontStyle: FontStyle.italic),
               ),
             ),
           SizedBox(
@@ -394,7 +393,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'RICERCA WEB & DOWNLOAD DA PC',
           style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: AppTheme.secondary),
         ),
@@ -421,18 +420,18 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
         TextField(
           controller: _searchCtrl,
           onSubmitted: (_) => _performSearch(),
-          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+          style: TextStyle(color: AppTheme.textPrimary, fontSize: 14),
           decoration: InputDecoration(
             hintText: 'Cerca brano o artista...',
-            hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-            prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary),
+            hintStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            prefixIcon: Icon(Icons.search_rounded, color: AppTheme.primary),
             suffixIcon: IconButton(
-              icon: const Icon(Icons.send_rounded, color: AppTheme.primary),
+              icon: Icon(Icons.send_rounded, color: AppTheme.primary),
               onPressed: _performSearch,
             ),
             filled: true,
             fillColor: AppTheme.surfaceCard,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.goldBorder)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppTheme.goldBorder)),
           ),
         ),
       ],
@@ -477,18 +476,18 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
           height: 46,
           borderRadius: 8,
         ),
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
         subtitle: Text(
           '$artist • ${service.toUpperCase()}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.send_to_mobile_rounded, color: AppTheme.primary, size: 22),
+              icon: Icon(Icons.send_to_mobile_rounded, color: AppTheme.primary, size: 22),
               tooltip: 'Richiedi download al PC',
               onPressed: () async {
                 final sent = await PcSyncService.instance.sendDownloadRequest(
@@ -508,7 +507,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
               },
             ),
             IconButton(
-              icon: const Icon(Icons.play_circle_fill_rounded, color: AppTheme.secondary, size: 24),
+              icon: Icon(Icons.play_circle_fill_rounded, color: AppTheme.secondary, size: 24),
               tooltip: 'Riproduci ora',
               onPressed: () async {
                 // Cerca la versione audio stream su YouTube per riproduzione immediata

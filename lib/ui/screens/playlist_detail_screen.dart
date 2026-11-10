@@ -77,7 +77,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                         children: [
                           Text(
                             currentPl.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.textPrimary,
@@ -86,7 +86,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                           const SizedBox(height: 4),
                           Text(
                             '${tracks.length} brani',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               color: AppTheme.secondary,
                             ),
@@ -113,7 +113,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               // Lista brani
               Expanded(
                 child: tracks.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'Nessun brano in questa playlist.\nAggiungi brani dalla Libreria o da YouTube!',
                           textAlign: TextAlign.center,
@@ -159,7 +159,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),

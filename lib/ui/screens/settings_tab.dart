@@ -55,8 +55,8 @@ class SettingsTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     'Temi Visivi & Palette Colori',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
@@ -90,7 +90,7 @@ class SettingsTab extends StatelessWidget {
                         ),
                         subtitle: Text(
                           vt.description,
-                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                         ),
                         trailing: isSelected
                             ? Icon(Icons.check_circle_rounded, color: vt.primary, size: 22)
@@ -138,8 +138,8 @@ class SettingsTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     'Temi di Animazione tra Canzoni',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
@@ -172,10 +172,10 @@ class SettingsTab extends StatelessWidget {
                         ),
                         subtitle: Text(
                           a.description,
-                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                         ),
                         trailing: isSelected
-                            ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
+                            ? Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
                             : null,
                         onTap: () {
                           AnimationThemeService.instance.setAnimationType(a.type);
@@ -220,8 +220,8 @@ class SettingsTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     'Layout & Stile Visualizzazione',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
@@ -254,10 +254,10 @@ class SettingsTab extends StatelessWidget {
                         ),
                         subtitle: Text(
                           info.description,
-                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                         ),
                         trailing: isSelected
-                            ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
+                            ? Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
                             : null,
                         onTap: () {
                           ViewModeService.instance.setViewMode(info.mode);
@@ -326,13 +326,13 @@ class SettingsTab extends StatelessWidget {
                             border: Border.all(color: AppTheme.primary, width: 1.5),
                             color: AppTheme.primary.withOpacity(0.18),
                           ),
-                          child: const Icon(Icons.star_rounded, color: AppTheme.primary, size: 22),
+                          child: Icon(Icons.star_rounded, color: AppTheme.primary, size: 22),
                         ),
                         const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'SBORRAPLAY GOLD',
                               style: TextStyle(
                                 fontSize: 11,
@@ -343,7 +343,7 @@ class SettingsTab extends StatelessWidget {
                             ),
                             Text(
                               theme.name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.textPrimary,
@@ -465,8 +465,8 @@ class SettingsTab extends StatelessWidget {
                   await lib.scanLibrary();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Libreria aggiornata e copertine estratte!'),
+                      SnackBar(
+                        content: const Text('Libreria aggiornata e copertine estratte!'),
                         backgroundColor: AppTheme.secondary,
                       ),
                     );
@@ -577,7 +577,7 @@ class SettingsTab extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: AppTheme.primary,
@@ -586,7 +586,7 @@ class SettingsTab extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
         ),
       ],
     );
@@ -597,7 +597,7 @@ class SettingsTab extends StatelessWidget {
       padding: const EdgeInsets.only(left: 4, bottom: 10),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.3,
@@ -653,7 +653,7 @@ class SettingsTab extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppTheme.textPrimary,
                   fontSize: 15,
@@ -683,10 +683,10 @@ class SettingsTab extends StatelessWidget {
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             subtitle,
-            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.3),
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.3),
           ),
         ),
-        trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.primary, size: 24),
+        trailing: Icon(Icons.chevron_right_rounded, color: AppTheme.primary, size: 24),
         onTap: onTap,
       ),
     );
@@ -719,13 +719,13 @@ class SettingsTab extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary, fontSize: 14),
+          style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary, fontSize: 14),
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
         ),
-        trailing: onTap != null ? const Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondary) : null,
+        trailing: onTap != null ? Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondary) : null,
         onTap: onTap,
       ),
     );
@@ -739,13 +739,13 @@ class SettingsTab extends StatelessWidget {
         backgroundColor: AppTheme.surfaceCard,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: AppTheme.goldBorder),
+          side: BorderSide(color: AppTheme.goldBorder),
         ),
-        title: const Text('Importa Backup JSON', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+        title: Text('Importa Backup JSON', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Incolla qui il contenuto del file JSON esportato in precedenza:',
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
             ),
@@ -753,8 +753,8 @@ class SettingsTab extends StatelessWidget {
             TextField(
               controller: textCtrl,
               maxLines: 5,
-              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontFamily: 'monospace'),
-              decoration: const InputDecoration(
+              style: TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontFamily: 'monospace'),
+              decoration: InputDecoration(
                 hintText: '{\n  "app": "SborraPlay", ...\n}',
                 hintStyle: TextStyle(color: AppTheme.textMuted),
                 filled: true,
@@ -772,7 +772,7 @@ class SettingsTab extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(

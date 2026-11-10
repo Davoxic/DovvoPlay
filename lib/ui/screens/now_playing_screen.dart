@@ -48,8 +48,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     'Modalità Shuffle',
                     style: TextStyle(
@@ -90,10 +90,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                         ),
                         subtitle: Text(
                           mode.description,
-                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                         ),
                         trailing: isSelected
-                            ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
+                            ? Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
                             : null,
                         onTap: () {
                           player.setShuffleMode(mode);
@@ -148,10 +148,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
         transform: Matrix4.translationValues(0, _dragOffset, 0),
         child: Scaffold(
           body: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xFF16130B),
+                  const Color(0xFF16130B),
                   AppTheme.background,
                   AppTheme.background,
                 ],
@@ -197,13 +197,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: AppTheme.textPrimary),
+                              icon: Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: AppTheme.textPrimary),
                               tooltip: 'Riduci a icona (scorri verso il basso)',
                               onPressed: () => Navigator.of(context).pop(),
                             ),
                             Column(
                               children: [
-                                const Text(
+                                Text(
                                   'IN RIPRODUZIONE',
                                   style: TextStyle(
                                     fontSize: 11,
@@ -214,7 +214,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                 ),
                                 Text(
                                   track.isOnline ? 'YouTube Stream' : 'Libreria Locale',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     color: AppTheme.primary,
                                     fontWeight: FontWeight.w600,
@@ -223,7 +223,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                               ],
                             ),
                             IconButton(
-                              icon: const Icon(Icons.playlist_add_rounded, size: 26, color: AppTheme.textPrimary),
+                              icon: Icon(Icons.playlist_add_rounded, size: 26, color: AppTheme.textPrimary),
                               tooltip: 'Aggiungi a playlist',
                               onPressed: () => _showAddToPlaylistSheet(context, track),
                             ),
@@ -275,7 +275,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                     track.displayTitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
                                       color: AppTheme.textPrimary,
@@ -286,7 +286,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                     track.displayArtist,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
                                       color: AppTheme.textSecondary,
                                     ),
@@ -311,7 +311,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                       const SizedBox(width: 5),
                                       Text(
                                         player.shuffleMode.label,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: AppTheme.primary,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
@@ -379,11 +379,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                             children: [
                               Text(
                                 _formatTime(player.position),
-                                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                               ),
                               Text(
                                 _formatTime(player.duration),
-                                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                               ),
                             ],
                           ),
@@ -406,7 +406,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                               onPressed: () => _showShuffleModeSheet(context, player),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.skip_previous_rounded, size: 36, color: AppTheme.textPrimary),
+                              icon: Icon(Icons.skip_previous_rounded, size: 36, color: AppTheme.textPrimary),
                               onPressed: () => player.previous(),
                             ),
                             GestureDetector(
@@ -414,7 +414,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                               child: Container(
                                 width: 70,
                                 height: 70,
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   gradient: AppTheme.primaryGradient,
                                   boxShadow: [
@@ -441,7 +441,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.skip_next_rounded, size: 36, color: AppTheme.textPrimary),
+                              icon: Icon(Icons.skip_next_rounded, size: 36, color: AppTheme.textPrimary),
                               onPressed: () => player.next(),
                             ),
                             IconButton(
@@ -487,14 +487,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Aggiungi a Playlist',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
               ),
               const SizedBox(height: 16),
               if (playlists.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Center(
                     child: Text('Nessuna playlist presente.', style: TextStyle(color: AppTheme.textSecondary)),
                   ),
@@ -507,8 +507,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                     itemBuilder: (context, idx) {
                       final p = playlists[idx];
                       return ListTile(
-                        leading: const Icon(Icons.queue_music_rounded, color: AppTheme.primary),
-                        title: Text(p.name, style: const TextStyle(color: AppTheme.textPrimary)),
+                        leading: Icon(Icons.queue_music_rounded, color: AppTheme.primary),
+                        title: Text(p.name, style: TextStyle(color: AppTheme.textPrimary)),
                         onTap: () {
                           LibraryService.instance.addTrackToPlaylist(p.id, track.id);
                           Navigator.pop(ctx);

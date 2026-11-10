@@ -83,7 +83,7 @@ class MiniPlayer extends StatelessWidget {
                       value: progress,
                       minHeight: 2.5,
                       backgroundColor: Colors.transparent,
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
                     ),
                   ),
                   Padding(
@@ -106,7 +106,7 @@ class MiniPlayer extends StatelessWidget {
                                 track.displayTitle,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppTheme.textPrimary,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
@@ -116,7 +116,7 @@ class MiniPlayer extends StatelessWidget {
                                 track.displayArtist,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppTheme.secondary,
                                   fontSize: 12,
                                 ),
@@ -126,7 +126,7 @@ class MiniPlayer extends StatelessWidget {
                         ),
                         if (player.isBuffering)
                           IconButton(
-                            icon: const SizedBox(
+                            icon: SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
@@ -145,7 +145,7 @@ class MiniPlayer extends StatelessWidget {
                             },
                           ),
                         IconButton(
-                          icon: const Icon(Icons.skip_next_rounded, color: AppTheme.secondary, size: 26),
+                          icon: Icon(Icons.skip_next_rounded, color: AppTheme.secondary, size: 26),
                           onPressed: () {
                             player.next();
                           },
