@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/youtube_track.dart';
@@ -36,29 +35,51 @@ class YouTubeService {
     }
   }
 
+  /// Recupera l'URL dello stream nativo HLS (.m3u8) per iOS se disponibile
+  Future<String?> getHlsStreamUrl(String videoId) async {
+    try {
+      final manifest = await yt.videos.streamsClient.getManifest(
+        videoId,
+        ytClients: [
+          YoutubeApiClient.ios,
+          YoutubeApiClient.safari,
+        ],
+      ).timeout(const Duration(seconds: 7));
+
+      if (manifest.hls.isNotEmpty) {
+        final hls = manifest.hls.first;
+        return hls.url.toString();
+      }
+    } catch (e) {
+      print('getHlsStreamUrl info: $e');
+    }
+    return null;
+  }
+
   /// Recupera lo StreamInfo riproducibile su iOS (privilegia AAC in MP4 o Muxed MP4)
   Future<StreamInfo?> getPlayableStreamInfo(String videoId) async {
     StreamManifest? manifest;
 
-    // 1. Prova prima il manifest standard (veloce e stabile)
+    // 1. Prova prima con client iOS e Safari (generano stream compatibili AAC/MP4 per AVPlayer)
     try {
-      manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
+      manifest = await yt.videos.streamsClient.getManifest(
+        videoId,
+        ytClients: [
+          YoutubeApiClient.ios,
+          YoutubeApiClient.safari,
+          YoutubeApiClient.androidVr,
+        ],
+      ).timeout(const Duration(seconds: 8));
     } catch (e) {
-      print('getManifest standard: $e');
+      print('getManifest ytClients: $e');
     }
 
-    // 2. Fallback su client Android VR / iOS
+    // 2. Fallback su manifest standard
     if (manifest == null) {
       try {
-        manifest = await yt.videos.streamsClient.getManifest(
-          videoId,
-          ytClients: [
-            YoutubeApiClient.androidVr,
-            YoutubeApiClient.ios,
-          ],
-        ).timeout(const Duration(seconds: 8));
+        manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
       } catch (e) {
-        print('getManifest ytClients: $e');
+        print('getManifest standard: $e');
       }
     }
 
@@ -78,8 +99,7 @@ class YouTubeService {
       return mp4Audio.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
     }
 
-    // 2. Se non c'è audio-only MP4 (YouTube offre solo Opus in audioOnly),
-    // usa i flussi muxed MP4: contengono sempre traccia audio AAC decodificabile nativamente da iOS.
+    // 2. Se non c'è audio-only MP4, usa i flussi muxed MP4 (audio AAC nativo per iOS)
     final mp4Muxed = manifest.muxed.where((s) {
       final containerName = s.container.name.toLowerCase();
       return containerName == 'mp4' || containerName == 'm4a';
@@ -89,9 +109,9 @@ class YouTubeService {
       return mp4Muxed.reduce((a, b) => a.bitrate.bitsPerSecond < b.bitrate.bitsPerSecond ? a : b);
     }
 
-    // 3. Fallback estremo su qualsiasi audio disponibile
+    // 3. Fallback: qualunque audio-only disponibile
     if (manifest.audioOnly.isNotEmpty) {
-      return manifest.audioOnly.withHighestBitrate();
+      return manifest.audioOnly.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
     }
 
     return null;
@@ -103,10 +123,12 @@ class YouTubeService {
     return info?.url.toString();
   }
 
-  /// Controlla se il brano è già stato scaricato in precedenza nella cartella Music
-  Future<File?> getLocalDownloadedFile(String trackId) async {
+  /// Cerca se la traccia è già disponibile nei download offline o nella cache locale
+  Future<File?> getLocalAudioFile(String trackId) async {
+    final safeId = trackId.replaceAll('yt_', '').replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+
+    // 1. Controlla nei download offline permanenti (cartella Music)
     try {
-      final safeId = trackId.replaceAll('yt_', '').replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       final docsDir = await getApplicationDocumentsDirectory();
       final musicDir = Directory('${docsDir.path}/Music');
       if (await musicDir.exists()) {
@@ -118,7 +140,87 @@ class YouTubeService {
         }
       }
     } catch (_) {}
+
+    // 2. Controlla nella cache temporanea di streaming
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final cacheDir = Directory('${tempDir.path}/yt_cache');
+      if (await cacheDir.exists()) {
+        final files = cacheDir.listSync().whereType<File>();
+        for (final f in files) {
+          if (f.path.contains(safeId) && await f.length() > 50000) {
+            return f;
+          }
+        }
+      }
+    } catch (_) {}
+
     return null;
+  }
+
+  /// Alias retrocompatibile
+  Future<File?> getLocalDownloadedFile(String trackId) => getLocalAudioFile(trackId);
+
+  /// Scarica il flusso audio AAC (.m4a) in cache temporanea via youtube_explode
+  /// (senza 403 Forbidden di Apple AVPlayer)
+  Future<File?> downloadToCache(
+    String videoId,
+    String title, {
+    void Function(double progress)? onProgress,
+  }) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final cacheDir = Directory('${tempDir.path}/yt_cache');
+      if (!await cacheDir.exists()) {
+        await cacheDir.create(recursive: true);
+      }
+
+      final safeId = videoId.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final targetFile = File('${cacheDir.path}/yt_$safeId.m4a');
+      if (await targetFile.exists() && await targetFile.length() > 50000) {
+        return targetFile;
+      }
+
+      final streamInfo = await getPlayableStreamInfo(videoId);
+      if (streamInfo == null) return null;
+
+      final tempFile = File('${cacheDir.path}/yt_$safeId.m4a.tmp');
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+
+      final stream = yt.videos.streamsClient.get(streamInfo);
+      final sink = tempFile.openWrite();
+      int receivedBytes = 0;
+      final totalBytes = streamInfo.size.totalBytes;
+
+      try {
+        await for (final chunk in stream) {
+          sink.add(chunk);
+          receivedBytes += chunk.length;
+          if (totalBytes > 0 && onProgress != null) {
+            onProgress(receivedBytes / totalBytes);
+          }
+        }
+        await sink.flush();
+      } finally {
+        await sink.close();
+      }
+
+      if (await tempFile.length() > 50000) {
+        if (await targetFile.exists()) {
+          await targetFile.delete();
+        }
+        await tempFile.rename(targetFile.path);
+        return targetFile;
+      } else {
+        if (await tempFile.exists()) await tempFile.delete();
+        return null;
+      }
+    } catch (e) {
+      print('Errore downloadToCache: $e');
+      return null;
+    }
   }
 
   /// Scarica il brano audio in background nella cartella Music per ascolto offline
@@ -141,6 +243,13 @@ class YouTubeService {
         return targetFile;
       }
 
+      // Se il brano è già stato scaricato nella cache streaming, copialo istantaneamente!
+      final cached = await getLocalAudioFile(videoId);
+      if (cached != null && await cached.exists() && await cached.length() > 50000) {
+        await cached.copy(targetFile.path);
+        return targetFile;
+      }
+
       final streamInfo = await getPlayableStreamInfo(videoId);
       if (streamInfo == null) return null;
 
@@ -149,18 +258,13 @@ class YouTubeService {
         await tempFile.delete();
       }
 
-      final client = http.Client();
+      final stream = yt.videos.streamsClient.get(streamInfo);
+      final sink = tempFile.openWrite();
+      int receivedBytes = 0;
+      final totalBytes = streamInfo.size.totalBytes;
+
       try {
-        final request = http.Request('GET', streamInfo.url);
-        request.headers['User-Agent'] =
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
-
-        final response = await client.send(request).timeout(const Duration(seconds: 15));
-        final totalBytes = response.contentLength ?? streamInfo.size.totalBytes;
-        int receivedBytes = 0;
-
-        final sink = tempFile.openWrite();
-        await for (final chunk in response.stream) {
+        await for (final chunk in stream) {
           sink.add(chunk);
           receivedBytes += chunk.length;
           if (totalBytes > 0 && onProgress != null) {
@@ -168,20 +272,19 @@ class YouTubeService {
           }
         }
         await sink.flush();
-        await sink.close();
-
-        if (await tempFile.length() > 50000) {
-          if (await targetFile.exists()) {
-            await targetFile.delete();
-          }
-          await tempFile.rename(targetFile.path);
-          return targetFile;
-        } else {
-          if (await tempFile.exists()) await tempFile.delete();
-          return null;
-        }
       } finally {
-        client.close();
+        await sink.close();
+      }
+
+      if (await tempFile.length() > 50000) {
+        if (await targetFile.exists()) {
+          await targetFile.delete();
+        }
+        await tempFile.rename(targetFile.path);
+        return targetFile;
+      } else {
+        if (await tempFile.exists()) await tempFile.delete();
+        return null;
       }
     } catch (e) {
       print('Errore downloadAudioStream: $e');

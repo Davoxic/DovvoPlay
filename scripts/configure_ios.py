@@ -41,6 +41,7 @@ def configure_info_plist():
     # ATS per consentire stream audio HTTP locali / CDN
     ats = plist.get("NSAppTransportSecurity", {})
     ats["NSAllowsArbitraryLoads"] = True
+    ats["NSAllowsLocalNetworking"] = True
     plist["NSAppTransportSecurity"] = ats
 
     with open(INFO_PLIST, "wb") as f:

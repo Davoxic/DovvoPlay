@@ -4,7 +4,6 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import '../models/track.dart';
 import '../models/youtube_track.dart';
-import 'youtube_audio_source.dart';
 import 'youtube_service.dart';
 
 enum PlayerLoopMode { off, all, one }
@@ -15,9 +14,9 @@ class AudioPlayerService extends ChangeNotifier {
     _initListeners();
   }
 
-  final AudioPlayer _player = AudioPlayer(
-    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-  );
+  // AudioPlayer standard senza proxy header custom su iOS
+  // (permette ad AVPlayer di riprodurre HLS ed m4a senza interferenze proxy)
+  final AudioPlayer _player = AudioPlayer();
 
   Track? _currentTrack;
   List<Track> _queue = [];
@@ -118,8 +117,6 @@ class AudioPlayerService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      AudioSource audioSource;
-
       final mediaItem = MediaItem(
         id: track.id,
         album: track.album.isNotEmpty ? track.album : (track.isOnline ? 'YouTube' : 'SborraPlay'),
@@ -130,41 +127,61 @@ class AudioPlayerService extends ChangeNotifier {
       );
 
       if (track.isOnline) {
-        // 1. Controlla se il brano è già stato scaricato in locale
-        final localFile = await YouTubeService.instance.getLocalDownloadedFile(track.id);
+        final videoId = track.id.replaceFirst('yt_', '');
+
+        // 1. Controlla se la canzone è già scaricata o in cache locale
+        final localFile = await YouTubeService.instance.getLocalAudioFile(track.id);
         if (localFile != null && await localFile.exists()) {
-          audioSource = AudioSource.uri(Uri.file(localFile.path), tag: mediaItem);
-        } else {
-          // 2. Altrimenti usa YouTubeAudioSource basato su StreamAudioSource (streaming progressive affidabile su iOS)
-          final videoId = track.id.replaceFirst('yt_', '');
-          final streamInfo = await YouTubeService.instance.getPlayableStreamInfo(videoId);
-
+          final audioSource = AudioSource.uri(Uri.file(localFile.path), tag: mediaItem);
+          await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
-
-          if (streamInfo == null) {
-            throw Exception('Nessun flusso audio compatibile trovato per questo video.');
-          }
-
-          audioSource = YouTubeAudioSource(
-            videoId: videoId,
-            streamInfo: streamInfo,
-            tag: mediaItem,
-          );
+          await _player.play();
+          return;
         }
+
+        // 2. Prova prima lo stream HLS (.m3u8) nativo per iOS (zero download del file, streaming istantaneo)
+        final hlsUrl = await YouTubeService.instance.getHlsStreamUrl(videoId);
+        if (_playRequestId != requestId) return;
+
+        if (hlsUrl != null && hlsUrl.isNotEmpty) {
+          try {
+            final audioSource = AudioSource.uri(Uri.parse(hlsUrl), tag: mediaItem);
+            await _player.setAudioSource(audioSource);
+            if (_playRequestId != requestId) return;
+            await _player.play();
+            return;
+          } catch (hlsErr) {
+            print('Streaming HLS non riuscito ($hlsErr), procedo al download in cache...');
+          }
+        }
+
+        // 3. Fallback: scarica i chunk audio AAC (.m4a) in cache con youtube_explode
+        // (completamente immune al blocco 403 Forbidden di Google Video CDN)
+        final cached = await YouTubeService.instance.downloadToCache(videoId, track.title);
+        if (_playRequestId != requestId) return;
+
+        if (cached != null && await cached.exists()) {
+          final audioSource = AudioSource.uri(Uri.file(cached.path), tag: mediaItem);
+          await _player.setAudioSource(audioSource);
+          if (_playRequestId != requestId) return;
+          await _player.play();
+          return;
+        }
+
+        throw Exception('Impossibile ottenere il flusso audio compatibile per iOS.');
       } else if (track.filePath != null) {
-        audioSource = AudioSource.uri(Uri.file(track.filePath!), tag: mediaItem);
+        final audioSource = AudioSource.uri(Uri.file(track.filePath!), tag: mediaItem);
+        await _player.setAudioSource(audioSource);
+        if (_playRequestId != requestId) return;
+        await _player.play();
       } else if (track.streamUrl != null && track.streamUrl!.isNotEmpty) {
-        audioSource = AudioSource.uri(Uri.parse(track.streamUrl!), tag: mediaItem);
+        final audioSource = AudioSource.uri(Uri.parse(track.streamUrl!), tag: mediaItem);
+        await _player.setAudioSource(audioSource);
+        if (_playRequestId != requestId) return;
+        await _player.play();
       } else {
         throw Exception('Percorso audio non valido.');
       }
-
-      if (_playRequestId != requestId) return;
-
-      await _player.setAudioSource(audioSource);
-
-      if (_playRequestId != requestId) return;
-      await _player.play();
     } catch (e, stack) {
       _lastErrorMessage = e.toString().replaceFirst('Exception: ', '');
       print('Errore riproduzione: $e\n$stack');
