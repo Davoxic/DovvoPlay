@@ -75,10 +75,11 @@ class _YouTubeTileState extends State<YouTubeTile> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       decoration: BoxDecoration(
-        color: isCurrent ? AppTheme.surfaceLight : AppTheme.surface,
+        color: isCurrent ? const Color(0xFF1A170F) : AppTheme.surfaceCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isCurrent ? AppTheme.primary.withOpacity(0.6) : const Color(0x14FFFFFF),
+          color: isCurrent ? AppTheme.primary : AppTheme.goldBorder,
+          width: isCurrent ? 1.5 : 1.0,
         ),
       ),
       child: ListTile(

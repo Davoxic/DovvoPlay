@@ -33,9 +33,9 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: AppTheme.surfaceCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x14FFFFFF)),
+        border: Border.all(color: AppTheme.goldBorder),
       ),
       child: Row(
         children: [
@@ -119,11 +119,11 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                 ),
                 ElevatedButton.icon(
                   onPressed: onPlayAll,
-                  icon: const Icon(Icons.shuffle_rounded, size: 16),
-                  label: const Text('Riproduci con Shuffle', style: TextStyle(fontSize: 12)),
+                  icon: const Icon(Icons.shuffle_rounded, size: 16, color: Colors.black),
+                  label: const Text('Riproduci con Shuffle', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   ),
@@ -166,9 +166,9 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            color: AppTheme.surfaceCard,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0x12FFFFFF)),
+            border: Border.all(color: AppTheme.goldBorder),
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -334,13 +334,13 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
+                        color: AppTheme.surfaceCard,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0x15FFFFFF)),
+                        border: Border.all(color: AppTheme.goldBorder),
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.verified_rounded, size: 14, color: AppTheme.secondary),
+                          Icon(Icons.verified_rounded, size: 14, color: AppTheme.primary),
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(

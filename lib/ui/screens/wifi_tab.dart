@@ -14,27 +14,30 @@ class WifiTab extends StatelessWidget {
         final wifi = WifiServerService.instance;
 
         return Scaffold(
+          backgroundColor: AppTheme.background,
           appBar: AppBar(
             title: const Text('Server Wi-Fi PC'),
           ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 90),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
             children: [
               // Card di stato Server
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: wifi.isRunning
-                        ? [const Color(0xFF2C194D), AppTheme.surface]
-                        : [AppTheme.surface, const Color(0xFF141022)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: AppTheme.goldSurfaceGradient,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: wifi.isRunning ? AppTheme.primary.withOpacity(0.5) : const Color(0x1AFFFFFF),
+                    color: wifi.isRunning ? AppTheme.primary : AppTheme.goldBorder,
+                    width: 1.3,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: wifi.isRunning ? const Color(0x33FFD700) : Colors.transparent,
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: Column(
                   children: [
@@ -43,7 +46,11 @@ class WifiTab extends StatelessWidget {
                       height: 72,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: wifi.isRunning ? AppTheme.primary.withOpacity(0.2) : const Color(0x0FFFFFFF),
+                        color: wifi.isRunning ? const Color(0x33FFD700) : const Color(0x11FFFFFF),
+                        border: Border.all(
+                          color: wifi.isRunning ? AppTheme.primary : AppTheme.goldBorder,
+                          width: 1.5,
+                        ),
                       ),
                       child: Icon(
                         wifi.isRunning ? Icons.wifi_tethering_rounded : Icons.wifi_off_rounded,
@@ -57,14 +64,14 @@ class WifiTab extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: wifi.isRunning ? Colors.white : AppTheme.textSecondary,
+                        color: wifi.isRunning ? AppTheme.primary : AppTheme.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       wifi.isRunning
-                          ? 'Raggiungibile dai computer sulla stessa rete'
-                          : 'Attiva il server per ricevere musica dal PC',
+                          ? 'Raggiungibile dai computer sulla stessa rete Wi-Fi'
+                          : 'Attiva il server per caricare musica dal tuo PC',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                     ),
@@ -73,9 +80,9 @@ class WifiTab extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0x28FFFFFF)),
+                          border: Border.all(color: AppTheme.goldBorder),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -85,17 +92,20 @@ class WifiTab extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.accentCyan,
+                                color: AppTheme.primary,
                                 fontFamily: 'monospace',
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
+                              icon: const Icon(Icons.copy_rounded, color: AppTheme.primary, size: 20),
                               tooltip: 'Copia indirizzo',
                               onPressed: () {
                                 Clipboard.setData(ClipboardData(text: wifi.serverUrl));
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Indirizzo copiato negli appunti!')),
+                                  const SnackBar(
+                                    content: Text('Indirizzo copiato negli appunti!'),
+                                    backgroundColor: AppTheme.secondary,
+                                  ),
                                 );
                               },
                             ),
@@ -108,14 +118,15 @@ class WifiTab extends StatelessWidget {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: wifi.isRunning ? Colors.redAccent.withOpacity(0.8) : AppTheme.primary,
+                          backgroundColor: wifi.isRunning ? Colors.redAccent.shade700 : AppTheme.primary,
+                          foregroundColor: wifi.isRunning ? Colors.white : Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        icon: Icon(wifi.isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded, color: Colors.white),
+                        icon: Icon(wifi.isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded),
                         label: Text(
                           wifi.isRunning ? 'Spegni Server' : 'Accendi Server Wi-Fi',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         onPressed: () => wifi.toggle(),
                       ),
@@ -127,16 +138,18 @@ class WifiTab extends StatelessWidget {
               const SizedBox(height: 24),
 
               // Istruzioni d'uso
-              const Text(
-                'COME TRASFERIRE MUSICA',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                  color: AppTheme.textSecondary,
+              const Padding(
+                padding: EdgeInsets.only(left: 4, bottom: 12),
+                child: Text(
+                  'COME TRASFERIRE MUSICA',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.3,
+                    color: AppTheme.secondary,
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
 
               _buildInstructionStep(
                 icon: Icons.wifi_rounded,
@@ -159,28 +172,30 @@ class WifiTab extends StatelessWidget {
 
               if (wifi.recentUploads.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                Text(
-                  'CARICAMENTI RECENTI (${wifi.recentUploads.length})',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.1,
-                    color: AppTheme.textSecondary,
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 10),
+                  child: Text(
+                    'CARICAMENTI RECENTI (${wifi.recentUploads.length})',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.3,
+                      color: AppTheme.secondary,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 10),
                 ...wifi.recentUploads.map(
                   (name) => Container(
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppTheme.surface,
+                      color: AppTheme.surfaceCard,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0x14FFFFFF)),
+                      border: Border.all(color: AppTheme.goldBorder),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.check_circle_rounded, color: Color(0xFF4ADE80), size: 18),
+                        const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 18),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -211,9 +226,9 @@ class WifiTab extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: AppTheme.surfaceCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x14FFFFFF)),
+        border: Border.all(color: AppTheme.goldBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,8 +237,9 @@ class WifiTab extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.15),
+              color: const Color(0x22FFD700),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.primary),
             ),
             child: Center(
               child: Text(

@@ -48,22 +48,22 @@ class MiniPlayer extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             height: 64,
             decoration: BoxDecoration(
-              color: AppTheme.surfaceLight,
+              gradient: AppTheme.goldSurfaceGradient,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.4),
+                  color: Color(0x22FFD700),
                   blurRadius: 16,
-                  offset: const Offset(0, 6),
+                  offset: Offset(0, 4),
                 ),
               ],
-              border: Border.all(color: const Color(0x1FFFFFFF)),
+              border: Border.all(color: AppTheme.goldBorder, width: 1.2),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Stack(
                 children: [
-                  // Progress indicator sottile in alto
+                  // Progress indicator gold in alto
                   Positioned(
                     top: 0,
                     left: 0,
@@ -106,7 +106,7 @@ class MiniPlayer extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  color: AppTheme.textSecondary,
+                                  color: AppTheme.secondary,
                                   fontSize: 12,
                                 ),
                               ),
@@ -125,16 +125,16 @@ class MiniPlayer extends StatelessWidget {
                         else
                           IconButton(
                             icon: Icon(
-                              player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                              color: AppTheme.textPrimary,
-                              size: 28,
+                              player.isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                              color: AppTheme.primary,
+                              size: 32,
                             ),
                             onPressed: () {
                               player.togglePlayPause();
                             },
                           ),
                         IconButton(
-                          icon: const Icon(Icons.skip_next_rounded, color: AppTheme.textSecondary, size: 26),
+                          icon: const Icon(Icons.skip_next_rounded, color: AppTheme.secondary, size: 26),
                           onPressed: () {
                             player.next();
                           },

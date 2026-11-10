@@ -147,10 +147,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
         transform: Matrix4.translationValues(0, _dragOffset, 0),
         child: Scaffold(
           body: Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF23163A),
+                  Color(0xFF16130B),
                   AppTheme.background,
                   AppTheme.background,
                 ],
@@ -239,11 +239,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                             height: MediaQuery.of(context).size.width * 0.78,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(28),
-                              boxShadow: [
+                              border: Border.all(color: AppTheme.goldBorder, width: 1.5),
+                              boxShadow: const [
                                 BoxShadow(
-                                  color: AppTheme.primary.withOpacity(0.25),
+                                  color: Color(0x33FFD700),
                                   blurRadius: 36,
-                                  offset: const Offset(0, 14),
+                                  offset: Offset(0, 14),
                                 ),
                               ],
                             ),
@@ -352,8 +353,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                             overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
                             activeTrackColor: AppTheme.primary,
-                            inactiveTrackColor: const Color(0x28FFFFFF),
-                            thumbColor: Colors.white,
+                            inactiveTrackColor: const Color(0x33D4AF37),
+                            thumbColor: AppTheme.primary,
                             trackHeight: 4,
                           ),
                           child: Slider(
@@ -407,16 +408,16 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                             GestureDetector(
                               onTap: () => player.togglePlayPause(),
                               child: Container(
-                                width: 68,
-                                height: 68,
-                                decoration: BoxDecoration(
+                                width: 70,
+                                height: 70,
+                                decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
                                   gradient: AppTheme.primaryGradient,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppTheme.primary.withOpacity(0.4),
-                                      blurRadius: 18,
-                                      offset: const Offset(0, 6),
+                                      color: Color(0x55FFD700),
+                                      blurRadius: 22,
+                                      offset: Offset(0, 6),
                                     ),
                                   ],
                                 ),
@@ -425,12 +426,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                       ? const SizedBox(
                                           width: 28,
                                           height: 28,
-                                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                                          child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3),
                                         )
                                       : Icon(
                                           player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                          size: 38,
-                                          color: Colors.white,
+                                          size: 40,
+                                          color: Colors.black,
                                         ),
                                 ),
                               ),

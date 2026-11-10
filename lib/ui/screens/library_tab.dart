@@ -7,7 +7,6 @@ import '../../services/library_service.dart';
 import '../../services/stats_service.dart';
 import '../theme.dart';
 import '../widgets/track_tile.dart';
-import 'playlist_detail_screen.dart';
 import 'stats_screen.dart';
 
 class LibraryTab extends StatefulWidget {
@@ -17,21 +16,13 @@ class LibraryTab extends StatefulWidget {
   State<LibraryTab> createState() => _LibraryTabState();
 }
 
-class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _LibraryTabState extends State<LibraryTab> {
   final TextEditingController _filterCtrl = TextEditingController();
   String _filterText = '';
   String _activeCategory = 'all'; // 'all', 'top', 'least', 'recent'
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
   void dispose() {
-    _tabController.dispose();
     _filterCtrl.dispose();
     super.dispose();
   }
@@ -66,43 +57,6 @@ class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateM
         );
       }
     }
-  }
-
-  void _showCreatePlaylistDialog() {
-    final textCtrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: const Text('Nuova Playlist', style: TextStyle(color: AppTheme.textPrimary)),
-        content: TextField(
-          controller: textCtrl,
-          autofocus: true,
-          style: const TextStyle(color: AppTheme.textPrimary),
-          decoration: const InputDecoration(
-            hintText: 'Nome della playlist',
-            hintStyle: TextStyle(color: AppTheme.textSecondary),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla', style: TextStyle(color: AppTheme.textSecondary)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () {
-              final name = textCtrl.text.trim();
-              if (name.isNotEmpty) {
-                LibraryService.instance.createPlaylist(name);
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Crea', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showMagicShufflePicker(BuildContext context, List<Track> tracks) {
@@ -153,7 +107,7 @@ class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateM
                         ctx,
                         tracks,
                         ShuffleMode.magic,
-                        '🔮 Shuffle Magico',
+                        '🔮 Shuffle Magico Oro',
                         'Mix perfetto: bilancia le tue preferite, le medie e le perle dimenticate',
                         AppTheme.primary,
                       ),
@@ -163,7 +117,7 @@ class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateM
                         ShuffleMode.mostPlayed,
                         '🔥 Hit Parade (Più Ascoltate)',
                         'Riproduce e mescola solo i tuoi brani preferiti e più ripetuti',
-                        Colors.orangeAccent,
+                        const Color(0xFFFFB300),
                       ),
                       _buildShuffleTile(
                         ctx,
@@ -171,7 +125,7 @@ class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateM
                         ShuffleMode.leastPlayed,
                         '💎 Riscopri (Meno Ascoltate)',
                         'Dai spazio ai brani mai ascoltati o che ascolti raramente',
-                        Colors.tealAccent,
+                        const Color(0xFF64FFDA),
                       ),
                       _buildShuffleTile(
                         ctx,
@@ -179,7 +133,7 @@ class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateM
                         ShuffleMode.mediumPlayed,
                         '⚖️ Equilibrato (Medio Ascolto)',
                         'Le canzoni di mezzo: né le solite hit, né quelle sconosciute',
-                        Colors.blueAccent,
+                        const Color(0xFF64B5F6),
                       ),
                       _buildShuffleTile(
                         ctx,
@@ -187,7 +141,7 @@ class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateM
                         ShuffleMode.recent,
                         '⏳ Freschi & Recenti',
                         'Concentrati sui brani aggiunti o ascoltati ultimamente',
-                        Colors.purpleAccent,
+                        const Color(0xFFBA68C8),
                       ),
                       _buildShuffleTile(
                         ctx,
@@ -271,11 +225,45 @@ class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateM
         }).toList();
 
         return Scaffold(
+          backgroundColor: AppTheme.background,
           appBar: AppBar(
-            title: const Text('Libreria'),
+            backgroundColor: AppTheme.background,
+            elevation: 0,
+            title: Row(
+              children: [
+                ShaderMask(
+                  shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+                  child: const Text(
+                    'Libreria',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.goldBorder),
+                  ),
+                  child: Text(
+                    '${lib.tracks.length}',
+                    style: const TextStyle(
+                      color: AppTheme.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.analytics_rounded, color: AppTheme.secondary),
+                icon: const Icon(Icons.analytics_rounded, color: AppTheme.primary),
                 tooltip: 'Statistiche d\'ascolto',
                 onPressed: () {
                   Navigator.of(context).push(
@@ -284,287 +272,211 @@ class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateM
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.file_upload_outlined, color: AppTheme.textPrimary),
+                icon: const Icon(Icons.file_upload_outlined, color: AppTheme.secondary),
                 tooltip: 'Importa file audio',
                 onPressed: _pickFiles,
               ),
-              IconButton(
-                icon: const Icon(Icons.playlist_add_rounded, color: AppTheme.primary),
-                tooltip: 'Crea playlist',
-                onPressed: _showCreatePlaylistDialog,
-              ),
             ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: AppTheme.primary,
-              labelColor: AppTheme.primary,
-              unselectedLabelColor: AppTheme.textSecondary,
-              tabs: [
-                Tab(text: 'Brani (${lib.tracks.length})'),
-                Tab(text: 'Playlist (${lib.playlists.length})'),
-              ],
-            ),
           ),
-          body: TabBarView(
-            controller: _tabController,
-            children: [
-              // TAB 1: Brani
-              RefreshIndicator(
-                color: AppTheme.primary,
-                backgroundColor: AppTheme.surface,
-                onRefresh: () async {
-                  await lib.scanLibrary();
-                },
-                child: Column(
-                  children: [
-                    // Schede Rapide: Shuffle Magico & Statistiche
-                    if (lib.tracks.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: GestureDetector(
-                                onTap: () => _showMagicShufflePicker(context, lib.tracks),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    gradient: AppTheme.primaryGradient,
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppTheme.primary.withOpacity(0.35),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Shuffle Magico',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              flex: 2,
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => const StatsScreen()),
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.surface,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: const Color(0x18FFFFFF)),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.bar_chart_rounded, color: AppTheme.secondary, size: 20),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        stats.totalListeningSeconds > 0
-                                            ? stats.formatDurationSummary()
-                                            : 'Insight',
-                                        style: const TextStyle(
-                                          color: AppTheme.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // Campo ricerca locale
-                    if (lib.tracks.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                        child: TextField(
-                          controller: _filterCtrl,
-                          onChanged: (val) => setState(() => _filterText = val),
-                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
-                          decoration: InputDecoration(
-                            hintText: 'Cerca tra i brani locali...',
-                            hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                            prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppTheme.textSecondary),
-                            filled: true,
-                            fillColor: AppTheme.surface,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    // Chip filtri rapidi (Tutti, Più ascoltate, Riscopri, Recenti)
-                    if (lib.tracks.isNotEmpty)
-                      SizedBox(
-                        height: 36,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          children: [
-                            _buildFilterChip('all', 'Tutti i brani', Icons.music_note_rounded),
-                            const SizedBox(width: 8),
-                            _buildFilterChip('top', '🔥 Più ascoltate', Icons.local_fire_department_rounded),
-                            const SizedBox(width: 8),
-                            _buildFilterChip('least', '💎 Da riscoprire', Icons.explore_rounded),
-                            const SizedBox(width: 8),
-                            _buildFilterChip('recent', '🕒 Recenti', Icons.history_rounded),
-                          ],
-                        ),
-                      ),
-
-                    const SizedBox(height: 4),
-
-                    Expanded(
-                      child: lib.tracks.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.library_music_rounded, size: 64, color: AppTheme.primary.withOpacity(0.3)),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Nessun brano salvato',
-                                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'Carica file dal computer via Wi-Fi\no cerca e scarica brani da YouTube!',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primary,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                    ),
-                                    icon: const Icon(Icons.file_upload_outlined, color: Colors.white),
-                                    label: const Text('Importa da File / iCloud', style: TextStyle(color: Colors.white)),
-                                    onPressed: _pickFiles,
+          body: RefreshIndicator(
+            color: AppTheme.primary,
+            backgroundColor: AppTheme.surfaceCard,
+            onRefresh: () async {
+              await lib.scanLibrary();
+            },
+            child: Column(
+              children: [
+                // Schede Rapide: Shuffle Magico Oro & Statistiche
+                if (lib.tracks.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: GestureDetector(
+                            onTap: () => _showMagicShufflePicker(context, lib.tracks),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.primaryGradient,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x33FFD700),
+                                    blurRadius: 12,
+                                    offset: Offset(0, 4),
                                   ),
                                 ],
                               ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.only(bottom: 90, top: 4),
-                              itemCount: filteredTracks.length,
-                              itemBuilder: (context, idx) {
-                                return TrackTile(
-                                  track: filteredTracks[idx],
-                                  queue: filteredTracks,
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // TAB 2: Playlist
-              lib.playlists.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.queue_music_rounded, size: 64, color: AppTheme.secondary.withOpacity(0.3)),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Nessuna playlist',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Crea playlist per organizzare i tuoi brani locali e online.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                          ),
-                          const SizedBox(height: 20),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.secondary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            ),
-                            icon: const Icon(Icons.add_rounded, color: Colors.white),
-                            label: const Text('Crea prima playlist', style: TextStyle(color: Colors.white)),
-                            onPressed: _showCreatePlaylistDialog,
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 90, top: 12),
-                      itemCount: lib.playlists.length,
-                      itemBuilder: (context, idx) {
-                        final pl = lib.playlists[idx];
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0x14FFFFFF)),
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                            leading: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                gradient: AppTheme.primaryGradient,
-                                borderRadius: BorderRadius.circular(12),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.auto_awesome_rounded, color: Colors.black, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Shuffle Magico',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              child: const Icon(Icons.queue_music_rounded, color: Colors.white, size: 24),
                             ),
-                            title: Text(
-                              pl.name,
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary, fontSize: 15),
-                            ),
-                            subtitle: Text(
-                              '${pl.trackIds.length} brani',
-                              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                            ),
-                            trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondary),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: GestureDetector(
                             onTap: () {
                               Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => PlaylistDetailScreen(playlist: pl),
-                                ),
+                                MaterialPageRoute(builder: (_) => const StatsScreen()),
                               );
                             },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceCard,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppTheme.goldBorder),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.bar_chart_rounded, color: AppTheme.primary, size: 20),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    stats.totalListeningSeconds > 0
+                                        ? stats.formatDurationSummary()
+                                        : 'Insight',
+                                    style: const TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
-            ],
+                  ),
+
+                // Campo ricerca locale
+                if (lib.tracks.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: TextField(
+                      controller: _filterCtrl,
+                      onChanged: (val) => setState(() => _filterText = val),
+                      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Cerca tra i brani locali...',
+                        hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppTheme.primary),
+                        filled: true,
+                        fillColor: AppTheme.surfaceCard,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppTheme.goldBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Chip filtri rapidi (Tutti, Più ascoltate, Riscopri, Recenti)
+                if (lib.tracks.isNotEmpty)
+                  SizedBox(
+                    height: 36,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        _buildFilterChip('all', 'Tutti i brani', Icons.music_note_rounded),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('top', '🔥 Più ascoltate', Icons.local_fire_department_rounded),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('least', '💎 Da riscoprire', Icons.explore_rounded),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('recent', '🕒 Recenti', Icons.history_rounded),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 6),
+
+                // Lista Brani
+                Expanded(
+                  child: lib.tracks.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceCard,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppTheme.goldBorder, width: 1.5),
+                                  ),
+                                  child: const Icon(Icons.library_music_rounded, size: 40, color: AppTheme.primary),
+                                ),
+                                const SizedBox(height: 18),
+                                const Text(
+                                  'Nessun brano salvato',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Carica file dal computer via Wi-Fi\no scarica brani da YouTube nella sezione Impostazioni!',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+                                ),
+                                const SizedBox(height: 24),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primary,
+                                    foregroundColor: Colors.black,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  ),
+                                  icon: const Icon(Icons.file_upload_outlined, color: Colors.black),
+                                  label: const Text(
+                                    'Importa da File / iCloud',
+                                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                                  ),
+                                  onPressed: _pickFiles,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 90, top: 4),
+                          itemCount: filteredTracks.length,
+                          itemBuilder: (context, idx) {
+                            return TrackTile(
+                              track: filteredTracks[idx],
+                              queue: filteredTracks,
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -578,21 +490,21 @@ class _LibraryTabState extends State<LibraryTab> with SingleTickerProviderStateM
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary : AppTheme.surface,
+          color: isSelected ? AppTheme.primary : AppTheme.surfaceCard,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppTheme.primary : const Color(0x18FFFFFF),
+            color: isSelected ? AppTheme.primary : AppTheme.goldBorder,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: isSelected ? Colors.white : AppTheme.textSecondary),
+            Icon(icon, size: 14, color: isSelected ? Colors.black : AppTheme.textSecondary),
             const SizedBox(width: 5),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.white : AppTheme.textSecondary,
+                color: isSelected ? Colors.black : AppTheme.textSecondary,
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),

@@ -1,24 +1,43 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color background = Color(0xFF0D0B16);
-  static const Color surface = Color(0xFF181328);
-  static const Color surfaceLight = Color(0xFF261F3C);
-  static const Color primary = Color(0xFFA855F7);
-  static const Color secondary = Color(0xFFEC4899);
-  static const Color accentCyan = Color(0xFF06B6D4);
-  static const Color textPrimary = Color(0xFFF8FAFC);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color divider = Color(0x1FFFFFFF);
+  // --- OLED BLACK & LUXURY GOLD PALETTE ---
+  static const Color background = Color(0xFF000000); // 100% OLED Pure Black
+  static const Color surface = Color(0xFF0B0B0A);
+  static const Color surfaceLight = Color(0xFF141310);
+  static const Color surfaceCard = Color(0xFF11100C);
 
-  static final LinearGradient primaryGradient = const LinearGradient(
-    colors: [Color(0xFFA855F7), Color(0xFFEC4899)],
+  // Ori metallici e champagne
+  static const Color primary = Color(0xFFFFD700); // Oro brillante
+  static const Color secondary = Color(0xFFD4AF37); // Oro metallico nobile
+  static const Color accentGold = Color(0xFFFFE57F); // Champagne highlight
+  static const Color darkGold = Color(0xFF997A15); // Oro antico
+  static const Color goldBorder = Color(0x38D4AF37); // Bordo oro satinato
+  static const Color goldGlow = Color(0x33FFD700);
+
+  // Tipografia
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFFBFB7A3);
+  static const Color textMuted = Color(0xFF756F62);
+  static const Color divider = Color(0x22D4AF37);
+
+  // Gradienti lusso oro
+  static const LinearGradient primaryGradient = LinearGradient(
+    colors: [Color(0xFFFFE898), Color(0xFFD4AF37), Color(0xFFAA7C11)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  static final LinearGradient darkGradient = const LinearGradient(
-    colors: [Color(0xFF151025), Color(0xFF0D0B16)],
+  static const LinearGradient goldGradient = primaryGradient;
+
+  static const LinearGradient goldSurfaceGradient = LinearGradient(
+    colors: [Color(0xFF1C180E), Color(0xFF0D0C08)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient darkGradient = LinearGradient(
+    colors: [Color(0xFF14120B), Color(0xFF000000)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
@@ -32,6 +51,8 @@ class AppTheme {
         primary: primary,
         secondary: secondary,
         surface: surface,
+        onPrimary: Colors.black,
+        onSurface: textPrimary,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -43,22 +64,30 @@ class AppTheme {
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
         ),
-        iconTheme: IconThemeData(color: textPrimary),
+        iconTheme: IconThemeData(color: primary),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: Color(0xFF110E1F),
+        backgroundColor: Color(0xFF000000),
         selectedItemColor: primary,
-        unselectedItemColor: textSecondary,
+        unselectedItemColor: Color(0xFF756F62),
+        selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+        unselectedLabelStyle: TextStyle(fontSize: 11),
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
       cardTheme: CardTheme(
-        color: surface,
+        color: surfaceCard,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0x1AFFFFFF), width: 1),
+          side: const BorderSide(color: goldBorder, width: 1),
         ),
+      ),
+      sliderTheme: const SliderThemeData(
+        activeTrackColor: primary,
+        inactiveTrackColor: Color(0x22FFFFFF),
+        thumbColor: primary,
+        overlayColor: Color(0x29FFD700),
       ),
     );
   }

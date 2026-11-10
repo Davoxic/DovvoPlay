@@ -33,10 +33,11 @@ class TrackTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: isCurrent ? AppTheme.surfaceLight : AppTheme.surface,
+        color: isCurrent ? const Color(0xFF1C1910) : AppTheme.surfaceCard,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isCurrent ? AppTheme.primary.withOpacity(0.5) : const Color(0x14FFFFFF),
+          color: isCurrent ? AppTheme.primary : AppTheme.goldBorder,
+          width: isCurrent ? 1.4 : 0.8,
         ),
       ),
       child: ListTile(
@@ -57,12 +58,12 @@ class TrackTile extends StatelessWidget {
                 height: 46,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
-                  color: Colors.black.withOpacity(0.45),
+                  color: Colors.black.withOpacity(0.55),
                 ),
                 child: Icon(
                   isPlaying ? Icons.volume_up_rounded : Icons.pause_rounded,
-                  color: Colors.white,
-                  size: 22,
+                  color: AppTheme.primary,
+                  size: 24,
                 ),
               ),
           ],

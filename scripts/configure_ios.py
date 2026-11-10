@@ -85,7 +85,8 @@ def configure_icons():
     print("Configuro le icone dell'app...")
     icon_src = ROOT / "assets" / "AppIcon.png"
     appicon_dir = RUNNER_DIR / "Assets.xcassets" / "AppIcon.appiconset"
-    if icon_src.exists() and appicon_dir.exists():
+    if icon_src.exists():
+        appicon_dir.mkdir(parents=True, exist_ok=True)
         dest = appicon_dir / "AppIcon.png"
         shutil.copy2(icon_src, dest)
 
@@ -105,7 +106,7 @@ def configure_icons():
 }
 """
         (appicon_dir / "Contents.json").write_text(contents_json, encoding="utf-8")
-        print("Icona copiata e Contents.json aggiornato.")
+        print("Icona copiata e Contents.json aggiornato in:", dest)
 
 if __name__ == "__main__":
     configure_info_plist()

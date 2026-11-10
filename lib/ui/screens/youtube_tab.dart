@@ -62,24 +62,20 @@ class _YouTubeTabState extends State<YouTubeTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text('YouTube Music Online'),
       ),
       body: Column(
         children: [
-          // Banner informativo su stream e background
+          // Banner informativo gold
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.primary.withOpacity(0.15),
-                  AppTheme.secondary.withOpacity(0.12),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+              gradient: AppTheme.goldSurfaceGradient,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.goldBorder, width: 1.1),
             ),
             child: const Row(
               children: [
@@ -87,7 +83,7 @@ class _YouTubeTabState extends State<YouTubeTab> {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Riproduzione solo audio: ascolta anche a schermo spento con controlli da lock screen senza scaricare il video.',
+                    'Riproduzione solo audio AAC: streaming istantaneo e ascolto a schermo spento con controlli da Lock Screen.',
                     style: TextStyle(fontSize: 12, color: AppTheme.textPrimary, height: 1.3),
                   ),
                 ),
@@ -97,7 +93,7 @@ class _YouTubeTabState extends State<YouTubeTab> {
 
           // Barra di ricerca
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
             child: TextField(
               controller: _searchCtrl,
               textInputAction: TextInputAction.search,
@@ -105,9 +101,9 @@ class _YouTubeTabState extends State<YouTubeTab> {
               style: const TextStyle(color: AppTheme.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Cerca brano o artista su YouTube...',
-                hintStyle: const TextStyle(color: AppTheme.textSecondary),
+                hintStyle: const TextStyle(color: AppTheme.textMuted),
                 filled: true,
-                fillColor: AppTheme.surface,
+                fillColor: AppTheme.surfaceCard,
                 prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary),
                 suffixIcon: _searchCtrl.text.isNotEmpty
                     ? IconButton(
@@ -119,13 +115,9 @@ class _YouTubeTabState extends State<YouTubeTab> {
                       )
                     : null,
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0x1AFFFFFF)),
-                ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0x1AFFFFFF)),
+                  borderSide: const BorderSide(color: AppTheme.goldBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -149,7 +141,7 @@ class _YouTubeTabState extends State<YouTubeTab> {
                   child: ActionChip(
                     label: Text(tag, style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary)),
                     backgroundColor: AppTheme.surfaceLight,
-                    side: const BorderSide(color: Color(0x14FFFFFF)),
+                    side: const BorderSide(color: AppTheme.goldBorder),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                     onPressed: () {
                       _searchCtrl.text = tag;
@@ -204,7 +196,7 @@ class _YouTubeTabState extends State<YouTubeTab> {
                                 label: const Text('Riprova'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.primary,
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
                               ),
@@ -218,14 +210,14 @@ class _YouTubeTabState extends State<YouTubeTab> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.youtube_searched_for_rounded, size: 64, color: AppTheme.primary.withOpacity(0.4)),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 14),
                                 const Text(
                                   'Cerca le tue canzoni preferite',
-                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 15, fontWeight: FontWeight.w600),
+                                  style: TextStyle(color: AppTheme.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 4),
                                 const Text(
-                                  'I brani vengono trasmessi in streaming audio immediato',
+                                  'I brani vengono riprodotti in streaming audio AAC immediato',
                                   style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                                 ),
                               ],

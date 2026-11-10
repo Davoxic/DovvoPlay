@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../widgets/mini_player.dart';
 import 'library_tab.dart';
-import 'youtube_tab.dart';
-import 'wifi_tab.dart';
+import 'playlist_tab.dart';
 import 'settings_tab.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,14 +17,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _tabs = const [
     LibraryTab(),
-    YouTubeTab(),
-    WifiTab(),
+    PlaylistTab(),
     SettingsTab(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.background,
       body: Stack(
         children: [
           IndexedStack(
@@ -40,29 +39,44 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (idx) => setState(() => _currentIndex = idx),
-        selectedItemColor: AppTheme.primary,
-        unselectedItemColor: AppTheme.textSecondary,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.library_music_rounded),
-            label: 'Libreria',
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF000000),
+          border: Border(
+            top: BorderSide(
+              color: AppTheme.goldBorder,
+              width: 1.0,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.youtube_searched_for_rounded),
-            label: 'YouTube',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.wifi_tethering_rounded),
-            label: 'Wi-Fi PC',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_rounded),
-            label: 'Impostazioni',
-          ),
-        ],
+        ),
+        child: BottomNavigationBar(
+          backgroundColor: const Color(0xFF000000),
+          currentIndex: _currentIndex,
+          onTap: (idx) => setState(() => _currentIndex = idx),
+          selectedItemColor: AppTheme.primary,
+          unselectedItemColor: const Color(0xFF756F62),
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.library_music_rounded),
+              activeIcon: Icon(Icons.library_music_rounded, color: AppTheme.primary),
+              label: 'Libreria',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.queue_music_rounded),
+              activeIcon: Icon(Icons.queue_music_rounded, color: AppTheme.primary),
+              label: 'Playlist',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings_rounded),
+              activeIcon: Icon(Icons.settings_rounded, color: AppTheme.primary),
+              label: 'Impostazioni',
+            ),
+          ],
+        ),
       ),
     );
   }

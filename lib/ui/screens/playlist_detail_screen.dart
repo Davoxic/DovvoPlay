@@ -28,6 +28,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         final tracks = lib.getTracksForPlaylist(currentPl);
 
         return Scaffold(
+          backgroundColor: AppTheme.background,
           appBar: AppBar(
             title: Text(currentPl.name),
             actions: [
@@ -47,16 +48,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 margin: const EdgeInsets.all(16),
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primary.withOpacity(0.2),
-                      AppTheme.surface,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: AppTheme.goldSurfaceGradient,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0x1FFFFFFF)),
+                  border: Border.all(color: AppTheme.goldBorder, width: 1.2),
                 ),
                 child: Row(
                   children: [
@@ -66,8 +60,15 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                       decoration: BoxDecoration(
                         gradient: AppTheme.primaryGradient,
                         borderRadius: BorderRadius.circular(16),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x33FFD700),
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.queue_music_rounded, color: Colors.white, size: 32),
+                      child: const Icon(Icons.queue_music_rounded, color: Colors.black, size: 32),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -87,7 +88,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                             '${tracks.length} brani',
                             style: const TextStyle(
                               fontSize: 13,
-                              color: AppTheme.textSecondary,
+                              color: AppTheme.secondary,
                             ),
                           ),
                         ],
@@ -103,7 +104,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                         onPressed: () {
                           AudioPlayerService.instance.playTrack(tracks.first, newQueue: tracks);
                         },
-                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
+                        child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 28),
                       ),
                   ],
                 ),
