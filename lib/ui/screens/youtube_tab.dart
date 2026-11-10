@@ -41,11 +41,14 @@ class _YouTubeTabState extends State<YouTubeTab> {
       setState(() {
         _results = res;
         _isLoading = false;
+        if (res.isEmpty) {
+          _errorMessage = 'Nessun risultato trovato per "$q". Prova con parole chiave diverse.';
+        }
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Errore durante la ricerca. Riprova più tardi.';
+        _errorMessage = 'Errore di connessione a YouTube ($e).\nVerifica la connessione internet dell\'iPhone e riprova.';
       });
     }
   }
@@ -178,9 +181,35 @@ class _YouTubeTabState extends State<YouTubeTab> {
                   )
                 : _errorMessage != null
                     ? Center(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.redAccent),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.wifi_off_rounded, color: Colors.redAccent, size: 48),
+                              const SizedBox(height: 12),
+                              Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  if (_searchCtrl.text.isNotEmpty) {
+                                    _performSearch(_searchCtrl.text);
+                                  }
+                                },
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                label: const Text('Riprova'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     : _results.isEmpty

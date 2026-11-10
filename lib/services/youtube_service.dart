@@ -10,25 +10,65 @@ class YouTubeService {
   YoutubeExplode? _yt;
   YoutubeExplode get yt => _yt ??= YoutubeExplode();
 
-  /// Cerca video su YouTube e restituisce i risultati
+  /// Cerca video su YouTube e restituisce i risultati in modo resiliente
   Future<List<YouTubeTrack>> search(String query) async {
-    if (query.trim().isEmpty) return [];
+    final cleanQuery = query.trim();
+    if (cleanQuery.isEmpty) return [];
+
     try {
-      final searchResults = await yt.search.search(query);
+      // 1. Se l'utente ha inserito un link diretto a un video di YouTube
+      if (cleanQuery.contains('youtube.com/watch') || cleanQuery.contains('youtu.be/')) {
+        try {
+          final video = await yt.videos.get(cleanQuery).timeout(const Duration(seconds: 8));
+          return [
+            YouTubeTrack(
+              id: video.id.value,
+              title: video.title,
+              author: video.author,
+              duration: video.duration ?? Duration.zero,
+              thumbnailUrl: video.thumbnails.highResUrl,
+              url: video.url,
+            )
+          ];
+        } catch (_) {}
+      }
+
+      // 2. Ricerca standard con timeout protetto
+      final searchResults = await yt.search.search(cleanQuery).timeout(const Duration(seconds: 12));
       final tracks = <YouTubeTrack>[];
 
       for (final item in searchResults) {
-        tracks.add(YouTubeTrack(
-          id: item.id.value,
-          title: item.title,
-          author: item.author,
-          duration: item.duration ?? Duration.zero,
-          thumbnailUrl: item.thumbnails.highResUrl,
-          url: item.url,
-        ));
+        try {
+          final id = item.id.value;
+          if (id.isEmpty) continue;
+
+          String thumb = '';
+          try {
+            thumb = item.thumbnails.highResUrl;
+          } catch (_) {
+            try {
+              thumb = item.thumbnails.standardResUrl;
+            } catch (_) {
+              thumb = 'https://i.ytimg.com/vi/$id/hqdefault.jpg';
+            }
+          }
+
+          tracks.add(YouTubeTrack(
+            id: id,
+            title: item.title.isNotEmpty ? item.title : 'Video YouTube',
+            author: item.author.isNotEmpty ? item.author : 'YouTube',
+            duration: item.duration ?? Duration.zero,
+            thumbnailUrl: thumb,
+            url: item.url,
+          ));
+        } catch (itemErr) {
+          // Ignora singolo elemento difettoso (es. canali, live streams) e mantieni gli altri
+          print('Errore parsing elemento ricerca: $itemErr');
+        }
       }
       return tracks;
     } catch (e) {
+      print('Errore YouTubeService.search: $e');
       _yt?.close();
       _yt = YoutubeExplode();
       rethrow;
