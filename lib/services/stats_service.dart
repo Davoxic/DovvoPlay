@@ -11,6 +11,7 @@ class TrackStat {
   int playCount;
   int repeatCount;
   int completionCount;
+  int skipCount;
   int totalDurationSeconds;
   DateTime lastPlayedAt;
   DateTime firstPlayedAt;
@@ -23,6 +24,7 @@ class TrackStat {
     this.playCount = 0,
     this.repeatCount = 0,
     this.completionCount = 0,
+    this.skipCount = 0,
     this.totalDurationSeconds = 0,
     DateTime? lastPlayedAt,
     DateTime? firstPlayedAt,
@@ -37,6 +39,7 @@ class TrackStat {
         'playCount': playCount,
         'repeatCount': repeatCount,
         'completionCount': completionCount,
+        'skipCount': skipCount,
         'totalDurationSeconds': totalDurationSeconds,
         'lastPlayedAt': lastPlayedAt.toIso8601String(),
         'firstPlayedAt': firstPlayedAt.toIso8601String(),
@@ -50,6 +53,7 @@ class TrackStat {
         playCount: json['playCount'] ?? 0,
         repeatCount: json['repeatCount'] ?? 0,
         completionCount: json['completionCount'] ?? 0,
+        skipCount: json['skipCount'] ?? 0,
         totalDurationSeconds: json['totalDurationSeconds'] ?? 0,
         lastPlayedAt: json['lastPlayedAt'] != null
             ? DateTime.tryParse(json['lastPlayedAt']) ?? DateTime.now()
@@ -128,6 +132,9 @@ class StatsService extends ChangeNotifier {
       existing.completionCount = existing.completionCount > importedStat.completionCount
           ? existing.completionCount
           : importedStat.completionCount;
+      existing.skipCount = existing.skipCount > importedStat.skipCount
+          ? existing.skipCount
+          : importedStat.skipCount;
       existing.totalDurationSeconds = existing.totalDurationSeconds > importedStat.totalDurationSeconds
           ? existing.totalDurationSeconds
           : importedStat.totalDurationSeconds;
@@ -139,8 +146,28 @@ class StatsService extends ChangeNotifier {
     }
   }
 
-  /// Registra l'avvio della riproduzione di una traccia
+  /// Inizializza o aggiorna i metadati della traccia all'avvio della riproduzione
+  /// NOTA: NON incrementa playCount! Per essere conteggiata, la canzone deve
+  /// raggiungere almeno il 50% di durata d'ascolto (tramite [recordTrackPlayed]).
   void recordTrackStart(Track track) {
+    final now = DateTime.now();
+    _stats.putIfAbsent(
+      track.id,
+      () => TrackStat(
+        trackId: track.id,
+        title: track.displayTitle,
+        artist: track.displayArtist,
+        thumbnailUrl: track.thumbnailUrl,
+        firstPlayedAt: now,
+        lastPlayedAt: now,
+      ),
+    );
+  }
+
+  /// Registra l'ascolto effettivo di una traccia:
+  /// viene invocato ESCLUSIVAMENTE quando l'utente ascolta la canzone per almeno il 50% della durata.
+  /// Se skippata prima, non viene conteggiata tra gli ascolti.
+  void recordTrackPlayed(Track track) {
     final now = DateTime.now();
     final stat = _stats.putIfAbsent(
       track.id,
@@ -157,12 +184,32 @@ class StatsService extends ChangeNotifier {
     stat.playCount += 1;
     stat.lastPlayedAt = now;
 
-    // Se la stessa canzone è stata suonata subito prima (loop o ripetuta)
+    // Se la stessa canzone è stata ascoltata ad almeno il 50% subito prima (loop/ripetizione)
     if (_lastPlayedTrackId == track.id) {
       stat.repeatCount += 1;
     }
     _lastPlayedTrackId = track.id;
 
+    notifyListeners();
+    _saveStats();
+  }
+
+  /// Registra il salto di un brano prima del 50% di ascolto ("skippata e basta")
+  void recordTrackSkipped(Track track) {
+    final now = DateTime.now();
+    final stat = _stats.putIfAbsent(
+      track.id,
+      () => TrackStat(
+        trackId: track.id,
+        title: track.displayTitle,
+        artist: track.displayArtist,
+        thumbnailUrl: track.thumbnailUrl,
+        firstPlayedAt: now,
+        lastPlayedAt: now,
+      ),
+    );
+
+    stat.skipCount += 1;
     notifyListeners();
     _saveStats();
   }
@@ -259,6 +306,21 @@ class StatsService extends ChangeNotifier {
 
   int get totalRepeatsCount {
     return _stats.values.fold(0, (sum, stat) => sum + stat.repeatCount);
+  }
+
+  int get totalSkipsCount {
+    return _stats.values.fold(0, (sum, stat) => sum + stat.skipCount);
+  }
+
+  /// Canzoni più skippate prima del 50%
+  List<Track> getMostSkippedTracks(List<Track> library, {int limit = 30}) {
+    final list = List<Track>.from(library);
+    list.sort((a, b) {
+      final countA = _stats[a.id]?.skipCount ?? 0;
+      final countB = _stats[b.id]?.skipCount ?? 0;
+      return countB.compareTo(countA);
+    });
+    return list.where((t) => (_stats[t.id]?.skipCount ?? 0) > 0).take(limit).toList();
   }
 
   String get topArtist {

@@ -46,6 +46,8 @@ class AudioPlayerService extends ChangeNotifier {
   ShuffleMode _shuffleMode = ShuffleMode.off;
   int _playRequestId = 0;
   String? _lastErrorMessage;
+  bool _hasReached50Percent = false;
+  Duration _maxPositionReached = Duration.zero;
 
   AudioPlayer get player => _player;
   Track? get currentTrack => _currentTrack;
@@ -88,6 +90,31 @@ class AudioPlayerService extends ChangeNotifier {
 
     _player.positionStream.listen((pos) {
       _position = pos;
+      if (pos > _maxPositionReached) {
+        _maxPositionReached = pos;
+      }
+
+      // Regola del 50%: una canzone è considerata ascoltata solo se
+      // riprodotta per almeno il 50% della sua durata effettiva.
+      // Se skippata prima, non viene conteggiata come ascolto.
+      if (!_hasReached50Percent && _currentTrack != null) {
+        final totalDur = _duration > Duration.zero
+            ? _duration
+            : (_currentTrack!.duration > Duration.zero ? _currentTrack!.duration : Duration.zero);
+
+        if (totalDur > Duration.zero) {
+          final halfDuration = Duration(milliseconds: totalDur.inMilliseconds ~/ 2);
+          if (pos >= halfDuration || _maxPositionReached >= halfDuration) {
+            _hasReached50Percent = true;
+            StatsService.instance.recordTrackPlayed(_currentTrack!);
+          }
+        } else if (pos >= const Duration(seconds: 30)) {
+          // Fallback per streaming live o brani con durata temporaneamente non disponibile
+          _hasReached50Percent = true;
+          StatsService.instance.recordTrackPlayed(_currentTrack!);
+        }
+      }
+
       notifyListeners();
     });
 
@@ -101,10 +128,18 @@ class AudioPlayerService extends ChangeNotifier {
 
   void _onTrackCompleted() {
     if (_currentTrack != null) {
+      if (!_hasReached50Percent) {
+        _hasReached50Percent = true;
+        StatsService.instance.recordTrackPlayed(_currentTrack!);
+      }
       StatsService.instance.recordTrackCompleted(_currentTrack!);
     }
 
     if (_loopMode == PlayerLoopMode.one) {
+      // In loop continuo, azzera i flag così che anche la successiva ripetizione
+      // debba raggiungere almeno il 50% per essere ri-conteggiata!
+      _hasReached50Percent = false;
+      _maxPositionReached = Duration.zero;
       _player.seek(Duration.zero);
       _player.play();
     } else if (hasNext) {
@@ -122,6 +157,17 @@ class AudioPlayerService extends ChangeNotifier {
 
   Future<void> playTrack(Track track, {List<Track>? newQueue}) async {
     final requestId = ++_playRequestId;
+
+    // Se c'era una traccia attiva ed è stata cambiata prima di raggiungere il 50%,
+    // viene considerata "skippata e basta" e non incrementa gli ascolti
+    if (_currentTrack != null && _currentTrack!.id != track.id) {
+      if (!_hasReached50Percent) {
+        StatsService.instance.recordTrackSkipped(_currentTrack!);
+      }
+    }
+
+    _hasReached50Percent = false;
+    _maxPositionReached = Duration.zero;
 
     if (newQueue != null) {
       _originalQueue = List.from(newQueue);

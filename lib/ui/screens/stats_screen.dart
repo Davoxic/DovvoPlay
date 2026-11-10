@@ -140,7 +140,11 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
 
         if (badgeType == 'plays') {
           final count = stats.getPlayCount(track.id);
-          badgeText = '$count ${count == 1 ? 'ascolto' : 'ascolti'}';
+          final stat = stats.getStat(track.id);
+          final skips = stat?.skipCount ?? 0;
+          badgeText = skips > 0
+              ? '$count ascolti (≥50%) • $skips skip'
+              : '$count ${count == 1 ? 'ascolto (≥50%)' : 'ascolti (≥50%)'}';
           badgeIcon = Icons.local_fire_department_rounded;
           badgeColor = Colors.orangeAccent;
         } else if (badgeType == 'repeats') {
@@ -295,7 +299,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                         const SizedBox(width: 10),
                         Expanded(
                           child: _buildKpiCard(
-                            'Ascolti Totali',
+                            'Ascolti Reali (≥50%)',
                             '${stats.totalPlaysCount}',
                             Icons.headphones_rounded,
                             Colors.blueAccent,
@@ -317,13 +321,35 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                         const SizedBox(width: 10),
                         Expanded(
                           child: _buildKpiCard(
-                            'Top Artista',
-                            stats.topArtist,
-                            Icons.star_rounded,
-                            Colors.purpleAccent,
+                            'Skippate (<50%)',
+                            '${stats.totalSkipsCount}',
+                            Icons.skip_next_rounded,
+                            Colors.redAccent.shade200,
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0x15FFFFFF)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.verified_rounded, size: 14, color: AppTheme.secondary),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Regola 50%: un brano è conteggiato solo se ascoltato per oltre metà durata, altrimenti è considerato skippato.',
+                              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
