@@ -480,7 +480,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                             ListenableBuilder(
                               listenable: StatsService.instance,
                               builder: (context, _) {
-                                final todayMins = StatsService.instance.todayStat.totalDurationSeconds ~/ 60;
+                                final todayMins = StatsService.instance.todayStat.listeningSeconds ~/ 60;
                                 return GestureDetector(
                                   onTap: () => _showShuffleModeSheet(context, player),
                                   child: Container(

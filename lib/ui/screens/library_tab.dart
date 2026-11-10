@@ -73,96 +73,6 @@ class _LibraryTabState extends State<LibraryTab> {
     }
   }
 
-  void _showViewModePicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.surfaceCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        final current = ViewModeService.instance.currentMode;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    'Stile di Visualizzazione Libreria',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: ViewModeService.modes.map((info) {
-                      final isSelected = info.mode == current;
-                      return ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        tileColor: isSelected ? AppTheme.primary.withOpacity(0.18) : Colors.transparent,
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: isSelected ? AppTheme.primary : AppTheme.surfaceLight,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            info.icon,
-                            color: isSelected ? Colors.black : AppTheme.textPrimary,
-                            size: 20,
-                          ),
-                        ),
-                        title: Text(
-                          info.name,
-                          style: TextStyle(
-                            color: isSelected ? AppTheme.primary : AppTheme.textPrimary,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        subtitle: Text(
-                          info.description,
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                        ),
-                        trailing: isSelected
-                            ? Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 22)
-                            : null,
-                        onTap: () {
-                          ViewModeService.instance.setViewMode(info.mode);
-                          Navigator.pop(ctx);
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   void _showMagicShufflePicker(BuildContext context, List<Track> tracks) {
     if (tracks.isEmpty) return;
 
@@ -340,8 +250,8 @@ class _LibraryTabState extends State<LibraryTab> {
             break;
           case TrackSortMode.playCount:
             sortedTracks.sort((a, b) {
-              final aSec = stats.getTrackStat(a.id)?.totalDurationSeconds ?? 0;
-              final bSec = stats.getTrackStat(b.id)?.totalDurationSeconds ?? 0;
+              final aSec = stats.getStat(a.id)?.totalDurationSeconds ?? 0;
+              final bSec = stats.getStat(b.id)?.totalDurationSeconds ?? 0;
               return bSec.compareTo(aSec);
             });
             break;
@@ -468,7 +378,7 @@ class _LibraryTabState extends State<LibraryTab> {
                                         ),
                                       ),
                                       Text(
-                                        '${stats.todayStat.totalDurationSeconds ~/ 60}m ascoltati oggi',
+                                        '${stats.todayStat.listeningSeconds ~/ 60}m ascoltati oggi',
                                         style: const TextStyle(
                                           color: Colors.black87,
                                           fontWeight: FontWeight.w600,

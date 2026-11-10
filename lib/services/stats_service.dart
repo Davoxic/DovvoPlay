@@ -86,6 +86,7 @@ class TrackStat {
 class DayStat {
   final String dateKey; // YYYY-MM-DD
   int listeningSeconds;
+  int get totalDurationSeconds => listeningSeconds;
   int skipsCount;
   int briefCount;
   int halfCount;
@@ -605,6 +606,7 @@ class StatsService extends ChangeNotifier {
   }
 
   TrackStat? getStat(String trackId) => _stats[trackId];
+  TrackStat? getTrackStat(String trackId) => getStat(trackId);
   int getPlayCount(String trackId) => _stats[trackId]?.completedCount ?? 0;
   int getRepeatCount(String trackId) => _stats[trackId]?.repeatCount ?? 0;
   int getSkipCount(String trackId) => _stats[trackId]?.skipCount ?? 0;
