@@ -88,7 +88,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                       ),
                     ),
                   ),
-                  ...servizio.animations.map((a) {
+                  // 'animations' e' static const: va letto dalla classe,
+                  // non dall'istanza, altrimenti l'analisi fallisce.
+                  ...AnimationThemeService.animations.map((a) {
                     final scelta = servizio.selectedType == a.type;
                     return ListTile(
                       leading: Icon(
