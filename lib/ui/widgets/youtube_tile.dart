@@ -132,10 +132,27 @@ class _YouTubeTileState extends State<YouTubeTile> {
       }
     } else {
       if (mounted) {
+        // Il motivo arriva dal servizio: prima si leggeva solo "Errore
+        // durante il download", che non diceva nulla di utile.
+        final motivo = YouTubeService.instance.lastFailureReason;
+        final pcDisponibile = PcSyncService.instance.isConnected;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Errore durante il download.'),
+          SnackBar(
+            content: Text(motivo ?? 'Errore durante il download.'),
             backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 6),
+            action: pcDisponibile
+                ? SnackBarAction(
+                    label: 'USA IL PC',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      DownloadQueueService.instance.enqueue(
+                        url: 'https://www.youtube.com/watch?v=${widget.track.id}',
+                        label: widget.track.title,
+                      );
+                    },
+                  )
+                : null,
           ),
         );
       }

@@ -77,7 +77,16 @@ class YouTubeService {
 
   /// Recupera lo StreamInfo rigorosamente compatibile con iOS (AAC in container MP4/M4A)
   /// CRITICO: Non restituisce MAI flussi WebM/Opus perché AVPlayer su iOS non li decodifica e lancia fatalmente (-1) unknown error.
+  /// Motivo dell'ultimo fallimento, da mostrare all'utente.
+  ///
+  /// Serviva perche' un download che non riusciva restituiva soltanto null e
+  /// l'app diceva "Errore durante il download" senza spiegare niente: il caso
+  /// piu' frequente e' un video che YouTube serve solo in WebM/Opus, formato
+  /// che AVPlayer su iOS non riproduce.
+  String? lastFailureReason;
+
   Future<StreamInfo?> getPlayableStreamInfo(String videoId) async {
+    lastFailureReason = null;
     StreamManifest? manifest;
 
     // 1. Prova prima il manifest standard (fornisce itag 140 AAC 128kbps m4a e flussi muxed MP4)
@@ -102,7 +111,12 @@ class YouTubeService {
       }
     }
 
-    if (manifest == null) return null;
+    if (manifest == null) {
+      lastFailureReason =
+          'YouTube non ha restituito i formati del video. Potrebbe essere un blocco '
+          'temporaneo o un video non disponibile.';
+      return null;
+    }
 
     // 1. Cerca PRIMA nei flussi audio-only uno stream MP4 / AAC (itag 140 m4a 128kbps)
     final mp4Audio = manifest.audioOnly.where((s) {
@@ -133,7 +147,14 @@ class YouTubeService {
       return mp4Muxed.reduce((a, b) => a.bitrate.bitsPerSecond < b.bitrate.bitsPerSecond ? a : b);
     }
 
-    // Ritorna null se esistono solo flussi WebM/Opus per evitare il crash di AVPlayer
+    // Solo WebM/Opus: su iOS AVPlayer non li riproduce, quindi scaricarli
+    // darebbe un file inutilizzabile. Meglio dirlo e indicare la via del PC,
+    // che con yt-dlp e ffmpeg converte in MP3 senza questo limite.
+    final soloOpus = manifest.audioOnly.isNotEmpty || manifest.muxed.isNotEmpty;
+    lastFailureReason = soloOpus
+        ? 'Questo video e\' disponibile solo in formato Opus, che iOS non '
+            'riproduce. Scaricalo delegando al PC: lo converte in MP3.'
+        : 'Nessun flusso audio disponibile per questo video.';
     return null;
   }
 
