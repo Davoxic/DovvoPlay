@@ -38,6 +38,82 @@ class PcDownloadTask {
       );
 }
 
+/// Avanzamento della sincronizzazione di una playlist, come lo riporta il PC.
+class SyncProgress {
+  final bool active;
+  final String phase;
+  final String playlist;
+  final int total;
+  final int alreadyOnPhone;
+  final int toDownload;
+  final int index;
+  final int received;
+  final int failed;
+  final String current;
+  final double percent;
+  final String? error;
+  final List<String> missingTitles;
+
+  const SyncProgress({
+    required this.active,
+    required this.phase,
+    required this.playlist,
+    required this.total,
+    required this.alreadyOnPhone,
+    required this.toDownload,
+    required this.index,
+    required this.received,
+    required this.failed,
+    required this.current,
+    required this.percent,
+    this.error,
+    this.missingTitles = const [],
+  });
+
+  factory SyncProgress.fromJson(Map<String, dynamic> j) => SyncProgress(
+        active: j['active'] == true,
+        phase: j['phase']?.toString() ?? '',
+        playlist: j['playlist']?.toString() ?? '',
+        total: (j['total'] as num?)?.toInt() ?? 0,
+        alreadyOnPhone: (j['alreadyOnPhone'] as num?)?.toInt() ?? 0,
+        toDownload: (j['toDownload'] as num?)?.toInt() ?? 0,
+        index: (j['index'] as num?)?.toInt() ?? 0,
+        received: (j['received'] as num?)?.toInt() ?? 0,
+        failed: (j['failed'] as num?)?.toInt() ?? 0,
+        current: j['current']?.toString() ?? '',
+        percent: (j['percent'] as num?)?.toDouble() ?? 0.0,
+        error: j['error']?.toString(),
+        missingTitles: (j['missingTitles'] as List<dynamic>? ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+      );
+
+  /// Quante ne sono arrivate sulle quante attese: e' il "x/y" mostrato nell'app.
+  String get counter => '$received/$toDownload';
+
+  bool get isDone => phase == 'completato';
+  bool get hasError => phase == 'errore';
+
+  String get phaseLabel {
+    switch (phase) {
+      case 'in_coda':
+        return 'In coda...';
+      case 'analisi':
+        return 'Leggo la playlist...';
+      case 'confronto':
+        return 'Confronto con la tua libreria...';
+      case 'download':
+        return 'Scarico e ricevo i brani mancanti';
+      case 'completato':
+        return 'Sincronizzazione completata';
+      case 'errore':
+        return 'Errore nella sincronizzazione';
+      default:
+        return phase;
+    }
+  }
+}
+
 class PcSyncService extends ChangeNotifier {
   static final PcSyncService instance = PcSyncService._();
   PcSyncService._() {
@@ -63,7 +139,9 @@ class PcSyncService extends ChangeNotifier {
   String _statusMessage = 'Nessun computer connesso';
   final List<PcDownloadTask> _activeTasks = [];
   Timer? _autoSyncTimer;
+  Timer? _progressTimer;
   int _lastPulledCount = 0;
+  SyncProgress? _syncProgress;
 
   String get pcHost => _pcHost;
   int get pcPort => _pcPort;
@@ -73,6 +151,8 @@ class PcSyncService extends ChangeNotifier {
   List<PcDownloadTask> get activeTasks => List.unmodifiable(_activeTasks);
   bool get isPulling => _isPulling;
   int get lastPulledCount => _lastPulledCount;
+  SyncProgress? get syncProgress => _syncProgress;
+  bool get isSyncing => _syncProgress?.active == true;
 
   String get baseUrl => 'http://$_pcHost:$_pcPort';
 
@@ -483,9 +563,131 @@ class PcSyncService extends ChangeNotifier {
     return saved;
   }
 
+  /// Avvia sul PC la sincronizzazione di una playlist.
+  ///
+  /// Allega la libreria locale cosi' il PC puo' confrontarla e scaricare solo
+  /// i brani mancanti, uno per volta. Il PC risponde subito e il lavoro
+  /// prosegue in background: l'avanzamento si segue con [syncProgress].
+  Future<bool> startPlaylistSync(String playlistUrl, {void Function(String step)? onStatus}) async {
+    if (_pcHost.isEmpty) {
+      onStatus?.call('Nessun PC configurato.');
+      return false;
+    }
+
+    final url = playlistUrl.trim();
+    if (url.isEmpty) return false;
+
+    // La libreria locale serve al PC per il matching: senza questa, il PC la
+    // chiede da solo al telefono, ma solo se il server interno e' attivo.
+    final deviceSongs = LibraryService.instance.tracks
+        .map((t) => {
+              'id': t.id,
+              'title': t.title,
+              'artist': t.artist,
+              'album': t.album,
+              'duration': t.duration.inSeconds.toDouble(),
+            })
+        .toList();
+
+    onStatus?.call('Invio al PC la playlist e ${deviceSongs.length} brani già in libreria...');
+
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/api/playlist_sync'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'playlist_url': url,
+              'device_songs': deviceSongs,
+              'auto_download_missing': true,
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (res.statusCode != 200) {
+        onStatus?.call('Il PC ha risposto con HTTP ${res.statusCode}');
+        return false;
+      }
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if (data['ok'] != true) {
+        onStatus?.call(data['message']?.toString() ?? 'Il PC ha rifiutato la richiesta.');
+        if (data['progress'] is Map<String, dynamic>) {
+          _syncProgress = SyncProgress.fromJson(data['progress'] as Map<String, dynamic>);
+          notifyListeners();
+          _startProgressPolling();
+        }
+        return false;
+      }
+
+      if (data['progress'] is Map<String, dynamic>) {
+        _syncProgress = SyncProgress.fromJson(data['progress'] as Map<String, dynamic>);
+      }
+      notifyListeners();
+      _startProgressPolling();
+      onStatus?.call('Sincronizzazione avviata sul PC.');
+      return true;
+    } catch (e) {
+      onStatus?.call('Errore comunicazione con il PC: $e');
+      return false;
+    }
+  }
+
+  /// Interroga il PC sull'avanzamento e ritira i brani man mano che arrivano.
+  void _startProgressPolling() {
+    _progressTimer?.cancel();
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 1500), (t) async {
+      if (_pcHost.isEmpty) {
+        t.cancel();
+        return;
+      }
+
+      final p = await fetchSyncProgress();
+
+      // Ritira subito i brani consegnati, cosi' il contatore nell'app
+      // corrisponde a quello che e' davvero in libreria.
+      await syncPendingFromPc();
+
+      if (p == null || !p.active) {
+        t.cancel();
+        // Ultimo giro: qualcosa puo' essere arrivato dopo il controllo.
+        await syncPendingFromPc();
+      }
+    });
+  }
+
+  void stopProgressPolling() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
+  }
+
+  /// Legge GET /api/sync/progress dal PC.
+  Future<SyncProgress?> fetchSyncProgress() async {
+    if (_pcHost.isEmpty) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/api/sync/progress'))
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) return _syncProgress;
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final raw = data['progress'];
+      if (raw is Map<String, dynamic>) {
+        _syncProgress = SyncProgress.fromJson(raw);
+      } else {
+        _syncProgress = null;
+      }
+      notifyListeners();
+      return _syncProgress;
+    } catch (_) {
+      return _syncProgress;
+    }
+  }
+
   @override
   void dispose() {
     _autoSyncTimer?.cancel();
+    _progressTimer?.cancel();
     super.dispose();
   }
 
@@ -501,23 +703,10 @@ class PcSyncService extends ChangeNotifier {
     if (cleanUrl.isEmpty) return 0;
 
     if (delegateToPc) {
-      onStatus?.call('Invio playlist Spotify al PC Companion...');
-      try {
-        final uri = Uri.parse('$baseUrl/api/spotify_playlist');
-        final res = await http.post(
-          uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'url': cleanUrl}),
-        ).timeout(const Duration(seconds: 10));
-
-        if (res.statusCode == 200 || res.statusCode == 202) {
-          onStatus?.call('Playlist presa in carico dal PC! Il download è in corso.');
-          return 1;
-        }
-      } catch (e) {
-        onStatus?.call('Errore comunicazione con PC: $e');
-        return 0;
-      }
+      // Percorso nuovo: il PC confronta con la libreria del telefono e invia
+      // solo i brani mancanti, uno per volta, con avanzamento interrogabile.
+      final started = await startPlaylistSync(cleanUrl, onStatus: onStatus);
+      return started ? 1 : 0;
     }
 
     // Modalità Analisi Locale

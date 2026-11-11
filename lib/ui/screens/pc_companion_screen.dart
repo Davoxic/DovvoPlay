@@ -14,7 +14,7 @@ class PcCompanionScreen extends StatefulWidget {
   State<PcCompanionScreen> createState() => _PcCompanionScreenState();
 }
 
-class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTickerProviderStateMixin {
+class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProviderStateMixin {
   late TabController _tabCtrl;
   final TextEditingController _ipCtrl = TextEditingController();
   final TextEditingController _portCtrl = TextEditingController();
@@ -28,16 +28,28 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
   bool _isSearchingSources = false;
   List<dynamic> _searchResults = []; // YouTubeTrack | SpotifyItem | SoundCloudTrack
 
+  late AnimationController _spinCtrl;
+
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 3, vsync: this);
     _ipCtrl.text = PcSyncService.instance.pcHost;
     _portCtrl.text = PcSyncService.instance.pcPort.toString();
+
+    // Rotazione continua delle due frecce durante la sincronizzazione
+    _spinCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+
+    // Se il PC sta già sincronizzando, riprendi a seguirlo all'apertura
+    PcSyncService.instance.fetchSyncProgress();
   }
 
   @override
   void dispose() {
+    _spinCtrl.dispose();
     _tabCtrl.dispose();
     _ipCtrl.dispose();
     _portCtrl.dispose();
@@ -148,6 +160,12 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
 
               // 2. CONVERTITORE PLAYLIST SPOTIFY
               _buildSpotifyConverterCard(),
+
+              // 2b. AVANZAMENTO SINCRONIZZAZIONE (solo quando c'e' qualcosa in corso)
+              if (sync.syncProgress != null) ...[
+                const SizedBox(height: 14),
+                _buildSyncProgressCard(sync.syncProgress!),
+              ],
 
               const SizedBox(height: 22),
 
@@ -395,6 +413,132 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
           ),
         ],
       ),
+    );
+  }
+
+  /// Avanzamento della sincronizzazione: due frecce che girano e il contatore
+  /// dei brani ricevuti sul totale dei mancanti.
+  Widget _buildSyncProgressCard(SyncProgress p) {
+    final Color accent = p.hasError
+        ? const Color(0xFFE5534B)
+        : (p.isDone ? const Color(0xFF4ADE80) : const Color(0xFF1DB954));
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: accent.withOpacity(0.55)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Le due frecce circolari: girano solo mentre il lavoro e' in corso
+              if (p.active)
+                RotationTransition(
+                  turns: _spinCtrl,
+                  child: Icon(Icons.sync_rounded, color: accent, size: 22),
+                )
+              else
+                Icon(
+                  p.hasError ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+                  color: accent,
+                  size: 22,
+                ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  p.playlist.isEmpty ? 'Sincronizzazione' : p.playlist,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              // Il contatore x/y richiesto: ricevute sul totale da ricevere
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: accent.withOpacity(0.5)),
+                ),
+                child: Text(
+                  '${p.counter} ricevute',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            p.phaseLabel,
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+          if (p.current.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${p.index}/${p.toDownload} · ${p.current}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: AppTheme.textPrimary),
+            ),
+          ],
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: p.toDownload == 0 ? (p.isDone ? 1.0 : null) : p.percent / 100.0,
+              minHeight: 6,
+              backgroundColor: Colors.black,
+              valueColor: AlwaysStoppedAnimation<Color>(accent),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 14,
+            runSpacing: 4,
+            children: [
+              _syncStat('Nella playlist', '${p.total}'),
+              _syncStat('Già sul telefono', '${p.alreadyOnPhone}'),
+              _syncStat('Da ricevere', '${p.toDownload}'),
+              if (p.failed > 0) _syncStat('Non riuscite', '${p.failed}'),
+            ],
+          ),
+          if (p.hasError && p.error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              p.error!,
+              style: const TextStyle(fontSize: 11, color: Color(0xFFE5534B)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _syncStat(String label, String value) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$label: ',
+          style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+        ),
+        Text(
+          value,
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+        ),
+      ],
     );
   }
 
