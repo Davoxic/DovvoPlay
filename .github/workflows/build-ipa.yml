@@ -5,8 +5,7 @@ on:
     branches: [main, master]
     tags: ["v*"]
     paths-ignore:
-      - "scripts/probe_sources.py"
-      - ".github/workflows/probe.yml"
+      - "tools/**"
       - "**/*.md"
   pull_request:
   workflow_dispatch:
@@ -16,67 +15,55 @@ permissions:
 
 jobs:
   build:
-    name: Build unsigned .ipa
+    name: Build Native Swift IPA
     runs-on: macos-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.29.0'
-          channel: 'stable'
-          cache: true
-
       - name: Show toolchain
         run: |
-          flutter --version
           xcodebuild -version
+          swift --version
           sw_vers
 
-      - name: Ensure iOS platform files
+      - name: Generate Xcode project if needed
         run: |
-          cp -R lib lib_bak
-          cp pubspec.yaml pubspec.yaml.bak
-          flutter create . --org com.dchietti --project-name dovvoplay --platforms ios
-          rm -rf lib test
-          mv lib_bak lib
-          mv pubspec.yaml.bak pubspec.yaml
+          python3 generate_xcodeproj.py
 
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Analyze Dart code
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings | python3 scripts/parse_analyze.py
-
-      - name: Configure iOS project (signing disabled & permissions)
-        run: python3 scripts/configure_ios.py
-
-      - name: Build iOS (Release, no code signing)
+      - name: Build iOS App (Release, unsigned)
         run: |
           set -o pipefail
-          export LANG=en_US.UTF-8
-          flutter build ios --release --no-codesign 2>&1 | tee build.log || {
-            echo "::error::Build failed! Last log lines:"
-            tail -n 80 build.log
-            echo "### Flutter Build Failure Log" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -n 100 build.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            exit 1
-          }
+          xcodebuild -project DovvoPlay.xcodeproj \
+            -scheme DovvoPlay \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES 2>&1 | tee build.log || {
+              echo "::error::Xcode build failed!"
+              tail -n 80 build.log
+              echo "### Xcode Build Failure Log" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              tail -n 100 build.log >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              exit 1
+            }
 
       - name: Package into .ipa
         run: |
           set -euo pipefail
-          APP_PATH="build/ios/iphoneos/Runner.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "::error::Runner.app non trovata in $APP_PATH"
+          APP_PATH="$(find build/DerivedData -name "DovvoPlay.app" -type d | head -n 1)"
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "::error::DovvoPlay.app non trovata in build/DerivedData"
             find build -name "*.app" -maxdepth 6 -print || true
             exit 1
           fi
+          echo "Trovata app in: $APP_PATH"
           rm -rf Payload DovvoPlay-unsigned.ipa
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/DovvoPlay.app
@@ -105,20 +92,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Su push di un tag v* si usa quel tag.
-          # Su push del branch si ricava la versione dal pubspec, cosi' la
-          # release ha un tag semver reale (es. v1.3.0) e il controllo
-          # aggiornamenti in-app puo' confrontarla. Col vecchio tag fisso
-          # "latest" il client faceva int.tryParse("latest") -> 0, leggeva
-          # 0.0.0 e nessuna release risultava mai piu' recente di quella
-          # installata: l'aggiornamento non veniva mai segnalato.
           RELEASE_TAG="${GITHUB_REF_NAME}"
           if [ "$GITHUB_REF_NAME" = "main" ] || [ "$GITHUB_REF_NAME" = "master" ]; then
-            APP_VERSION="$( (grep -m1 '^version:' pubspec.yaml || true) | sed 's/^version:[[:space:]]*//' | cut -d'+' -f1 | tr -d '[:space:]' )"
+            APP_VERSION="$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" DovvoPlay/Resources/Info.plist 2>/dev/null || echo "2.0.0")"
             if [ -n "$APP_VERSION" ]; then
               RELEASE_TAG="v${APP_VERSION}"
             else
-              echo "::warning::Versione non leggibile da pubspec.yaml, ripiego sul tag latest"
               RELEASE_TAG="latest"
             fi
           fi
@@ -126,10 +105,7 @@ jobs:
 
           gh release create "$RELEASE_TAG" DovvoPlay-unsigned.ipa \
             --title "DovvoPlay ${RELEASE_TAG}" \
-            --notes "Build unsigned automatica generata da GitHub Actions. Firmala in locale con la tua app di firma preferita (ESign, Scarlet, Feather, Sideloadly)." \
+            --notes "Build unsigned nativa Swift & SwiftUI generata da GitHub Actions. Firmala in locale con la tua app di firma preferita (ESign, Scarlet, Feather, Sideloadly, TrollStore)." \
             || gh release upload "$RELEASE_TAG" DovvoPlay-unsigned.ipa --clobber
 
-          # Fa puntare l'API releases/latest a questa release, altrimenti la
-          # vecchia release "latest" rimasta dai build precedenti potrebbe
-          # continuare a essere servita al client.
           gh release edit "$RELEASE_TAG" --latest || true

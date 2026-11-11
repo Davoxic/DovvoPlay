@@ -1,0 +1,462 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		248D6C85B8E1C326D842D6CB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8C8D96A7FA63B6D2B08AFFB8 /* Assets.xcassets */; };
+		40BB9DF69E616AFF5B516CC3 /* DovvoPlayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F73A391535C5E4953C8F20 /* DovvoPlayApp.swift */; };
+		818B70E61225C08E8EF356A4 /* ExternalModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AF5D3ED104EB66C46B59E92 /* ExternalModels.swift */; };
+		F66C644FDBE25E066AC78850 /* Playlist.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43BBE56AB0657598C91F014 /* Playlist.swift */; };
+		016E99D5F0BCCA20D3337577 /* StatsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2B9B381A031ED92BA6D5050 /* StatsModels.swift */; };
+		45D516E9F8D960EAC20699EF /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7708465091188209A96585 /* Track.swift */; };
+		953FC86B9CC616DF98B4DD03 /* YouTubeTrack.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE84A89316068A538CABA83 /* YouTubeTrack.swift */; };
+		4BB8A5D26B5C76A6BF756DA6 /* AnimationThemeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23C9B757AA1446B87859397 /* AnimationThemeService.swift */; };
+		F9E0208D19E6DD1249BA6DA8 /* AudioPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 864C446DED0810CE6BE9C456 /* AudioPlayerService.swift */; };
+		BB03A57349AB19179546DAB0 /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8CEC5912A9801FA6D95A8A0 /* BackupService.swift */; };
+		A8FFABFEFD608DD4454366BC /* DownloadQueueService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDAF5A23369121F57B9C78DB /* DownloadQueueService.swift */; };
+		DAFAAAF9A50E2636025BEB67 /* EqualizerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA803CB4024B91B32DAC1F5 /* EqualizerService.swift */; };
+		8434E6CAF310716DFBD3211B /* LibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4914C313DDD156C069B02C22 /* LibraryService.swift */; };
+		C0A7BFD156A3D9C0C3EBC27E /* MetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C6722ED3771C2FF3282D19 /* MetadataService.swift */; };
+		03A51B2E131C211C8EC44131 /* PcSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9EE3C4A19C47820755A953D /* PcSyncService.swift */; };
+		32D764D2F2489FA3748D9525 /* SoundCloudService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6943E96B8DF40C812F0C3A07 /* SoundCloudService.swift */; };
+		56A8F436D56F79F8AEA52582 /* SpotifyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216BBF1F47726DEC5BA7F84B /* SpotifyService.swift */; };
+		9DAE18B2F9DB2BA3BB22A739 /* StatsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7620F38918DA37FA5F92A2 /* StatsService.swift */; };
+		A58C1DB999436A7C9E1AF122 /* ThemeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4B75D4AD5F1031AA1F266B /* ThemeService.swift */; };
+		8E8172B68636CB25F736C7AF /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A462922D78C4DB1042422AA8 /* UpdateService.swift */; };
+		9C14C64C5F661BF0A1A0290C /* ViewModeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA6B086E27E7DDE002539534 /* ViewModeService.swift */; };
+		FD8CF82B12551CC6D3F16A44 /* WifiServerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA835B2988DC4D7C93311848 /* WifiServerService.swift */; };
+		75C4D3978BA9F7BE6B58EA04 /* YouTubeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B06F9EB965D3DB436CAE57 /* YouTubeService.swift */; };
+		CE9C976B47F77A327550C0CF /* AnimatedTrackTransitionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B68439BF9677569F839787 /* AnimatedTrackTransitionView.swift */; };
+		A4629C64A0FBECA814BC616E /* EqualizerSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91EC050D14D62FCFCDB61511 /* EqualizerSheetView.swift */; };
+		50DAE3B93962EDE4516FCE7B /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F9EC491962290C884C1F579 /* MiniPlayerView.swift */; };
+		3B556DEAF03DE935F8939622 /* TrackArtworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67C28471595A2E26B21ED3A /* TrackArtworkView.swift */; };
+		51A134E25A8F7E6EFAFD54EB /* TrackRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4C419135274E55CD7638F2 /* TrackRowView.swift */; };
+		741A7FA41826DAA33F0504B2 /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F782BC44984115FF32CA996 /* HomeScreen.swift */; };
+		A54716706A76095720EBBB7B /* LibraryTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92234D03058BFDC4055FA30 /* LibraryTab.swift */; };
+		2E86E298EB94D172762CBC11 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C63221A3F6BC274AF89764 /* NowPlayingView.swift */; };
+		55DE2C212A8915FEADA359BA /* PcCompanionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD1BECD41FC655D4518813B /* PcCompanionView.swift */; };
+		1EB6D1DA097008D365C60BDA /* PlaylistDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FA837A0BD33C512F765096 /* PlaylistDetailView.swift */; };
+		FDEF3702450B7FDBFED7EBB3 /* PlaylistTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5490982639F3EE2B59FFEF60 /* PlaylistTab.swift */; };
+		CB6DDD5FEBA9C60FC6023994 /* SettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63FD098FF3658292A2D3E3D1 /* SettingsTab.swift */; };
+		FCBC297C70F40A9A23085537 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A868CD5A2937C95EC9FE5C2 /* StatsView.swift */; };
+		A4788A4188959833B7394423 /* WifiServerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB82C28A1880D67144578398 /* WifiServerView.swift */; };
+		3CAE61594F07BA321FB252B6 /* YouTubeTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5DF53604211ECED758DD070 /* YouTubeTabView.swift */; };
+		FFA0ACA485585D8E994D8A2F /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68C5196A3D89D29E1C32C20A /* AppTheme.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		E55D682476050E32292B25A7 /* DovvoPlay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DovvoPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8C8D96A7FA63B6D2B08AFFB8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		529A4F9FB960C4CA973E04C2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		69F73A391535C5E4953C8F20 /* DovvoPlayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DovvoPlayApp.swift"; sourceTree = "<group>"; };
+		4AF5D3ED104EB66C46B59E92 /* ExternalModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ExternalModels.swift"; sourceTree = "<group>"; };
+		D43BBE56AB0657598C91F014 /* Playlist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playlist.swift"; sourceTree = "<group>"; };
+		D2B9B381A031ED92BA6D5050 /* StatsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatsModels.swift"; sourceTree = "<group>"; };
+		9A7708465091188209A96585 /* Track.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Track.swift"; sourceTree = "<group>"; };
+		FBE84A89316068A538CABA83 /* YouTubeTrack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "YouTubeTrack.swift"; sourceTree = "<group>"; };
+		C23C9B757AA1446B87859397 /* AnimationThemeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnimationThemeService.swift"; sourceTree = "<group>"; };
+		864C446DED0810CE6BE9C456 /* AudioPlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioPlayerService.swift"; sourceTree = "<group>"; };
+		C8CEC5912A9801FA6D95A8A0 /* BackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackupService.swift"; sourceTree = "<group>"; };
+		FDAF5A23369121F57B9C78DB /* DownloadQueueService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DownloadQueueService.swift"; sourceTree = "<group>"; };
+		AFA803CB4024B91B32DAC1F5 /* EqualizerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EqualizerService.swift"; sourceTree = "<group>"; };
+		4914C313DDD156C069B02C22 /* LibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LibraryService.swift"; sourceTree = "<group>"; };
+		A1C6722ED3771C2FF3282D19 /* MetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MetadataService.swift"; sourceTree = "<group>"; };
+		C9EE3C4A19C47820755A953D /* PcSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PcSyncService.swift"; sourceTree = "<group>"; };
+		6943E96B8DF40C812F0C3A07 /* SoundCloudService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SoundCloudService.swift"; sourceTree = "<group>"; };
+		216BBF1F47726DEC5BA7F84B /* SpotifyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SpotifyService.swift"; sourceTree = "<group>"; };
+		9D7620F38918DA37FA5F92A2 /* StatsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatsService.swift"; sourceTree = "<group>"; };
+		6A4B75D4AD5F1031AA1F266B /* ThemeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ThemeService.swift"; sourceTree = "<group>"; };
+		A462922D78C4DB1042422AA8 /* UpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UpdateService.swift"; sourceTree = "<group>"; };
+		EA6B086E27E7DDE002539534 /* ViewModeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ViewModeService.swift"; sourceTree = "<group>"; };
+		CA835B2988DC4D7C93311848 /* WifiServerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WifiServerService.swift"; sourceTree = "<group>"; };
+		D5B06F9EB965D3DB436CAE57 /* YouTubeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "YouTubeService.swift"; sourceTree = "<group>"; };
+		E3B68439BF9677569F839787 /* AnimatedTrackTransitionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnimatedTrackTransitionView.swift"; sourceTree = "<group>"; };
+		91EC050D14D62FCFCDB61511 /* EqualizerSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EqualizerSheetView.swift"; sourceTree = "<group>"; };
+		6F9EC491962290C884C1F579 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MiniPlayerView.swift"; sourceTree = "<group>"; };
+		F67C28471595A2E26B21ED3A /* TrackArtworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrackArtworkView.swift"; sourceTree = "<group>"; };
+		0A4C419135274E55CD7638F2 /* TrackRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrackRowView.swift"; sourceTree = "<group>"; };
+		8F782BC44984115FF32CA996 /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeScreen.swift"; sourceTree = "<group>"; };
+		E92234D03058BFDC4055FA30 /* LibraryTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LibraryTab.swift"; sourceTree = "<group>"; };
+		F7C63221A3F6BC274AF89764 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NowPlayingView.swift"; sourceTree = "<group>"; };
+		ABD1BECD41FC655D4518813B /* PcCompanionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PcCompanionView.swift"; sourceTree = "<group>"; };
+		A7FA837A0BD33C512F765096 /* PlaylistDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlaylistDetailView.swift"; sourceTree = "<group>"; };
+		5490982639F3EE2B59FFEF60 /* PlaylistTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlaylistTab.swift"; sourceTree = "<group>"; };
+		63FD098FF3658292A2D3E3D1 /* SettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsTab.swift"; sourceTree = "<group>"; };
+		4A868CD5A2937C95EC9FE5C2 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatsView.swift"; sourceTree = "<group>"; };
+		FB82C28A1880D67144578398 /* WifiServerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WifiServerView.swift"; sourceTree = "<group>"; };
+		B5DF53604211ECED758DD070 /* YouTubeTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "YouTubeTabView.swift"; sourceTree = "<group>"; };
+		68C5196A3D89D29E1C32C20A /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTheme.swift"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BE6D242E52F97101381F314D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4924D7311A4BA87424DA4E17 = {
+			isa = PBXGroup;
+			children = (
+				0C6B99FD820E7AD7C797DD3F /* DovvoPlay */,
+				BAA4D22F04FFC5B2FC3ED606 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BAA4D22F04FFC5B2FC3ED606 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E55D682476050E32292B25A7 /* DovvoPlay.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		0C6B99FD820E7AD7C797DD3F /* DovvoPlay */ = {
+			isa = PBXGroup;
+			children = (
+				D15C3F3A39D3CF7AC24DC1CD /* App */,
+				267E2DAFFE4EF3130058CF3C /* Models */,
+				65B4118D3774F84695C18BE8 /* Services */,
+				80DD466716A9542CDAF670E0 /* UI */,
+				236FC824C14136E17156FC99 /* Resources */,
+			);
+			path = "DovvoPlay";
+			sourceTree = "<group>";
+		};
+		D15C3F3A39D3CF7AC24DC1CD /* App */ = {
+			isa = PBXGroup;
+			children = (
+				69F73A391535C5E4953C8F20 /* DovvoPlayApp.swift */,
+			);
+			path = "App";
+			sourceTree = "<group>";
+		};
+		267E2DAFFE4EF3130058CF3C /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				4AF5D3ED104EB66C46B59E92 /* ExternalModels.swift */,
+				D43BBE56AB0657598C91F014 /* Playlist.swift */,
+				D2B9B381A031ED92BA6D5050 /* StatsModels.swift */,
+				9A7708465091188209A96585 /* Track.swift */,
+				FBE84A89316068A538CABA83 /* YouTubeTrack.swift */,
+			);
+			path = "Models";
+			sourceTree = "<group>";
+		};
+		65B4118D3774F84695C18BE8 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				C23C9B757AA1446B87859397 /* AnimationThemeService.swift */,
+				864C446DED0810CE6BE9C456 /* AudioPlayerService.swift */,
+				C8CEC5912A9801FA6D95A8A0 /* BackupService.swift */,
+				FDAF5A23369121F57B9C78DB /* DownloadQueueService.swift */,
+				AFA803CB4024B91B32DAC1F5 /* EqualizerService.swift */,
+				4914C313DDD156C069B02C22 /* LibraryService.swift */,
+				A1C6722ED3771C2FF3282D19 /* MetadataService.swift */,
+				C9EE3C4A19C47820755A953D /* PcSyncService.swift */,
+				6943E96B8DF40C812F0C3A07 /* SoundCloudService.swift */,
+				216BBF1F47726DEC5BA7F84B /* SpotifyService.swift */,
+				9D7620F38918DA37FA5F92A2 /* StatsService.swift */,
+				6A4B75D4AD5F1031AA1F266B /* ThemeService.swift */,
+				A462922D78C4DB1042422AA8 /* UpdateService.swift */,
+				EA6B086E27E7DDE002539534 /* ViewModeService.swift */,
+				CA835B2988DC4D7C93311848 /* WifiServerService.swift */,
+				D5B06F9EB965D3DB436CAE57 /* YouTubeService.swift */,
+			);
+			path = "Services";
+			sourceTree = "<group>";
+		};
+		80DD466716A9542CDAF670E0 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				79D7627263C6A8A92BBE1E98 /* Components */,
+				DC2D88C9293D77BC449792C6 /* Screens */,
+				CA0B8ABA92A5EEB81D355059 /* Theme */,
+			);
+			path = "UI";
+			sourceTree = "<group>";
+		};
+		79D7627263C6A8A92BBE1E98 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				E3B68439BF9677569F839787 /* AnimatedTrackTransitionView.swift */,
+				91EC050D14D62FCFCDB61511 /* EqualizerSheetView.swift */,
+				6F9EC491962290C884C1F579 /* MiniPlayerView.swift */,
+				F67C28471595A2E26B21ED3A /* TrackArtworkView.swift */,
+				0A4C419135274E55CD7638F2 /* TrackRowView.swift */,
+			);
+			path = "Components";
+			sourceTree = "<group>";
+		};
+		DC2D88C9293D77BC449792C6 /* Screens */ = {
+			isa = PBXGroup;
+			children = (
+				8F782BC44984115FF32CA996 /* HomeScreen.swift */,
+				E92234D03058BFDC4055FA30 /* LibraryTab.swift */,
+				F7C63221A3F6BC274AF89764 /* NowPlayingView.swift */,
+				ABD1BECD41FC655D4518813B /* PcCompanionView.swift */,
+				A7FA837A0BD33C512F765096 /* PlaylistDetailView.swift */,
+				5490982639F3EE2B59FFEF60 /* PlaylistTab.swift */,
+				63FD098FF3658292A2D3E3D1 /* SettingsTab.swift */,
+				4A868CD5A2937C95EC9FE5C2 /* StatsView.swift */,
+				FB82C28A1880D67144578398 /* WifiServerView.swift */,
+				B5DF53604211ECED758DD070 /* YouTubeTabView.swift */,
+			);
+			path = "Screens";
+			sourceTree = "<group>";
+		};
+		CA0B8ABA92A5EEB81D355059 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				68C5196A3D89D29E1C32C20A /* AppTheme.swift */,
+			);
+			path = "Theme";
+			sourceTree = "<group>";
+		};
+		236FC824C14136E17156FC99 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				8C8D96A7FA63B6D2B08AFFB8 /* Assets.xcassets */,
+				529A4F9FB960C4CA973E04C2 /* Info.plist */,
+			);
+			path = "Resources";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3A11B156DC6992A088FEB41D /* DovvoPlay */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA2BEB440B5C5B52A20DC414 /* Build configuration list for PBXNativeTarget "DovvoPlay" */;
+			buildPhases = (
+				7D6A60BD062F435E7497BC78 /* Sources */,
+				BE6D242E52F97101381F314D /* Frameworks */,
+				F70A3F09DA6A5462A79EEFAF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DovvoPlay;
+			productName = DovvoPlay;
+			productReference = E55D682476050E32292B25A7 /* DovvoPlay.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5E027069B7F464D3746E0E9F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					3A11B156DC6992A088FEB41D = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = C431E90333F2F86435381AF7 /* Build configuration list for PBXProject "DovvoPlay" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 4924D7311A4BA87424DA4E17;
+			productRefGroup = BAA4D22F04FFC5B2FC3ED606 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3A11B156DC6992A088FEB41D /* DovvoPlay */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F70A3F09DA6A5462A79EEFAF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				248D6C85B8E1C326D842D6CB /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7D6A60BD062F435E7497BC78 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				40BB9DF69E616AFF5B516CC3 /* DovvoPlayApp.swift in Sources */,
+				818B70E61225C08E8EF356A4 /* ExternalModels.swift in Sources */,
+				F66C644FDBE25E066AC78850 /* Playlist.swift in Sources */,
+				016E99D5F0BCCA20D3337577 /* StatsModels.swift in Sources */,
+				45D516E9F8D960EAC20699EF /* Track.swift in Sources */,
+				953FC86B9CC616DF98B4DD03 /* YouTubeTrack.swift in Sources */,
+				4BB8A5D26B5C76A6BF756DA6 /* AnimationThemeService.swift in Sources */,
+				F9E0208D19E6DD1249BA6DA8 /* AudioPlayerService.swift in Sources */,
+				BB03A57349AB19179546DAB0 /* BackupService.swift in Sources */,
+				A8FFABFEFD608DD4454366BC /* DownloadQueueService.swift in Sources */,
+				DAFAAAF9A50E2636025BEB67 /* EqualizerService.swift in Sources */,
+				8434E6CAF310716DFBD3211B /* LibraryService.swift in Sources */,
+				C0A7BFD156A3D9C0C3EBC27E /* MetadataService.swift in Sources */,
+				03A51B2E131C211C8EC44131 /* PcSyncService.swift in Sources */,
+				32D764D2F2489FA3748D9525 /* SoundCloudService.swift in Sources */,
+				56A8F436D56F79F8AEA52582 /* SpotifyService.swift in Sources */,
+				9DAE18B2F9DB2BA3BB22A739 /* StatsService.swift in Sources */,
+				A58C1DB999436A7C9E1AF122 /* ThemeService.swift in Sources */,
+				8E8172B68636CB25F736C7AF /* UpdateService.swift in Sources */,
+				9C14C64C5F661BF0A1A0290C /* ViewModeService.swift in Sources */,
+				FD8CF82B12551CC6D3F16A44 /* WifiServerService.swift in Sources */,
+				75C4D3978BA9F7BE6B58EA04 /* YouTubeService.swift in Sources */,
+				CE9C976B47F77A327550C0CF /* AnimatedTrackTransitionView.swift in Sources */,
+				A4629C64A0FBECA814BC616E /* EqualizerSheetView.swift in Sources */,
+				50DAE3B93962EDE4516FCE7B /* MiniPlayerView.swift in Sources */,
+				3B556DEAF03DE935F8939622 /* TrackArtworkView.swift in Sources */,
+				51A134E25A8F7E6EFAFD54EB /* TrackRowView.swift in Sources */,
+				741A7FA41826DAA33F0504B2 /* HomeScreen.swift in Sources */,
+				A54716706A76095720EBBB7B /* LibraryTab.swift in Sources */,
+				2E86E298EB94D172762CBC11 /* NowPlayingView.swift in Sources */,
+				55DE2C212A8915FEADA359BA /* PcCompanionView.swift in Sources */,
+				1EB6D1DA097008D365C60BDA /* PlaylistDetailView.swift in Sources */,
+				FDEF3702450B7FDBFED7EBB3 /* PlaylistTab.swift in Sources */,
+				CB6DDD5FEBA9C60FC6023994 /* SettingsTab.swift in Sources */,
+				FCBC297C70F40A9A23085537 /* StatsView.swift in Sources */,
+				A4788A4188959833B7394423 /* WifiServerView.swift in Sources */,
+				3CAE61594F07BA321FB252B6 /* YouTubeTabView.swift in Sources */,
+				FFA0ACA485585D8E994D8A2F /* AppTheme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		71030A6A8889494047A0BB98 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		164ABE5329C04A0F12C6F267 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		91A1AF7132323A2AE076A9E0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DovvoPlay/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dchietti.dovvoplay;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AFE46BC992AFF90A0120D3D7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DovvoPlay/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dchietti.dovvoplay;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C431E90333F2F86435381AF7 /* Build configuration list for PBXProject "DovvoPlay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				71030A6A8889494047A0BB98 /* Debug */,
+				164ABE5329C04A0F12C6F267 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA2BEB440B5C5B52A20DC414 /* Build configuration list for PBXNativeTarget "DovvoPlay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				91A1AF7132323A2AE076A9E0 /* Debug */,
+				AFE46BC992AFF90A0120D3D7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = 5E027069B7F464D3746E0E9F /* Project object */;
+}
