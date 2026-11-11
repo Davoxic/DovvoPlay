@@ -1,13 +1,13 @@
 @echo off
 chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
-title SborraPlay
+title DovvoPlay
 color 0D
 cd /d "%~dp0tools"
 
 echo.
 echo   ==========================================
-echo      SborraPlay - strumenti per il PC
+echo      DovvoPlay - strumenti per il PC
 echo   ==========================================
 echo.
 
@@ -72,7 +72,7 @@ if errorlevel 1 (
 cls
 echo.
 echo   ==========================================
-echo      SborraPlay
+echo      DovvoPlay
 echo   ==========================================
 echo.
 echo     1   Scarica una playlist Spotify
@@ -112,9 +112,9 @@ echo.
 set /p prova=   Scarico solo i primi 3 brani per provare? [s/n]:
 echo.
 if /i "%prova%"=="s" (
-  "%VPY%" sborraplay-dl playlist %rif% --limit 3
+  "%VPY%" dovvoplay-dl playlist %rif% --limit 3
 ) else (
-  "%VPY%" sborraplay-dl playlist %rif%
+  "%VPY%" dovvoplay-dl playlist %rif%
 )
 echo.
 pause
@@ -128,7 +128,7 @@ echo.
 set /p cart=   ^>
 if "%cart%"=="" goto menu
 echo.
-"%VPY%" sborraplay-dl push %cart%
+"%VPY%" dovvoplay-dl push %cart%
 echo.
 pause
 goto menu
@@ -136,7 +136,7 @@ goto menu
 :backup
 cls
 echo.
-"%VPY%" sborraplay-dl backup -o "%USERPROFILE%\Documents\SborraPlay Backup"
+"%VPY%" dovvoplay-dl backup -o "%USERPROFILE%\Documents\DovvoPlay Backup"
 echo.
 pause
 goto menu
@@ -152,9 +152,9 @@ echo.
 set /p sost=   Sostituire le playlist attuali invece di unirle? [s/n]:
 echo.
 if /i "%sost%"=="s" (
-  "%VPY%" sborraplay-dl restore %bk% --replace
+  "%VPY%" dovvoplay-dl restore %bk% --replace
 ) else (
-  "%VPY%" sborraplay-dl restore %bk%
+  "%VPY%" dovvoplay-dl restore %bk%
 )
 echo.
 pause
@@ -163,7 +163,7 @@ goto menu
 :library
 cls
 echo.
-"%VPY%" sborraplay-dl library
+"%VPY%" dovvoplay-dl library
 echo.
 pause
 goto menu
@@ -171,9 +171,9 @@ goto menu
 :discover
 cls
 echo.
-"%VPY%" sborraplay-dl discover
+"%VPY%" dovvoplay-dl discover
 echo.
-echo   Se non lo trova: apri SborraPlay sull'iPhone, Impostazioni, accendi il
+echo   Se non lo trova: apri DovvoPlay sull'iPhone, Impostazioni, accendi il
 echo   Server Wi-Fi, e controlla che telefono e PC siano sulla stessa rete.
 echo.
 pause
@@ -187,7 +187,7 @@ echo.
 set /p lnk=   ^>
 if "%lnk%"=="" goto menu
 echo.
-"%VPY%" sborraplay-dl grab %lnk%
+"%VPY%" dovvoplay-dl grab %lnk%
 echo.
 pause
 goto menu

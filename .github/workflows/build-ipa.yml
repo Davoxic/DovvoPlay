@@ -40,7 +40,7 @@ jobs:
         run: |
           cp -R lib lib_bak
           cp pubspec.yaml pubspec.yaml.bak
-          flutter create . --org com.dchietti --project-name sborraplay --platforms ios
+          flutter create . --org com.dchietti --project-name dovvoplay --platforms ios
           rm -rf lib test
           mv lib_bak lib
           mv pubspec.yaml.bak pubspec.yaml
@@ -77,18 +77,18 @@ jobs:
             find build -name "*.app" -maxdepth 6 -print || true
             exit 1
           fi
-          rm -rf Payload SborraPlay-unsigned.ipa
+          rm -rf Payload DovvoPlay-unsigned.ipa
           mkdir -p Payload
-          cp -R "$APP_PATH" Payload/SborraPlay.app
-          rm -rf "Payload/SborraPlay.app/_CodeSignature" "Payload/SborraPlay.app/embedded.mobileprovision"
-          zip -qry SborraPlay-unsigned.ipa Payload
-          ls -lh SborraPlay-unsigned.ipa
+          cp -R "$APP_PATH" Payload/DovvoPlay.app
+          rm -rf "Payload/DovvoPlay.app/_CodeSignature" "Payload/DovvoPlay.app/embedded.mobileprovision"
+          zip -qry DovvoPlay-unsigned.ipa Payload
+          ls -lh DovvoPlay-unsigned.ipa
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SborraPlay-unsigned-ipa
-          path: SborraPlay-unsigned.ipa
+          name: DovvoPlay-unsigned-ipa
+          path: DovvoPlay-unsigned.ipa
           if-no-files-found: error
           retention-days: 90
 
@@ -124,10 +124,10 @@ jobs:
           fi
           echo "Tag della release: $RELEASE_TAG"
 
-          gh release create "$RELEASE_TAG" SborraPlay-unsigned.ipa \
-            --title "SborraPlay ${RELEASE_TAG}" \
+          gh release create "$RELEASE_TAG" DovvoPlay-unsigned.ipa \
+            --title "DovvoPlay ${RELEASE_TAG}" \
             --notes "Build unsigned automatica generata da GitHub Actions. Firmala in locale con la tua app di firma preferita (ESign, Scarlet, Feather, Sideloadly)." \
-            || gh release upload "$RELEASE_TAG" SborraPlay-unsigned.ipa --clobber
+            || gh release upload "$RELEASE_TAG" DovvoPlay-unsigned.ipa --clobber
 
           # Fa puntare l'API releases/latest a questa release, altrimenti la
           # vecchia release "latest" rimasta dai build precedenti potrebbe

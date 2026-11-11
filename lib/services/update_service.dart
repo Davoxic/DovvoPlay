@@ -35,7 +35,7 @@ class UpdateService extends ChangeNotifier {
   static final UpdateService instance = UpdateService._();
   UpdateService._();
 
-  static const String currentVersion = '1.3.6';
+  static const String currentVersion = '1.4.0';
   static const String repoOwner = 'Davoxic';
   static const String repoName = 'sonora';
 
@@ -84,7 +84,7 @@ class UpdateService extends ChangeNotifier {
       final uri = Uri.parse('https://api.github.com/repos/$repoOwner/$repoName/releases/latest');
       final res = await http.get(uri, headers: {
         'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'SborraPlay-App',
+        'User-Agent': 'DovvoPlay-App',
       }).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
@@ -132,7 +132,7 @@ class UpdateService extends ChangeNotifier {
     return null;
   }
 
-  /// Scarica il file .ipa direttamente nella cartella Documents di SborraPlay
+  /// Scarica il file .ipa direttamente nella cartella Documents di DovvoPlay
   Future<File?> downloadIpa(
     AppReleaseInfo release, {
     void Function(double progress, String status)? onProgress,
@@ -148,7 +148,7 @@ class UpdateService extends ChangeNotifier {
 
     try {
       final docsDir = await getApplicationDocumentsDirectory();
-      final targetFile = File('${docsDir.path}/SborraPlay-${release.cleanVersion}.ipa');
+      final targetFile = File('${docsDir.path}/DovvoPlay-${release.cleanVersion}.ipa');
 
       // Se già scaricato completamente in precedenza
       if (await targetFile.exists() && release.ipaSize > 0 && await targetFile.length() == release.ipaSize) {
@@ -163,7 +163,7 @@ class UpdateService extends ChangeNotifier {
 
       final client = http.Client();
       final request = http.Request('GET', Uri.parse(url));
-      request.headers['User-Agent'] = 'SborraPlay-App';
+      request.headers['User-Agent'] = 'DovvoPlay-App';
 
       final response = await client.send(request);
       final totalBytes = response.contentLength ?? release.ipaSize;
@@ -210,8 +210,8 @@ class UpdateService extends ChangeNotifier {
     try {
       await Share.shareXFiles(
         [XFile(ipaFile.path)],
-        subject: 'SborraPlay Update IPA',
-        text: 'Installa o firma SborraPlay con la tua app di firma preferita.',
+        subject: 'DovvoPlay Update IPA',
+        text: 'Installa o firma DovvoPlay con la tua app di firma preferita.',
       );
     } catch (e) {
       print('Errore apertura Share Sheet: $e');

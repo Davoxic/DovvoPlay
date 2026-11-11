@@ -97,7 +97,7 @@ class WifiServerService extends ChangeNotifier {
       if (path == '/' || path == '/index.html') {
         await _serveWebPage(request);
       } else if (path == '/api/ping') {
-        _jsonResponse(request, {'ok': true, 'app': 'SborraPlay', 'version': UpdateService.currentVersion});
+        _jsonResponse(request, {'ok': true, 'app': 'DovvoPlay', 'version': UpdateService.currentVersion});
       } else if (path == '/api/library') {
         final tracks = LibraryService.instance.tracks.map((t) => t.toJson()).toList();
         _jsonResponse(request, {'ok': true, 'tracks': tracks, 'count': tracks.length});
@@ -297,7 +297,7 @@ class WifiServerService extends ChangeNotifier {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SborraPlay · Carica Musica</title>
+<title>DovvoPlay · Carica Musica</title>
 <style>
   :root {
     --bg: #0d0a17; --bg2: #171029; --card: rgba(255,255,255,.06);
@@ -344,7 +344,7 @@ class WifiServerService extends ChangeNotifier {
   <header>
     <div class="logo">⚡</div>
     <div>
-      <h1>SborraPlay</h1>
+      <h1>DovvoPlay</h1>
       <div class="sub">Carica musica direttamente sul tuo iPhone via Wi-Fi</div>
     </div>
   </header>

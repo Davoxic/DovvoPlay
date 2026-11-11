@@ -1,4 +1,4 @@
-# SborraPlay
+# DovvoPlay
 
 Player musicale per iPhone scritto in **Flutter / Dart** con ricerca **YouTube** e streaming audio in background + server Wi-Fi per caricare brani da PC.
 
@@ -19,15 +19,15 @@ La compilazione avviene automaticamente tramite **GitHub Actions** su runner mac
 1. Fai il push su GitHub sul branch `main`:
    ```bash
    git add -A
-   git commit -m "Aggiornamento SborraPlay"
+   git commit -m "Aggiornamento DovvoPlay"
    git push origin HEAD:main
    ```
 2. Il workflow `.github/workflows/build-ipa.yml` si avvia da solo al push:
    - Configura Flutter e le dipendenze
    - Prepara il target iOS con permessi di background audio e condivisione file
    - Compila la release unsigned (`flutter build ios --release --no-codesign`)
-   - Impacchetta l'IPA in `Payload/SborraPlay.app` e zippa in `SborraPlay-unsigned.ipa`
-3. A fine build scarica l'artifact **SborraPlay-unsigned-ipa**.
+   - Impacchetta l'IPA in `Payload/DovvoPlay.app` e zippa in `DovvoPlay-unsigned.ipa`
+3. A fine build scarica l'artifact **DovvoPlay-unsigned-ipa**.
 
 ### Firmare e installare
 
@@ -44,7 +44,7 @@ L'`.ipa` generato è privo di firma (unsigned): va firmato prima dell'installazi
 ## 2. Struttura del progetto
 
 ```
-sborraplay/
+dovvoplay/
 ├── .github/workflows/build-ipa.yml  # Pipeline CI per creare l'unsigned IPA
 ├── assets/                          # Icone e loghi
 ├── lib/                             # Codice Dart / Flutter

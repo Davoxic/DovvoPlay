@@ -1,5 +1,5 @@
 #!/bin/bash
-# Doppio clic su macOS (o ./SborraPlay.command su Linux).
+# Doppio clic su macOS (o ./DovvoPlay.command su Linux).
 cd "$(dirname "$0")/tools" || exit 1
 
 VIOLA=$'\033[35m'; VERDE=$'\033[32m'; GIALLO=$'\033[33m'; ROSSO=$'\033[31m'; FINE=$'\033[0m'
@@ -8,7 +8,7 @@ intestazione() {
   clear
   echo
   echo "${VIOLA}  ==========================================${FINE}"
-  echo "${VIOLA}     SborraPlay${FINE}"
+  echo "${VIOLA}     DovvoPlay${FINE}"
   echo "${VIOLA}  ==========================================${FINE}"
   echo
 }
@@ -89,9 +89,9 @@ while true; do
       read -r -p "  Scarico solo i primi 3 brani per provare? [s/n] " prova
       echo
       if [ "$prova" = "s" ]; then
-        eval "\"$VPY\" sborraplay-dl playlist $rif --limit 3"
+        eval "\"$VPY\" dovvoplay-dl playlist $rif --limit 3"
       else
-        eval "\"$VPY\" sborraplay-dl playlist $rif"
+        eval "\"$VPY\" dovvoplay-dl playlist $rif"
       fi
       ;;
     2)
@@ -99,10 +99,10 @@ while true; do
       read -r -p "  > " cart
       [ -z "$cart" ] && continue
       echo
-      eval "\"$VPY\" sborraplay-dl push $cart"
+      eval "\"$VPY\" dovvoplay-dl push $cart"
       ;;
     3)
-      "$VPY" sborraplay-dl backup -o "$HOME/Documents/SborraPlay Backup"
+      "$VPY" dovvoplay-dl backup -o "$HOME/Documents/DovvoPlay Backup"
       ;;
     4)
       echo "  Trascina qui il file .sborraplay.json"
@@ -111,16 +111,16 @@ while true; do
       read -r -p "  Sostituire le playlist attuali invece di unirle? [s/n] " sost
       echo
       if [ "$sost" = "s" ]; then
-        eval "\"$VPY\" sborraplay-dl restore $bk --replace"
+        eval "\"$VPY\" dovvoplay-dl restore $bk --replace"
       else
-        eval "\"$VPY\" sborraplay-dl restore $bk"
+        eval "\"$VPY\" dovvoplay-dl restore $bk"
       fi
       ;;
-    5) "$VPY" sborraplay-dl library ;;
+    5) "$VPY" dovvoplay-dl library ;;
     6)
-      "$VPY" sborraplay-dl discover
+      "$VPY" dovvoplay-dl discover
       echo
-      echo "  Se non lo trova: apri SborraPlay sull'iPhone, Impostazioni,"
+      echo "  Se non lo trova: apri DovvoPlay sull'iPhone, Impostazioni,"
       echo "  accendi il Server Wi-Fi, e controlla di essere sulla stessa rete."
       ;;
     7) "$VPY" -m pip install --upgrade yt-dlp ;;
@@ -129,7 +129,7 @@ while true; do
       read -r -p "  > " lnk
       [ -z "$lnk" ] && continue
       echo
-      eval "\"$VPY\" sborraplay-dl grab $lnk"
+      eval "\"$VPY\" dovvoplay-dl grab $lnk"
       ;;
     0) exit 0 ;;
     *) continue ;;

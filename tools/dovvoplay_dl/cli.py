@@ -48,7 +48,7 @@ def cmd_playlist(args) -> int:
     tracks = playlist.tracks[:args.limit] if args.limit else playlist.tracks
     ok(f"{playlist.name} — {len(tracks)} brani")
 
-    outdir = Path(args.out).expanduser() if args.out else Path.cwd() / "SborraPlay" / safe_filename(playlist.name)
+    outdir = Path(args.out).expanduser() if args.out else Path.cwd() / "DovvoPlay" / safe_filename(playlist.name)
     outdir.mkdir(parents=True, exist_ok=True)
     archive = outdir / ".yt-archive.txt" if args.archive else None
 
@@ -134,7 +134,7 @@ def cmd_playlist(args) -> int:
     device = resolve_device(args.host)
     if device is None:
         warn("Nessun telefono raggiungibile: i file restano nella cartella, "
-             "puoi inviarli dopo con  sborraplay-dl push \"" + str(outdir) + "\"")
+             "puoi inviarli dopo con  dovvoplay-dl push \"" + str(outdir) + "\"")
         return 0 if not bad else 1
 
     sent, names = pusher.push_many(device, [r.path for r in good], skip_existing=not args.overwrite)
@@ -179,7 +179,7 @@ def cmd_push(args) -> int:
 
 def cmd_discover(args) -> int:
     from . import pusher
-    info("Cerco SborraPlay sulla rete locale…")
+    info("Cerco DovvoPlay sulla rete locale…")
     devices = pusher.discover(timeout=args.timeout)
     if not devices:
         warn("Nessun dispositivo trovato. Controlla che l'app sia aperta con il server acceso, "
@@ -235,9 +235,9 @@ def cmd_backup(args) -> int:
         label = "contenuto non interpretabile"
 
     out = Path(args.out).expanduser() if args.out else Path.cwd() / (
-        "SborraPlay-%s.sborraplay.json" % datetime.now().strftime("%Y-%m-%d-%H%M"))
+        "DovvoPlay-%s.sborraplay.json" % datetime.now().strftime("%Y-%m-%d-%H%M"))
     if out.is_dir():
-        out = out / ("SborraPlay-%s.sborraplay.json" % datetime.now().strftime("%Y-%m-%d-%H%M"))
+        out = out / ("DovvoPlay-%s.sborraplay.json" % datetime.now().strftime("%Y-%m-%d-%H%M"))
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(payload)
     ok(f"{out}  ({len(payload)/1024:.0f} KB)")
@@ -309,7 +309,7 @@ def cmd_grab(args) -> int:
     cand = Candidate(video_id=meta.get("id") or "", title=title,
                      channel=artist, duration=duration, url=args.url)
 
-    outdir = Path(args.out).expanduser() if args.out else Path.cwd() / "SborraPlay" / "Singoli"
+    outdir = Path(args.out).expanduser() if args.out else Path.cwd() / "DovvoPlay" / "Singoli"
     step(f"2 · Scarico in {outdir}")
     try:
         path = fetch_and_tag(track, cand, outdir, args.format, args.quality, archive=None)
@@ -361,7 +361,7 @@ def resolve_device(host: str | None):
             ok(f"Trovato: {device.host}:{device.port}")
             return device
 
-    err("Telefono non raggiungibile. Apri SborraPlay, vai in Impostazioni, accendi il server Wi-Fi "
+    err("Telefono non raggiungibile. Apri DovvoPlay, vai in Impostazioni, accendi il server Wi-Fi "
         "e passa l'indirizzo mostrato con --host 192.168.x.x:8080")
     return None
 
@@ -370,20 +370,20 @@ def resolve_device(host: str | None):
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="sborraplay-dl",
+        prog="dovvoplay-dl",
         description="Dalla playlist Spotify ai file sul tuo iPhone, passando da YouTube e yt-dlp.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""esempi:
-  sborraplay-dl playlist https://open.spotify.com/playlist/37i9dQZF1DX...
-  sborraplay-dl playlist miei_brani.csv --format m4a --no-push
-  sborraplay-dl playlist <url> --host 192.168.1.42:8080 --workers 4
-  sborraplay-dl push ~/Musica/Estate --playlist "Estate 2026"
-  sborraplay-dl grab "https://soundcloud.com/artista/brano"
-  sborraplay-dl discover
-  sborraplay-dl backup -o ~/Backup
-  sborraplay-dl restore ~/Backup/SborraPlay-2026-11-08-2340.sborraplay.json
+  dovvoplay-dl playlist https://open.spotify.com/playlist/37i9dQZF1DX...
+  dovvoplay-dl playlist miei_brani.csv --format m4a --no-push
+  dovvoplay-dl playlist <url> --host 192.168.1.42:8080 --workers 4
+  dovvoplay-dl push ~/Musica/Estate --playlist "Estate 2026"
+  dovvoplay-dl grab "https://soundcloud.com/artista/brano"
+  dovvoplay-dl discover
+  dovvoplay-dl backup -o ~/Backup
+  dovvoplay-dl restore ~/Backup/DovvoPlay-2026-11-08-2340.sborraplay.json
 """)
-    p.add_argument("--version", action="version", version=f"sborraplay-dl {__version__}")
+    p.add_argument("--version", action="version", version=f"dovvoplay-dl {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
     pl = sub.add_parser("playlist", help="scarica una playlist Spotify (o un file CSV/JSON/TXT)")

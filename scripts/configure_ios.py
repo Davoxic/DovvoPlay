@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configura Info.plist, Podfile e le icone dell'app iOS per SborraPlay."""
+"""Configura Info.plist, Podfile e le icone dell'app iOS per DovvoPlay."""
 import os
 import plistlib
 import shutil
@@ -20,8 +20,8 @@ def configure_info_plist():
     with open(INFO_PLIST, "rb") as f:
         plist = plistlib.load(f)
 
-    plist["CFBundleDisplayName"] = "SborraPlay"
-    plist["CFBundleName"] = "SborraPlay"
+    plist["CFBundleDisplayName"] = "DovvoPlay"
+    plist["CFBundleName"] = "DovvoPlay"
 
     # Background audio mode
     bg_modes = plist.get("UIBackgroundModes", [])
@@ -35,7 +35,7 @@ def configure_info_plist():
 
     # Permessi rete locale per server Wi-Fi
     plist["NSLocalNetworkUsageDescription"] = (
-        "SborraPlay usa la rete locale per consentire il caricamento di file musicali via Wi-Fi dal tuo computer."
+        "DovvoPlay usa la rete locale per consentire il caricamento di file musicali via Wi-Fi dal tuo computer."
     )
 
     # ATS per consentire stream audio HTTP locali / CDN

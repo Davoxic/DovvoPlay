@@ -272,7 +272,7 @@ class LibraryService extends ChangeNotifier {
 
   String exportBackupJson() {
     final backup = {
-      'app': 'SborraPlay',
+      'app': 'DovvoPlay',
       'version': '1.0.0',
       'exported_at': DateTime.now().toIso8601String(),
       'tracks': _tracks.map((t) => t.toJson()).toList(),

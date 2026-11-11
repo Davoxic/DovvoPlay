@@ -572,7 +572,7 @@ class SettingsTab extends StatelessWidget {
               _buildSectionHeader('INFORMAZIONI APP'),
               _buildSettingTile(
                 icon: Icons.info_outline_rounded,
-                title: 'SborraPlay Gold v2.0.0',
+                title: 'DovvoPlay Gold v2.0.0',
                 subtitle: 'Temi Multipli • Animazioni di Transizione • PC LAN Sync',
                 onTap: null,
               ),
@@ -930,7 +930,7 @@ class SettingsTab extends StatelessWidget {
               maxLines: 5,
               style: TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontFamily: 'monospace'),
               decoration: InputDecoration(
-                hintText: '{\n  "app": "SborraPlay", ...\n}',
+                hintText: '{\n  "app": "DovvoPlay", ...\n}',
                 hintStyle: TextStyle(color: AppTheme.textMuted),
                 filled: true,
                 fillColor: Color(0x33000000),

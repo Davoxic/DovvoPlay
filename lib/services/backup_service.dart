@@ -48,7 +48,7 @@ class BackupService {
     final lib = LibraryService.instance;
 
     return {
-      'app': 'SborraPlay',
+      'app': 'DovvoPlay',
       'version': '1.0.0',
       'exported_at': DateTime.now().toIso8601String(),
       'stats': {
@@ -69,7 +69,7 @@ class BackupService {
     final dir = await _backupDirectory;
     final now = DateTime.now();
     final filename =
-        'SborraPlay_Backup_${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}.json';
+        'DovvoPlay_Backup_${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}.json';
     final target = File('${dir.path}/$filename');
     final jsonStr = createBackupJsonString();
 

@@ -34,7 +34,7 @@
 # non parte piu' su macOS/Linux.
 *.command           text eol=lf
 *.sh                text eol=lf
-tools/sborraplay-dl text eol=lf
+tools/dovvoplay-dl text eol=lf
 
 # ------------------------------------------------ script Windows: serve CRLF
 # cmd.exe puo' sbagliare la gestione di label e goto con fine riga LF.

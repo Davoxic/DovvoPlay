@@ -228,7 +228,7 @@ class AudioPlayerService extends ChangeNotifier {
 
       final mediaItem = MediaItem(
         id: track.id,
-        album: track.album.isNotEmpty ? track.album : (track.isOnline ? 'YouTube' : 'SborraPlay'),
+        album: track.album.isNotEmpty ? track.album : (track.isOnline ? 'YouTube' : 'DovvoPlay'),
         title: track.displayTitle,
         artist: track.displayArtist,
         artUri: artUri,

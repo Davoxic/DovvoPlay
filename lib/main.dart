@@ -16,7 +16,7 @@ Future<void> main() async {
   try {
     await JustAudioBackground.init(
       androidNotificationChannelId: 'com.dchietti.sborraplay.audio',
-      androidNotificationChannelName: 'SborraPlay Audio',
+      androidNotificationChannelName: 'DovvoPlay Audio',
       androidNotificationOngoing: true,
       androidStopForegroundOnPause: true,
     );
@@ -58,11 +58,11 @@ Future<void> main() async {
     print('Avviso PcSync: $e');
   }
 
-  runApp(const SborraPlayApp());
+  runApp(const DovvoPlayApp());
 }
 
-class SborraPlayApp extends StatelessWidget {
-  const SborraPlayApp({super.key});
+class DovvoPlayApp extends StatelessWidget {
+  const DovvoPlayApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +77,7 @@ class SborraPlayApp extends StatelessWidget {
         // forza la ricostruzione al cambio, e solo al cambio.
         final tema = ThemeService.instance.currentTheme;
         return MaterialApp(
-          title: 'SborraPlay',
+          title: 'DovvoPlay',
           debugShowCheckedModeBanner: false,
           theme: tema.toThemeData(),
           home: KeyedSubtree(

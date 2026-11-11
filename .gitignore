@@ -35,8 +35,8 @@ __pycache__/
 venv/
 
 # output del tool
-SborraPlay/Downloads/
-tools/SborraPlay/
+DovvoPlay/Downloads/
+tools/DovvoPlay/
 *.yt-archive.txt
 
 # ambiente creato dai lanciatori a doppio clic
