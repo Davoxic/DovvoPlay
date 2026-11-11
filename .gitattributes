@@ -1,0 +1,58 @@
+# ============================================================================
+# Normalizzazione dei fine riga.
+#
+# Nel repository i file di testo sono SEMPRE salvati con LF, su qualsiasi
+# macchina si lavori. Serve perche' la build gira su runner macOS, dove un
+# CRLF di troppo rompe lo shebang degli script, e perche' senza questo file
+# ogni commit da Windows mostrava "LF will be replaced by CRLF" e sporcava
+# i diff con differenze di sole fine riga.
+# ============================================================================
+
+# Default: Git distingue testo e binario da solo, e usa LF per il testo
+* text=auto eol=lf
+
+# ---------------------------------------------------------------- codice
+*.dart          text eol=lf
+*.py            text eol=lf
+*.swift         text eol=lf
+*.h             text eol=lf
+*.m             text eol=lf
+
+# ---------------------------------------------------- configurazione e testo
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.json          text eol=lf
+*.plist         text eol=lf
+*.xml           text eol=lf
+*.md            text eol=lf
+*.txt           text eol=lf
+.gitignore      text eol=lf
+.gitattributes  text eol=lf
+
+# ------------------------------------------- script Unix/macOS: LF obbligatorio
+# Con CRLF la riga "#!/usr/bin/env python3" diventa invalida e lo script
+# non parte piu' su macOS/Linux.
+*.command           text eol=lf
+*.sh                text eol=lf
+tools/sborraplay-dl text eol=lf
+
+# ------------------------------------------------ script Windows: serve CRLF
+# cmd.exe puo' sbagliare la gestione di label e goto con fine riga LF.
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+
+# ------------------------------------- binari: nessuna conversione ne' diff
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.icns          binary
+*.ttf           binary
+*.otf           binary
+*.ipa           binary
+*.zip           binary
+*.mp3           binary
+*.m4a           binary
+*.flac          binary
+*.wav           binary
