@@ -18,6 +18,19 @@ public struct TrackArtworkView: View {
         self.placeholderIcon = placeholderIcon
     }
 
+    public init(
+        artworkPath: String?,
+        title: String? = nil,
+        size: CGFloat = 48,
+        cornerRadius: CGFloat = 10,
+        placeholderIcon: String = "music.note"
+    ) {
+        self.urlString = artworkPath
+        self.size = size
+        self.cornerRadius = cornerRadius
+        self.placeholderIcon = placeholderIcon
+    }
+
     public var body: some View {
         Group {
             if let str = urlString?.trimmingCharacters(in: .whitespacesAndNewlines), !str.isEmpty {

@@ -4,6 +4,8 @@ import Combine
 public enum DownloadJobKind: String, Codable {
     case playlist
     case single
+
+    public static let singolo = DownloadJobKind.single
 }
 
 public enum DownloadJobStatus: String, Codable {
@@ -12,6 +14,8 @@ public enum DownloadJobStatus: String, Codable {
     case completed
     case error
     case cancelled
+
+    public static let inCorso = DownloadJobStatus.inProgress
 
     public var label: String {
         switch self {
@@ -79,6 +83,8 @@ public class DownloadJob: Identifiable, ObservableObject {
             return "Annullato"
         }
     }
+
+    public var statusText: String { statusDescription }
 }
 
 public class DownloadQueueService: ObservableObject {
@@ -86,6 +92,10 @@ public class DownloadQueueService: ObservableObject {
 
     @Published public private(set) var jobs: [DownloadJob] = []
     @Published public private(set) var isWorking: Bool = false
+
+    public func clearQueue() {
+        jobs.removeAll()
+    }
 
     public var pendingCount: Int {
         jobs.filter { $0.status == .waiting }.count

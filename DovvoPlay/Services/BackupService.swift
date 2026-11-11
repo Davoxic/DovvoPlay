@@ -147,4 +147,8 @@ public class BackupService {
             }
         }
     }
+
+    public func attemptAutoRestore() {
+        autoRestoreIfEmpty()
+    }
 }

@@ -21,7 +21,53 @@ public class PcSyncService: ObservableObject {
 
     public var isSyncing: Bool { syncProgress?.active == true }
     public var hasArrivedTracks: Bool { !arrivedTracks.isEmpty }
+    public var arrivedTrackTitles: [String] { arrivedTracks }
+    public var isDiscovering: Bool { isSearching }
     public var baseUrl: String { "http://\(pcHost):\(pcPort)" }
+
+    public static func isSingleTrackUrl(_ url: String) -> Bool {
+        let u = url.lowercased()
+        return u.contains("/track/") || u.contains("watch?v=") || u.contains("youtu.be/") || (u.contains("soundcloud.com/") && !u.contains("/sets/"))
+    }
+
+    public func connect(host: String, port: Int) {
+        Task {
+            await setHostAndPort(host: host, port: port)
+        }
+    }
+
+    public func checkHealth() async -> Bool {
+        return await testConnection()
+    }
+
+    public func cancelCurrentSync() async {
+        stopProgressPolling()
+        await MainActor.run {
+            self.syncProgress = nil
+        }
+    }
+
+    @discardableResult
+    public func importSpotifyPlaylist(
+        _ url: String,
+        delegateToPc: Bool = true,
+        createPlaylist: Bool = false,
+        onStatus: ((String) -> Void)? = nil
+    ) async -> Int {
+        if delegateToPc {
+            let isSingle = PcSyncService.isSingleTrackUrl(url)
+            DownloadQueueService.shared.enqueue(
+                url: url,
+                label: isSingle ? "Brano singolo" : "Playlist o album",
+                kind: isSingle ? .single : .playlist,
+                createPlaylist: createPlaylist
+            )
+            return 1
+        } else {
+            let ok = await startPlaylistSync(playlistUrl: url, createPlaylist: createPlaylist, onStatus: onStatus)
+            return ok ? 1 : 0
+        }
+    }
 
     private var autoSyncTimer: Timer?
     private var progressTimer: Timer?

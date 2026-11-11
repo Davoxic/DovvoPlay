@@ -23,6 +23,10 @@ public struct SpotifyItem: Identifiable, Equatable, Hashable {
         self.url = url
         self.duration = duration
     }
+
+    public var artworkUrl: String { thumbnailUrl }
+    public var permalinkUrl: String { url }
+    public var user: String { author }
 }
 
 public struct SpotifyPlaylistInfo {
@@ -62,6 +66,10 @@ public struct SoundCloudTrack: Identifiable, Equatable, Hashable {
         self.url = url
         self.duration = duration
     }
+
+    public var artworkUrl: String { thumbnailUrl }
+    public var permalinkUrl: String { url }
+    public var user: String { author }
 }
 
 public struct PcDownloadTask: Identifiable, Codable, Equatable {
@@ -174,6 +182,22 @@ public struct SyncProgress: Codable, Equatable {
 
     public var isDone: Bool { phase == "completato" }
     public var hasError: Bool { phase == "errore" }
+
+    public var progress: Double {
+        return percent > 1.0 ? percent / 100.0 : percent
+    }
+
+    public var currentTask: String? {
+        return current.isEmpty ? phaseLabel : current
+    }
+
+    public var currentTrack: Int {
+        return downloaded
+    }
+
+    public var totalTracks: Int {
+        return total
+    }
 
     public var phaseLabel: String {
         switch phase {

@@ -142,7 +142,7 @@ public struct PcCompanionView: View {
                 await sync.fetchSyncProgress()
             }
         }
-        .onChange(of: sync.arrivedTrackTitles) { _ in
+        .onChange(of: sync.arrivedTracks) { _ in
             checkForArrivedTracks()
         }
         .alert(isPresented: $showingPlaylistChoiceAlert) {

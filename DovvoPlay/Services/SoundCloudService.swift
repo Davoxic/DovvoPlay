@@ -4,6 +4,10 @@ public class SoundCloudService {
     public static let shared = SoundCloudService()
     private init() {}
 
+    public func search(_ query: String) async -> [SoundCloudTrack] {
+        return await search(query: query)
+    }
+
     public func search(query: String) async -> [SoundCloudTrack] {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return [] }

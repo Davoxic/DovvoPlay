@@ -2,6 +2,10 @@ import Foundation
 import SwiftUI
 
 public struct VisualTheme: Identifiable, Equatable {
+    public static func == (lhs: VisualTheme, rhs: VisualTheme) -> Bool {
+        return lhs.id == rhs.id
+    }
+
     public let id: String
     public let name: String
     public let description: String

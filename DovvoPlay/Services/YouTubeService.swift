@@ -1,7 +1,7 @@
 import Foundation
 import UIKit
 
-public class YouTubeService {
+public class YouTubeService: ObservableObject {
     public static let shared = YouTubeService()
     private init() {}
 

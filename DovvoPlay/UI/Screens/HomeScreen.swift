@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct HomeScreen: View {
     @State private var selectedTab: Int = 1 // 0: Playlist, 1: Libreria (Default), 2: Impostazioni
+    @State private var isPresentingNowPlaying: Bool = false
     @ObservedObject private var player = AudioPlayerService.shared
     @ObservedObject private var updateService = UpdateService.shared
 
@@ -40,16 +41,19 @@ public struct HomeScreen: View {
 
             // Floating MiniPlayer docked above the TabBar
             if player.currentTrack != nil {
-                MiniPlayerView()
+                MiniPlayerView(isPresentingNowPlaying: $isPresentingNowPlaying)
                     .padding(.bottom, 49) // Height of standard iOS TabBar
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+        }
+        .fullScreenCover(isPresented: $isPresentingNowPlaying) {
+            NowPlayingView()
         }
         .onAppear {
             // Customize tab bar appearance
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = UIColor(Color(hex: 0x0A0A0A))
+            appearance.backgroundColor = UIColor(white: 0.04, alpha: 1.0)
             UITabBar.appearance().standardAppearance = appearance
             if #available(iOS 15.0, *) {
                 UITabBar.appearance().scrollEdgeAppearance = appearance
@@ -164,7 +168,7 @@ public struct HomeScreen: View {
         updateStatusText = "Avvio download pacchetto .ipa..."
 
         Task {
-            let fileUrl = await updateService.downloadIpa(release) { prog, status in
+            let fileUrl = await updateService.downloadIpa(release: release) { prog, status in
                 DispatchQueue.main.async {
                     self.updateDownloadProgress = prog
                     self.updateStatusText = status

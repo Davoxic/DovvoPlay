@@ -227,6 +227,10 @@ public class LibraryService: ObservableObject {
         })
     }
 
+    public func findTrack(id: String) -> Track? {
+        return getTrackById(id)
+    }
+
     public func getTracksForPlaylist(_ playlist: Playlist) -> [Track] {
         return playlist.trackIds.compactMap { getTrackById($0) }
     }

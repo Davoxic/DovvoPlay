@@ -121,8 +121,8 @@ public class StatsService: ObservableObject {
             title: track.displayTitle,
             artist: track.displayArtist,
             thumbnailUrl: track.thumbnailUrl,
-            firstPlayedAt: now,
-            lastPlayedAt: now
+            lastPlayedAt: now,
+            firstPlayedAt: now
         )
 
         stat.lastPlayedAt = now

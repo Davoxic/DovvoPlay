@@ -101,6 +101,10 @@ public class SpotifyService {
         return SpotifyPlaylistInfo(title: plTitle, author: plAuthor, thumbnailUrl: plThumb, tracks: tracks)
     }
 
+    public func search(_ query: String) async -> [SpotifyItem] {
+        return await search(query: query)
+    }
+
     public func search(query: String) async -> [SpotifyItem] {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return [] }
