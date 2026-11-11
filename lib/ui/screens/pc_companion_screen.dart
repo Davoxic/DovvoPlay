@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/audio_player_service.dart';
+import '../../services/download_queue_service.dart';
 import '../../services/pc_sync_service.dart';
 import '../../services/soundcloud_service.dart';
 import '../../services/spotify_service.dart';
@@ -193,6 +194,24 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
           : (creaPlaylist ? 'Scarico i brani e creo la playlist...' : 'Scarico i brani...');
     });
 
+    // Delegando al PC si passa dalla coda: il PC accetta una
+    // sincronizzazione per volta, quindi le richieste vengono servite in
+    // ordine di inserimento invece di essere rifiutate.
+    if (_delegatePlaylistToPc) {
+      DownloadQueueService.instance.enqueue(
+        url: url,
+        label: singola ? 'Brano singolo' : 'Playlist o album',
+        kind: singola ? DownloadJobKind.singolo : DownloadJobKind.playlist,
+        createPlaylist: creaPlaylist,
+      );
+      setState(() {
+        _isProcessingPlaylist = false;
+        _playlistStatusText = 'Aggiunto alla coda delle richieste.';
+      });
+      _playlistUrlCtrl.clear();
+      return;
+    }
+
     final count = await PcSyncService.instance.importSpotifyPlaylist(
       url,
       delegateToPc: _delegatePlaylistToPc,
@@ -222,7 +241,33 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('PC Companion & Sorgenti Web'),
+        title: ListenableBuilder(
+          // Due frecce che girano accanto al titolo per tutta la durata del
+          // lavoro: resta visibile anche scorrendo via dalla card.
+          listenable: Listenable.merge([
+            PcSyncService.instance,
+            DownloadQueueService.instance,
+          ]),
+          builder: (context, _) {
+            final attivo = PcSyncService.instance.isSyncing ||
+                DownloadQueueService.instance.isWorking;
+            return Row(
+              children: [
+                if (attivo) ...[
+                  RotationTransition(
+                    turns: _spinCtrl,
+                    child: Icon(Icons.sync_rounded, size: 18, color: AppTheme.primary),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                const Flexible(
+                  child: Text('PC Companion & Sorgenti Web',
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            );
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.wifi_find_rounded),
@@ -232,9 +277,13 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
         ],
       ),
       body: ListenableBuilder(
-        listenable: PcSyncService.instance,
+        listenable: Listenable.merge([
+          PcSyncService.instance,
+          DownloadQueueService.instance,
+        ]),
         builder: (context, _) {
           final sync = PcSyncService.instance;
+          final coda = DownloadQueueService.instance;
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
@@ -251,6 +300,12 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
               if (sync.syncProgress != null) ...[
                 const SizedBox(height: 14),
                 _buildSyncProgressCard(sync.syncProgress!),
+              ],
+
+              // 2c. CODA DELLE RICHIESTE
+              if (coda.jobs.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _buildCodaCard(coda),
               ],
 
               const SizedBox(height: 22),
@@ -645,6 +700,94 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
           style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
         ),
       ],
+    );
+  }
+
+  /// Coda delle richieste verso il PC, in ordine di inserimento.
+  Widget _buildCodaCard(DownloadQueueService coda) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.goldBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.queue_rounded, color: AppTheme.primary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Coda richieste (${coda.jobs.length})',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              if (coda.jobs.any((j) => j.isDone))
+                TextButton(
+                  onPressed: coda.clearDone,
+                  child: const Text('Pulisci', style: TextStyle(fontSize: 12)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...coda.jobs.map((j) {
+            final Color c = j.status == DownloadJobStatus.errore
+                ? const Color(0xFFE5534B)
+                : (j.status == DownloadJobStatus.completato
+                    ? const Color(0xFF4ADE80)
+                    : (j.status == DownloadJobStatus.inCorso
+                        ? AppTheme.primary
+                        : AppTheme.textMuted));
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  Icon(
+                    j.kind == DownloadJobKind.playlist
+                        ? Icons.playlist_play_rounded
+                        : Icons.music_note_rounded,
+                    size: 16,
+                    color: c,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          j.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12.5, color: AppTheme.textPrimary),
+                        ),
+                        Text(
+                          j.statusLabel + (j.error != null ? ' · ${j.error}' : ''),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 10.5, color: c),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (j.status == DownloadJobStatus.attesa)
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, size: 16, color: AppTheme.textMuted),
+                      tooltip: 'Togli dalla coda',
+                      onPressed: () => coda.remove(j.id),
+                    ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 

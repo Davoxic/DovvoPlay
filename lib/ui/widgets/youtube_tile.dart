@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/youtube_track.dart';
 import '../../services/audio_player_service.dart';
+import '../../services/download_queue_service.dart';
+import '../../services/pc_sync_service.dart';
 import '../../services/library_service.dart';
 import '../../services/youtube_service.dart';
 import '../theme.dart';
@@ -24,6 +26,80 @@ class _YouTubeTileState extends State<YouTubeTile> {
     final m = d.inMinutes;
     final s = d.inSeconds % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  /// Chiede se scaricare sul telefono o delegare al PC.
+  ///
+  /// Il telefono scarica subito ma dipende da YouTube e dalla connessione;
+  /// il PC usa yt-dlp, regge formati e playlist che il telefono non gestisce,
+  /// e poi invia il file. Se il PC non e' collegato si scarica in locale
+  /// senza chiedere, perche' non ci sarebbe alternativa.
+  Future<void> _chiediDoveScaricare() async {
+    if (!PcSyncService.instance.isConnected) {
+      await _downloadOffline();
+      return;
+    }
+
+    final scelta = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+              child: Text(
+                'Dove scarico "${widget.track.title}"?',
+                maxLines: 2,
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.phone_iphone_rounded, color: AppTheme.textPrimary),
+              title: Text('Sul telefono',
+                  style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+              subtitle: Text('Scarica subito qui, senza passare dal computer',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+              onTap: () => Navigator.pop(ctx, 'locale'),
+            ),
+            ListTile(
+              leading: Icon(Icons.computer_rounded, color: AppTheme.primary),
+              title: Text('Delega al PC',
+                  style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+              subtitle: Text('Lo scarica il computer con yt-dlp e poi lo invia',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+              onTap: () => Navigator.pop(ctx, 'pc'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (scelta == 'locale') {
+      await _downloadOffline();
+    } else if (scelta == 'pc') {
+      DownloadQueueService.instance.enqueue(
+        url: 'https://www.youtube.com/watch?v=${widget.track.id}',
+        label: widget.track.title,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${widget.track.title}" accodato sul PC'),
+            backgroundColor: AppTheme.primary,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _downloadOffline() async {
@@ -176,7 +252,7 @@ class _YouTubeTileState extends State<YouTubeTile> {
               IconButton(
                 icon: Icon(Icons.download_rounded, color: AppTheme.textSecondary, size: 20),
                 tooltip: 'Salva brano offline',
-                onPressed: _downloadOffline,
+                onPressed: _chiediDoveScaricare,
               ),
             if (isBuffering)
               SizedBox(

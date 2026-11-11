@@ -177,6 +177,36 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   bool get hasNext => _currentIndex >= 0 && _currentIndex < _queue.length - 1;
+
+  /// Mette il brano subito dopo quello in riproduzione.
+  void playNext(Track track) {
+    _queue.removeWhere((t) => t.id == track.id && t.id != currentTrack?.id);
+    final pos = _currentIndex >= 0 ? _currentIndex + 1 : 0;
+    _queue.insert(pos.clamp(0, _queue.length), track);
+    if (!_originalQueue.any((t) => t.id == track.id)) {
+      _originalQueue.add(track);
+    }
+    notifyListeners();
+  }
+
+  /// Aggiunge il brano in fondo alla coda.
+  void addToQueue(Track track) {
+    if (_queue.any((t) => t.id == track.id)) return;
+    _queue.add(track);
+    if (!_originalQueue.any((t) => t.id == track.id)) {
+      _originalQueue.add(track);
+    }
+    notifyListeners();
+  }
+
+  /// Toglie un brano dalla coda, tenendo l'indice corrente allineato.
+  void removeFromQueue(String trackId) {
+    final i = _queue.indexWhere((t) => t.id == trackId);
+    if (i == -1 || i == _currentIndex) return;
+    _queue.removeAt(i);
+    if (i < _currentIndex) _currentIndex--;
+    notifyListeners();
+  }
   bool get hasPrevious => _currentIndex > 0;
 
   Future<void> playTrack(Track track, {List<Track>? newQueue}) async {

@@ -6,6 +6,69 @@ import '../../services/view_mode_service.dart';
 import '../theme.dart';
 import 'track_artwork.dart';
 
+/// Menu che compare tenendo premuto un brano: lo si puo' mettere subito dopo
+/// quello in riproduzione, oppure in fondo alla coda.
+void _mostraMenuCoda(BuildContext context, AudioPlayerService player, Track track) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppTheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+            child: Row(
+              children: [
+                Icon(Icons.queue_music_rounded, color: AppTheme.primary, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    track.displayTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.playlist_play_rounded, color: AppTheme.textPrimary),
+            title: Text('Riproduci dopo',
+                style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+            subtitle: Text('Subito dopo il brano in riproduzione',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+            onTap: () {
+              player.playNext(track);
+              Navigator.pop(ctx);
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.queue_rounded, color: AppTheme.textPrimary),
+            title: Text('Aggiungi in coda',
+                style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+            subtitle: Text('In fondo alla coda attuale',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+            onTap: () {
+              player.addToQueue(track);
+              Navigator.pop(ctx);
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
+}
+
 class TrackTile extends StatelessWidget {
   final Track track;
   final List<Track>? queue;
@@ -134,6 +197,7 @@ class TrackTile extends StatelessWidget {
           ],
         ),
         onTap: onTap ?? () => playerService.playTrack(track, newQueue: queue),
+        onLongPress: () => _mostraMenuCoda(context, playerService, track),
       ),
     );
   }
@@ -147,6 +211,7 @@ class TrackTile extends StatelessWidget {
   ) {
     return InkWell(
       onTap: onTap ?? () => playerService.playTrack(track, newQueue: queue),
+      onLongPress: () => _mostraMenuCoda(context, playerService, track),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
@@ -210,6 +275,7 @@ class TrackTile extends StatelessWidget {
   }) {
     return GestureDetector(
       onTap: onTap ?? () => playerService.playTrack(track, newQueue: queue),
+      onLongPress: () => _mostraMenuCoda(context, playerService, track),
       child: Container(
         decoration: BoxDecoration(
           color: isCurrent ? AppTheme.surfaceLight : AppTheme.surfaceCard,
@@ -284,6 +350,7 @@ class TrackTile extends StatelessWidget {
   ) {
     return GestureDetector(
       onTap: onTap ?? () => playerService.playTrack(track, newQueue: queue),
+      onLongPress: () => _mostraMenuCoda(context, playerService, track),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
         padding: const EdgeInsets.all(6),
@@ -375,6 +442,7 @@ class TrackTile extends StatelessWidget {
   ) {
     return GestureDetector(
       onTap: onTap ?? () => playerService.playTrack(track, newQueue: queue),
+      onLongPress: () => _mostraMenuCoda(context, playerService, track),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         padding: const EdgeInsets.all(8),
@@ -456,6 +524,7 @@ class TrackTile extends StatelessWidget {
   ) {
     return GestureDetector(
       onTap: onTap ?? () => playerService.playTrack(track, newQueue: queue),
+      onLongPress: () => _mostraMenuCoda(context, playerService, track),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
         padding: const EdgeInsets.all(10),
@@ -541,6 +610,7 @@ class TrackTile extends StatelessWidget {
     final idxStr = (index + 1).toString().padLeft(2, '0');
     return InkWell(
       onTap: onTap ?? () => playerService.playTrack(track, newQueue: queue),
+      onLongPress: () => _mostraMenuCoda(context, playerService, track),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         child: Row(

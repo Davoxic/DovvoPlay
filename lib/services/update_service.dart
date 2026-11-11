@@ -35,7 +35,7 @@ class UpdateService extends ChangeNotifier {
   static final UpdateService instance = UpdateService._();
   UpdateService._();
 
-  static const String currentVersion = '1.4.0';
+  static const String currentVersion = '1.4.1';
   static const String repoOwner = 'Davoxic';
   static const String repoName = 'sonora';
 
