@@ -101,15 +101,35 @@ jobs:
           if-no-files-found: ignore
 
       - name: Attach to GitHub Release (su tag v* o push su main)
-        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Su push di un tag v* si usa quel tag.
+          # Su push del branch si ricava la versione dal pubspec, cosi' la
+          # release ha un tag semver reale (es. v1.3.0) e il controllo
+          # aggiornamenti in-app puo' confrontarla. Col vecchio tag fisso
+          # "latest" il client faceva int.tryParse("latest") -> 0, leggeva
+          # 0.0.0 e nessuna release risultava mai piu' recente di quella
+          # installata: l'aggiornamento non veniva mai segnalato.
           RELEASE_TAG="${GITHUB_REF_NAME}"
-          if [ "$GITHUB_REF_NAME" = "main" ]; then
-            RELEASE_TAG="latest"
+          if [ "$GITHUB_REF_NAME" = "main" ] || [ "$GITHUB_REF_NAME" = "master" ]; then
+            APP_VERSION="$( (grep -m1 '^version:' pubspec.yaml || true) | sed 's/^version:[[:space:]]*//' | cut -d'+' -f1 | tr -d '[:space:]' )"
+            if [ -n "$APP_VERSION" ]; then
+              RELEASE_TAG="v${APP_VERSION}"
+            else
+              echo "::warning::Versione non leggibile da pubspec.yaml, ripiego sul tag latest"
+              RELEASE_TAG="latest"
+            fi
           fi
+          echo "Tag della release: $RELEASE_TAG"
+
           gh release create "$RELEASE_TAG" SborraPlay-unsigned.ipa \
             --title "SborraPlay ${RELEASE_TAG}" \
             --notes "Build unsigned automatica generata da GitHub Actions. Firmala in locale con la tua app di firma preferita (ESign, Scarlet, Feather, Sideloadly)." \
             || gh release upload "$RELEASE_TAG" SborraPlay-unsigned.ipa --clobber
+
+          # Fa puntare l'API releases/latest a questa release, altrimenti la
+          # vecchia release "latest" rimasta dai build precedenti potrebbe
+          # continuare a essere servita al client.
+          gh release edit "$RELEASE_TAG" --latest || true
