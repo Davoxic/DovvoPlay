@@ -178,6 +178,25 @@ class AudioPlayerService extends ChangeNotifier {
 
   bool get hasNext => _currentIndex >= 0 && _currentIndex < _queue.length - 1;
 
+  /// Il brano che verrebbe dopo, senza cambiare nulla.
+  /// Serve al mini player per mostrarlo in anteprima durante lo swipe.
+  Track? get nextTrack {
+    if (_queue.isEmpty) return null;
+    if (_currentIndex >= 0 && _currentIndex < _queue.length - 1) {
+      return _queue[_currentIndex + 1];
+    }
+    if (_loopMode == PlayerLoopMode.all) return _queue.first;
+    return null;
+  }
+
+  /// Il brano precedente, senza cambiare nulla.
+  Track? get previousTrack {
+    if (_queue.isEmpty) return null;
+    if (_currentIndex > 0) return _queue[_currentIndex - 1];
+    if (_loopMode == PlayerLoopMode.all) return _queue.last;
+    return null;
+  }
+
   /// Mette il brano subito dopo quello in riproduzione.
   void playNext(Track track) {
     _queue.removeWhere((t) => t.id == track.id && t.id != currentTrack?.id);

@@ -73,6 +73,11 @@ class _MiniPlayerState extends State<MiniPlayer> with SingleTickerProviderStateM
             ? (player.position.inMilliseconds / player.duration.inMilliseconds).clamp(0.0, 1.0)
             : 0.0;
 
+        // Quanto si e' trascinato, da 0 a 1: oltre i 110 px lo swipe e' pieno.
+        final t = (_dragOffset.abs() / 110.0).clamp(0.0, 1.0);
+        // Trascinando a sinistra arriva il successivo, a destra il precedente.
+        final anteprima = _dragOffset < 0 ? player.nextTrack : player.previousTrack;
+
         return GestureDetector(
           onTap: () => _openNowPlaying(context),
           onHorizontalDragUpdate: (details) {
@@ -120,6 +125,69 @@ class _MiniPlayerState extends State<MiniPlayer> with SingleTickerProviderStateM
               borderRadius: BorderRadius.circular(18),
               child: Stack(
                 children: [
+                  // Brano in arrivo: entra dal lato opposto allo swipe e si
+                  // fa nitido mentre quello attuale si allontana e sfuma.
+                  if (anteprima != null && t > 0.02)
+                    Positioned.fill(
+                      child: Opacity(
+                        opacity: t,
+                        child: Transform.translate(
+                          offset: Offset(
+                            (_dragOffset < 0 ? 1 : -1) * (1 - t) * 90,
+                            0,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Row(
+                              children: [
+                                TrackArtwork(
+                                  url: anteprima.thumbnailUrl,
+                                  width: 50,
+                                  height: 50,
+                                  borderRadius: 10,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        anteprima.displayTitle,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: AppTheme.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        anteprima.displayArtist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: AppTheme.textSecondary,
+                                          fontSize: 11.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  _dragOffset < 0
+                                      ? Icons.skip_next_rounded
+                                      : Icons.skip_previous_rounded,
+                                  color: AppTheme.primary,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
                   // Progress indicator gold sottile in alto
                   Positioned(
                     top: 0,
@@ -139,7 +207,10 @@ class _MiniPlayerState extends State<MiniPlayer> with SingleTickerProviderStateM
                     child: Row(
                       children: [
                         Expanded(
-                          child: Transform.translate(
+                          child: Opacity(
+                            // Il brano attuale sfuma man mano che esce di scena
+                            opacity: (1.0 - t * 0.9).clamp(0.1, 1.0),
+                            child: Transform.translate(
                             offset: Offset(_dragOffset, 0),
                             child: Row(
                               children: [
@@ -206,6 +277,7 @@ class _MiniPlayerState extends State<MiniPlayer> with SingleTickerProviderStateM
                                 ),
                               ],
                             ),
+                          ),
                           ),
                         ),
 
