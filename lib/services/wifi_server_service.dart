@@ -162,14 +162,26 @@ class WifiServerService extends ChangeNotifier {
       final name = data['name'] ?? 'Nuova Playlist';
       final files = (data['files'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
 
-      // Mappa i nomi file agli id traccia
+      // Mappa i nomi file agli id traccia.
+      // Nota: niente firstWhere con orElse su tracks.first, che andava in
+      // errore (500) a libreria vuota o associava la traccia sbagliata.
       final trackIds = <String>[];
       for (final f in files) {
-        final t = LibraryService.instance.tracks.firstWhere(
-          (x) => x.id.endsWith(f) || (x.filePath != null && x.filePath!.endsWith(f)),
-          orElse: () => LibraryService.instance.tracks.first,
-        );
-        trackIds.add(t.id);
+        for (final x in LibraryService.instance.tracks) {
+          if (x.id.endsWith(f) || (x.filePath != null && x.filePath!.endsWith(f))) {
+            trackIds.add(x.id);
+            break;
+          }
+        }
+      }
+
+      if (trackIds.isEmpty) {
+        _jsonResponse(request, {
+          'ok': false,
+          'error': 'Nessuno dei file indicati è presente nella libreria',
+          'files': files,
+        });
+        return;
       }
 
       final pl = await LibraryService.instance.createPlaylist(name, trackIds);

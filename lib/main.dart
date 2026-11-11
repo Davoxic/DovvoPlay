@@ -3,7 +3,9 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:audio_session/audio_session.dart';
 import 'services/backup_service.dart';
 import 'services/library_service.dart';
+import 'services/pc_sync_service.dart';
 import 'services/theme_service.dart';
+import 'services/wifi_server_service.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme.dart';
 
@@ -38,6 +40,23 @@ Future<void> main() async {
   try {
     await BackupService.instance.autoRestoreIfEmpty();
   } catch (_) {}
+
+  // Avvia il server di ricezione Wi-Fi: senza questo il PC Companion non puo'
+  // inviare i brani con il push diretto (PUT /api/file/...).
+  try {
+    await WifiServerService.instance.start();
+  } catch (e) {
+    print('Avviso WifiServer: $e');
+  }
+
+  // Ritira dal PC i brani rimasti in coda (canale di pull): funziona anche se
+  // il push era fallito perche' l'app era chiusa o in background.
+  try {
+    PcSyncService.instance.startAutoSync();
+    PcSyncService.instance.syncPendingFromPc();
+  } catch (e) {
+    print('Avviso PcSync: $e');
+  }
 
   runApp(const SborraPlayApp());
 }

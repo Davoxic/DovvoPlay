@@ -51,8 +51,11 @@ class PcSyncService extends ChangeNotifier {
   int _pcPort = 8080;
   bool _isConnected = false;
   bool _isSearching = false;
+  bool _isPulling = false;
   String _statusMessage = 'Nessun computer connesso';
   final List<PcDownloadTask> _activeTasks = [];
+  Timer? _autoSyncTimer;
+  int _lastPulledCount = 0;
 
   String get pcHost => _pcHost;
   int get pcPort => _pcPort;
@@ -60,6 +63,8 @@ class PcSyncService extends ChangeNotifier {
   bool get isSearching => _isSearching;
   String get statusMessage => _statusMessage;
   List<PcDownloadTask> get activeTasks => List.unmodifiable(_activeTasks);
+  bool get isPulling => _isPulling;
+  int get lastPulledCount => _lastPulledCount;
 
   String get baseUrl => 'http://$_pcHost:$_pcPort';
 
@@ -125,6 +130,11 @@ class PcSyncService extends ChangeNotifier {
         _isConnected = true;
         _statusMessage = 'Connesso al PC ($_pcHost:$_pcPort) 🟢';
         notifyListeners();
+        // Ritira subito eventuali brani lasciati in coda dal PC e tiene il
+        // canale di pull attivo: e' questo che fa arrivare la musica anche
+        // quando il server interno dell'app era spento o in background.
+        startAutoSync();
+        unawaited(syncPendingFromPc());
         return true;
       } else {
         _isConnected = false;
@@ -295,12 +305,180 @@ class PcSyncService extends ChangeNotifier {
           ),
         );
         notifyListeners();
+        // Il PC scarica in background: controlla la coda finche' il brano arriva.
+        _pollUntilDelivered();
         return true;
       }
     } catch (e) {
       print('Errore sendDownloadRequest: $e');
     }
     return false;
+  }
+
+  /// Controlla la coda del PC a intervalli brevi subito dopo una richiesta,
+  /// cosi' il brano appare in libreria appena il PC ha finito di scaricarlo.
+  void _pollUntilDelivered() {
+    int attempts = 0;
+    Timer.periodic(const Duration(seconds: 6), (t) async {
+      attempts++;
+      if (attempts > 50 || _pcHost.isEmpty) {
+        t.cancel();
+        return;
+      }
+      final got = await syncPendingFromPc();
+      await fetchTasks();
+      final stillWorking = _activeTasks.any(
+        (task) => task.status == 'queued' || task.status.startsWith('downloading'),
+      );
+      if (got > 0 && !stillWorking) {
+        t.cancel();
+      }
+    });
+  }
+
+  /// Avvia il controllo periodico della coda di consegna del PC.
+  void startAutoSync({Duration interval = const Duration(seconds: 20)}) {
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = Timer.periodic(interval, (_) {
+      if (_pcHost.isNotEmpty) {
+        syncPendingFromPc();
+      }
+    });
+  }
+
+  void stopAutoSync() {
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = null;
+  }
+
+  /// Legge dal PC lo stato dei download in corso (GET /api/tasks).
+  Future<void> fetchTasks() async {
+    if (_pcHost.isEmpty) return;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/api/tasks'))
+          .timeout(const Duration(seconds: 6));
+      if (res.statusCode != 200) return;
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final list = (data['tasks'] as List<dynamic>? ?? const []);
+      _activeTasks
+        ..clear()
+        ..addAll(
+          list.map((e) => PcDownloadTask.fromJson(e as Map<String, dynamic>)),
+        );
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Ritira dal PC tutti i brani pronti nella coda di consegna.
+  ///
+  /// Canale di PULL: GET /api/pending -> GET /api/file/<nome> -> ACK.
+  /// Funziona sempre, perche' e' l'iPhone a chiamare il PC: non serve che il
+  /// server interno dell'app sia attivo ne' che l'app resti in primo piano.
+  /// Ritorna il numero di brani effettivamente salvati in libreria.
+  Future<int> syncPendingFromPc({void Function(String step)? onStatus}) async {
+    if (_pcHost.isEmpty || _isPulling) return 0;
+
+    _isPulling = true;
+    notifyListeners();
+    int saved = 0;
+
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/api/pending'))
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) return 0;
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final files = (data['files'] as List<dynamic>? ?? const []);
+      if (files.isEmpty) return 0;
+
+      final musicDir = await LibraryService.instance.musicDirectory;
+      // Brani raggruppati per playlist: il PC indica a quale playlist
+      // appartiene ogni file, cosi' la ricreiamo anche quando il brano
+      // arriva via pull invece che via push.
+      final playlistGroups = <String, List<String>>{};
+
+      for (final raw in files) {
+        final f = raw as Map<String, dynamic>;
+        final fileName = f['fileName']?.toString() ?? '';
+        if (fileName.isEmpty) continue;
+
+        final label = f['title']?.toString() ?? fileName;
+        onStatus?.call('Ricevo dal PC: $label');
+        _statusMessage = 'Ricevo dal PC: $label';
+        notifyListeners();
+
+        try {
+          final encoded = Uri.encodeComponent(fileName);
+          final fileRes = await http
+              .get(Uri.parse('$baseUrl/api/file/$encoded'))
+              .timeout(const Duration(minutes: 5));
+
+          if (fileRes.statusCode == 200 && fileRes.bodyBytes.isNotEmpty) {
+            final dest = File('${musicDir.path}/$fileName');
+            await dest.writeAsBytes(fileRes.bodyBytes);
+            saved++;
+
+            final plName = f['playlist']?.toString() ?? '';
+            if (plName.isNotEmpty && plName != 'null') {
+              playlistGroups.putIfAbsent(plName, () => <String>[]).add(fileName);
+            }
+
+            // Conferma al PC: il brano esce dalla coda e non viene riproposto.
+            try {
+              await http
+                  .post(Uri.parse('$baseUrl/api/pending/$encoded/ack'))
+                  .timeout(const Duration(seconds: 8));
+            } catch (_) {}
+          }
+        } catch (e) {
+          print('Errore ritiro "$fileName" dal PC: $e');
+        }
+      }
+
+      if (saved > 0) {
+        await LibraryService.instance.scanLibrary();
+
+        // Ricrea su iPhone le playlist dei brani appena ritirati
+        for (final group in playlistGroups.entries) {
+          final ids = <String>[];
+          for (final fn in group.value) {
+            for (final t in LibraryService.instance.tracks) {
+              if (t.filePath != null && t.filePath!.endsWith(fn)) {
+                ids.add(t.id);
+                break;
+              }
+            }
+          }
+          if (ids.isNotEmpty) {
+            try {
+              await LibraryService.instance.createPlaylist(group.key, ids);
+            } catch (e) {
+              print('Errore creazione playlist "${group.key}": $e');
+            }
+          }
+        }
+
+        _lastPulledCount = saved;
+        _statusMessage = saved == 1
+            ? '1 brano ricevuto dal PC e aggiunto alla libreria 🎵'
+            : '$saved brani ricevuti dal PC e aggiunti alla libreria 🎵';
+      }
+    } catch (e) {
+      print('Errore syncPendingFromPc: $e');
+    } finally {
+      _isPulling = false;
+      notifyListeners();
+    }
+
+    return saved;
+  }
+
+  @override
+  void dispose() {
+    _autoSyncTimer?.cancel();
+    super.dispose();
   }
 
   /// Analizza una playlist Spotify ed esegue l'importazione
