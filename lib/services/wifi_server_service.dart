@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'library_service.dart';
+import 'update_service.dart';
 
 class WifiServerService extends ChangeNotifier {
   static final WifiServerService instance = WifiServerService._();
@@ -96,7 +97,7 @@ class WifiServerService extends ChangeNotifier {
       if (path == '/' || path == '/index.html') {
         await _serveWebPage(request);
       } else if (path == '/api/ping') {
-        _jsonResponse(request, {'ok': true, 'app': 'SborraPlay', 'version': '1.0.0'});
+        _jsonResponse(request, {'ok': true, 'app': 'SborraPlay', 'version': UpdateService.currentVersion});
       } else if (path == '/api/library') {
         final tracks = LibraryService.instance.tracks.map((t) => t.toJson()).toList();
         _jsonResponse(request, {'ok': true, 'tracks': tracks, 'count': tracks.length});
