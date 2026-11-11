@@ -1,7 +1,6 @@
 # Xcode / build
-*.xcuserdata/
+*.xcodeproj/
 *.xcworkspace/
-xcuserdata/
 build/
 DerivedData/
 Payload/
