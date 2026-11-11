@@ -94,6 +94,42 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
     }
   }
 
+  /// Chiede se creare anche la playlist. Non viene mostrata per una traccia
+  /// singola, dove creare una playlist di un solo brano non avrebbe senso.
+  Future<bool?> _chiediSeCrearePlaylist() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceCard,
+        title: Text('Cosa faccio con questa playlist?',
+            style: TextStyle(color: AppTheme.textPrimary, fontSize: 17)),
+        content: Text(
+          'Posso scaricare soltanto i brani, oppure scaricarli e creare una '
+          'playlist con lo stesso nome di quella che hai incollato.',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Solo i brani'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1DB954),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Brani + playlist'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _importPlaylist() async {
     final url = _playlistUrlCtrl.text.trim();
     if (url.isEmpty) {
@@ -103,14 +139,26 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
       return;
     }
 
+    // Traccia singola: si scarica solo quella, senza domande e senza playlist.
+    final singola = PcSyncService.isSingleTrackUrl(url);
+    bool creaPlaylist = false;
+    if (!singola) {
+      final scelta = await _chiediSeCrearePlaylist();
+      if (scelta == null) return; // annullato
+      creaPlaylist = scelta;
+    }
+
     setState(() {
       _isProcessingPlaylist = true;
-      _playlistStatusText = 'Avvio analisi...';
+      _playlistStatusText = singola
+          ? 'Scarico la singola traccia...'
+          : (creaPlaylist ? 'Scarico i brani e creo la playlist...' : 'Scarico i brani...');
     });
 
     final count = await PcSyncService.instance.importSpotifyPlaylist(
       url,
       delegateToPc: _delegatePlaylistToPc,
+      createPlaylist: creaPlaylist,
       onStatus: (step) {
         if (mounted) {
           setState(() => _playlistStatusText = step);
@@ -469,7 +517,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
                   border: Border.all(color: accent.withOpacity(0.5)),
                 ),
                 child: Text(
-                  '${p.counter} ricevute',
+                  '${p.counter} ${p.counterLabel}',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -508,10 +556,13 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
             spacing: 14,
             runSpacing: 4,
             children: [
-              _syncStat('Nella playlist', '${p.total}'),
+              _syncStat(p.isSingleTrack ? 'Traccia singola' : 'Nella playlist', '${p.total}'),
               _syncStat('Già sul telefono', '${p.alreadyOnPhone}'),
-              _syncStat('Da ricevere', '${p.toDownload}'),
-              if (p.failed > 0) _syncStat('Non riuscite', '${p.failed}'),
+              _syncStat('Da scaricare', '${p.toDownload}'),
+              if (p.toSend > 0) _syncStat('Da inviare', '${p.toSend}'),
+              if (p.failed > 0) _syncStat('Non scaricate', '${p.failed}'),
+              if (p.failedSend > 0) _syncStat('Invii da ripetere', '${p.failedSend}'),
+              if (p.playlistCreated) _syncStat('Playlist', 'creata'),
             ],
           ),
           if (p.hasError && p.error != null) ...[

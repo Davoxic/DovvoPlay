@@ -46,9 +46,16 @@ class SyncProgress {
   final int total;
   final int alreadyOnPhone;
   final int toDownload;
+  final int downloaded;
+  final int toSend;
   final int index;
   final int received;
   final int failed;
+  final int failedSend;
+  final int retryRound;
+  final int maxRetries;
+  final bool isSingleTrack;
+  final bool playlistCreated;
   final String current;
   final double percent;
   final String? error;
@@ -66,6 +73,13 @@ class SyncProgress {
     required this.failed,
     required this.current,
     required this.percent,
+    this.downloaded = 0,
+    this.toSend = 0,
+    this.failedSend = 0,
+    this.retryRound = 0,
+    this.maxRetries = 3,
+    this.isSingleTrack = false,
+    this.playlistCreated = false,
     this.error,
     this.missingTitles = const [],
   });
@@ -77,6 +91,13 @@ class SyncProgress {
         total: (j['total'] as num?)?.toInt() ?? 0,
         alreadyOnPhone: (j['alreadyOnPhone'] as num?)?.toInt() ?? 0,
         toDownload: (j['toDownload'] as num?)?.toInt() ?? 0,
+        downloaded: (j['downloaded'] as num?)?.toInt() ?? 0,
+        toSend: (j['toSend'] as num?)?.toInt() ?? 0,
+        failedSend: (j['failedSend'] as num?)?.toInt() ?? 0,
+        retryRound: (j['retryRound'] as num?)?.toInt() ?? 0,
+        maxRetries: (j['maxRetries'] as num?)?.toInt() ?? 3,
+        isSingleTrack: j['isSingleTrack'] == true,
+        playlistCreated: j['playlistCreated'] == true,
         index: (j['index'] as num?)?.toInt() ?? 0,
         received: (j['received'] as num?)?.toInt() ?? 0,
         failed: (j['failed'] as num?)?.toInt() ?? 0,
@@ -88,8 +109,16 @@ class SyncProgress {
             .toList(),
       );
 
-  /// Quante ne sono arrivate sulle quante attese: e' il "x/y" mostrato nell'app.
-  String get counter => '$received/$toDownload';
+  /// Il "x/y" mostrato nell'app: durante il download conta i brani scaricati
+  /// sul PC, durante l'invio quelli davvero arrivati sul telefono.
+  String get counter {
+    if (phase == 'download') return '$downloaded/$toDownload';
+    if (toSend > 0) return '$received/$toSend';
+    return '$received/$toDownload';
+  }
+
+  /// Etichetta del contatore, che cambia con la fase.
+  String get counterLabel => phase == 'download' ? 'scaricate' : 'ricevute';
 
   bool get isDone => phase == 'completato';
   bool get hasError => phase == 'errore';
@@ -103,7 +132,11 @@ class SyncProgress {
       case 'confronto':
         return 'Confronto con la tua libreria...';
       case 'download':
-        return 'Scarico e ricevo i brani mancanti';
+        return 'Scarico i brani mancanti sul PC';
+      case 'invio':
+        return 'Invio i brani al telefono';
+      case 'ritenta':
+        return 'Ritento gli invii non riusciti ($retryRound/$maxRetries)';
       case 'completato':
         return 'Sincronizzazione completata';
       case 'errore':
@@ -568,7 +601,18 @@ class PcSyncService extends ChangeNotifier {
   /// Allega la libreria locale cosi' il PC puo' confrontarla e scaricare solo
   /// i brani mancanti, uno per volta. Il PC risponde subito e il lavoro
   /// prosegue in background: l'avanzamento si segue con [syncProgress].
-  Future<bool> startPlaylistSync(String playlistUrl, {void Function(String step)? onStatus}) async {
+  /// Vero se il link e' di una singola traccia Spotify: in quel caso non si
+  /// chiede nulla, si scarica solo quel brano e non si crea alcuna playlist.
+  static bool isSingleTrackUrl(String url) {
+    final u = url.trim().toLowerCase();
+    return u.contains('/track/');
+  }
+
+  Future<bool> startPlaylistSync(
+    String playlistUrl, {
+    bool createPlaylist = false,
+    void Function(String step)? onStatus,
+  }) async {
     if (_pcHost.isEmpty) {
       onStatus?.call('Nessun PC configurato.');
       return false;
@@ -600,6 +644,7 @@ class PcSyncService extends ChangeNotifier {
               'playlist_url': url,
               'device_songs': deviceSongs,
               'auto_download_missing': true,
+              'create_playlist': createPlaylist,
             }),
           )
           .timeout(const Duration(seconds: 20));
@@ -697,15 +742,20 @@ class PcSyncService extends ChangeNotifier {
   Future<int> importSpotifyPlaylist(
     String spotifyUrl, {
     required bool delegateToPc,
+    bool createPlaylist = false,
     void Function(String step)? onStatus,
   }) async {
     final cleanUrl = spotifyUrl.trim();
     if (cleanUrl.isEmpty) return 0;
 
     if (delegateToPc) {
-      // Percorso nuovo: il PC confronta con la libreria del telefono e invia
-      // solo i brani mancanti, uno per volta, con avanzamento interrogabile.
-      final started = await startPlaylistSync(cleanUrl, onStatus: onStatus);
+      // Il PC confronta con la libreria del telefono, scarica i mancanti e
+      // poi li invia, con avanzamento interrogabile.
+      final started = await startPlaylistSync(
+        cleanUrl,
+        createPlaylist: createPlaylist,
+        onStatus: onStatus,
+      );
       return started ? 1 : 0;
     }
 
