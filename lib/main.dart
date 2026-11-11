@@ -69,11 +69,21 @@ class SborraPlayApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: ThemeService.instance,
       builder: (context, _) {
+        // I colori arrivano da getter statici di AppTheme, letti al momento
+        // del build: perche' un cambio di tema si veda, il sottoalbero deve
+        // essere ricostruito. Con "home: const HomeScreen()" il widget era
+        // sempre la stessa istanza, Flutter ne saltava il rebuild e il tema
+        // compariva solo riavviando l'app. La chiave legata all'id del tema
+        // forza la ricostruzione al cambio, e solo al cambio.
+        final tema = ThemeService.instance.currentTheme;
         return MaterialApp(
           title: 'SborraPlay',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.darkTheme,
-          home: const HomeScreen(),
+          theme: tema.toThemeData(),
+          home: KeyedSubtree(
+            key: ValueKey<String>('tema_${tema.id}'),
+            child: HomeScreen(),
+          ),
         );
       },
     );

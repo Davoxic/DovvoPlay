@@ -138,11 +138,15 @@ class AudioPlayerService extends ChangeNotifier {
       // Calcolo percentuale basato ESCLUSIVAMENTE sui millisecondi effettivi di ascolto
       percent = (listenedMs / totalDur.inMilliseconds) * 100.0;
     } else {
+      // Durata sconosciuta: si stima, ma senza mai arrivare alla soglia del
+      // "completo". Prima 120 secondi di ascolto valevano 85%, che superava
+      // la vecchia soglia del 70%: qualsiasi brano lungo suonato due minuti
+      // finiva contato come ascoltato per intero.
       final sec = listenedMs ~/ 1000;
       if (sec >= 120) {
-        percent = 85.0;
+        percent = 60.0;
       } else if (sec >= 60) {
-        percent = 50.0;
+        percent = 40.0;
       } else if (sec >= 20) {
         percent = 25.0;
       } else {

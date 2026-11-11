@@ -8,7 +8,7 @@ enum ListenTier {
   skipped,    // 0% - 15%
   brief,      // 15% - 35%
   half,       // 35% - 70%
-  completed,  // 70% - 100%
+  completed,  // 95% - 100% dei secondi effettivi
 }
 
 class TrackStat {
@@ -17,7 +17,7 @@ class TrackStat {
   final String artist;
   final String? thumbnailUrl;
   int playCount;       // Brani ascoltati al 70-100%
-  int completedCount;  // Brani ascoltati al 70-100%
+  int completedCount;  // Brani ascoltati al 95-100% dei secondi reali
   int halfCount;       // Brani ascoltati al 35-70%
   int briefCount;      // Brani ascoltati al 15-35%
   int skipCount;       // Brani skippati al 0-15%
@@ -374,12 +374,15 @@ class StatsService extends ChangeNotifier {
       // 15% - 35%: ASCOLTATA POCO
       stat.briefCount += 1;
       today.briefCount += 1;
-    } else if (percentage < 70.0) {
-      // 35% - 70%: ASCOLTATA A METÀ
+    } else if (percentage < 95.0) {
+      // 35% - 95%: ASCOLTATA A METÀ
+      // La soglia del "completo" sta al 95% dei secondi effettivamente
+      // riprodotti: mandare un brano alla fine e passare al successivo non
+      // deve farlo contare come ascoltato.
       stat.halfCount += 1;
       today.halfCount += 1;
     } else {
-      // 70% - 100%: ASCOLTATA COMPLETA
+      // 95% - 100%: ASCOLTATA COMPLETA
       stat.completedCount += 1;
       stat.playCount += 1;
       today.completedCount += 1;
