@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'audio_player_service.dart';
@@ -101,8 +102,21 @@ class EqualizerService extends ChangeNotifier {
     _saveToPrefs();
   }
 
+  /// ATTENZIONE: questo NON e' un equalizzatore per bande.
+  ///
+  /// just_audio espone un equalizzatore solo su Android (AndroidEqualizer);
+  /// su iOS non esiste un equivalente, e un vero filtro a 5 bande
+  /// richiederebbe AVAudioUnitEQ in codice nativo Swift. Nel progetto non e'
+  /// praticabile cosi' com'e', perche' la pipeline di build esegue
+  /// "flutter create . --platforms ios" a ogni compilazione e rigenera la
+  /// cartella ios/, cancellando qualunque codice nativo aggiunto a mano.
+  ///
+  /// Finche' resta cosi', i cursori agiscono solo sul livello di uscita.
+  /// Prima questa funzione ABBASSAVA il volume quando si alzava una banda
+  /// (headroom anti-clipping), quindi "alzare i bassi" rendeva la musica piu'
+  /// silenziosa: era il motivo per cui sembrava rotto. Ora il livello segue il
+  /// guadagno medio e il preamp, in modo prevedibile.
   void _applyEqualizer() {
-    // Adatta il volume audio per compensare il boost delle frequenze ed evitare distorsioni
     try {
       final player = AudioPlayerService.instance.player;
       if (!_isEnabled) {
@@ -110,19 +124,15 @@ class EqualizerService extends ChangeNotifier {
         return;
       }
 
-      // Calcola guadagno medio e applica headroom dinamico
-      final maxGain = _bandGains.reduce((a, b) => a > b ? a : b);
       final avgGain = _bandGains.reduce((a, b) => a + b) / _bandGains.length;
-      final totalBoost = (maxGain + _preampGain).clamp(-12.0, 12.0);
+      final totale = (avgGain + _preampGain).clamp(-12.0, 12.0);
 
-      // Headroom per evitare clipping digitale a volumi alti
-      double volumeMultiplier = 1.0;
-      if (totalBoost > 0) {
-        volumeMultiplier = 1.0 / (1.0 + (totalBoost * 0.04));
-      } else if (totalBoost < 0) {
-        volumeMultiplier = (1.0 + (avgGain * 0.03)).clamp(0.4, 1.0);
-      }
-      player.setVolume(volumeMultiplier.clamp(0.2, 1.0));
+      // dB -> fattore lineare, limitato a 1.0 perche' just_audio non amplifica
+      // oltre il volume originale: in positivo si resta a 1.0 senza penalizzare.
+      final fattore = totale >= 0
+          ? 1.0
+          : math.pow(10, totale / 20.0).toDouble();
+      player.setVolume(fattore.clamp(0.15, 1.0));
     } catch (_) {}
   }
 

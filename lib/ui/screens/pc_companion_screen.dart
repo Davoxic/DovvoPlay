@@ -43,12 +43,50 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
       duration: const Duration(milliseconds: 1400),
     )..repeat();
 
+    // Annuncia i brani che arrivano dal PC: il servizio li accumula, qui si
+    // consumano e si mostrano, perche' un servizio non puo' aprire SnackBar.
+    PcSyncService.instance.addListener(_annunciaArrivi);
+
     // Se il PC sta già sincronizzando, riprendi a seguirlo all'apertura
     PcSyncService.instance.fetchSyncProgress();
   }
 
+  /// Mostra un avviso per ogni brano ricevuto dal PC.
+  void _annunciaArrivi() {
+    if (!mounted) return;
+    final sync = PcSyncService.instance;
+    if (!sync.hasArrivedTracks) return;
+
+    final titoli = sync.consumeArrivedTracks();
+    if (titoli.isEmpty) return;
+
+    final testo = titoli.length == 1
+        ? 'Ricevuto dal PC: ${titoli.first}'
+        : 'Ricevuti dal PC ${titoli.length} brani';
+
+    // notifyListeners puo' arrivare durante un build, e aprire uno SnackBar
+    // in quel momento solleva un'eccezione: si rimanda a fine frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.library_music_rounded, color: Colors.black, size: 18),
+            const SizedBox(width: 10),
+            Expanded(child: Text(testo, style: const TextStyle(color: Colors.black))),
+          ],
+        ),
+          backgroundColor: const Color(0xFF4ADE80),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    });
+  }
+
   @override
   void dispose() {
+    PcSyncService.instance.removeListener(_annunciaArrivi);
     _spinCtrl.dispose();
     _tabCtrl.dispose();
     _ipCtrl.dispose();
@@ -318,6 +356,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
                   style: TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                   decoration: InputDecoration(
                     labelText: 'Porta',
+                    // il campo host accetta anche un nome, non solo un IP
                     labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                     hintText: '45678',
                     isDense: true,
@@ -327,18 +366,30 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
                 ),
               ),
               const SizedBox(width: 8),
+              // A PC collegato il pulsante diventa "Scollega": riconnettersi a
+              // uno a cui si e' gia' collegati non ha senso e confondeva.
               ElevatedButton(
-                onPressed: () {
-                  final p = int.tryParse(_portCtrl.text.trim()) ?? PcSyncService.defaultPcPort;
-                  sync.setHostAndPort(_ipCtrl.text.trim(), p);
-                },
+                onPressed: sync.isConnected
+                    ? () async {
+                        await sync.disconnect();
+                        _ipCtrl.clear();
+                      }
+                    : () {
+                        final p = int.tryParse(_portCtrl.text.trim()) ??
+                            PcSyncService.defaultPcPort;
+                        sync.setHostAndPort(_ipCtrl.text.trim(), p);
+                      },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.black,
+                  backgroundColor:
+                      sync.isConnected ? const Color(0xFFE5534B) : AppTheme.primary,
+                  foregroundColor: sync.isConnected ? Colors.white : Colors.black,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Connetti', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                child: Text(
+                  sync.isConnected ? 'Scollega' : 'Connetti',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -353,7 +404,11 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
             child: OutlinedButton.icon(
               onPressed: sync.isSearching
                   ? null
-                  : () => sync.discoverPcOnLan(port: int.tryParse(_portCtrl.text) ?? PcSyncService.defaultPcPort),
+                  : (sync.isConnected
+                      ? null
+                      : () => sync.discoverPcOnLan(
+                          port: int.tryParse(_portCtrl.text) ??
+                              PcSyncService.defaultPcPort)),
               icon: sync.isSearching
                   ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary))
                   : const Icon(Icons.radar_rounded, size: 16),
@@ -404,7 +459,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
             controller: _playlistUrlCtrl,
             style: TextStyle(color: AppTheme.textPrimary, fontSize: 13),
             decoration: InputDecoration(
-              hintText: 'https://open.spotify.com/playlist/...',
+              hintText: 'Link Spotify o YouTube (playlist, album o brano)',
               hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
               prefixIcon: const Icon(Icons.link_rounded, size: 20, color: Color(0xFF1DB954)),
               filled: true,

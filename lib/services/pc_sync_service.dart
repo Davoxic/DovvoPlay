@@ -175,6 +175,10 @@ class PcSyncService extends ChangeNotifier {
   Timer? _progressTimer;
   int _lastPulledCount = 0;
   SyncProgress? _syncProgress;
+  // Ultimi brani arrivati dal PC, che l'interfaccia deve annunciare.
+  // Il servizio non puo' mostrare avvisi da solo: li espone e la schermata
+  // li consuma con consumeArrivedTracks().
+  final List<String> _arrivedTracks = [];
 
   String get pcHost => _pcHost;
   int get pcPort => _pcPort;
@@ -186,6 +190,31 @@ class PcSyncService extends ChangeNotifier {
   int get lastPulledCount => _lastPulledCount;
   SyncProgress? get syncProgress => _syncProgress;
   bool get isSyncing => _syncProgress?.active == true;
+  bool get hasArrivedTracks => _arrivedTracks.isNotEmpty;
+
+  /// Restituisce i titoli arrivati dall'ultima chiamata e svuota la coda,
+  /// cosi' lo stesso brano non viene annunciato due volte.
+  List<String> consumeArrivedTracks() {
+    final out = List<String>.unmodifiable(_arrivedTracks);
+    _arrivedTracks.clear();
+    return out;
+  }
+
+  /// Dimentica il PC configurato e ferma i controlli periodici.
+  Future<void> disconnect() async {
+    stopAutoSync();
+    stopProgressPolling();
+    _pcHost = '';
+    _isConnected = false;
+    _syncProgress = null;
+    _activeTasks.clear();
+    _statusMessage = 'Scollegato dal PC';
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefHostKey);
+    } catch (_) {}
+  }
 
   String get baseUrl => 'http://$_pcHost:$_pcPort';
 
@@ -540,6 +569,9 @@ class PcSyncService extends ChangeNotifier {
             final dest = File('${musicDir.path}/$fileName');
             await dest.writeAsBytes(fileRes.bodyBytes);
             saved++;
+
+            // Da annunciare all'utente: finora il brano arrivava in silenzio.
+            _arrivedTracks.add(label);
 
             final plName = f['playlist']?.toString() ?? '';
             if (plName.isNotEmpty && plName != 'null') {
