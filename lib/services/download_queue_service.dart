@@ -140,6 +140,15 @@ class DownloadQueueService extends ChangeNotifier {
         notifyListeners();
 
         final sync = PcSyncService.instance;
+
+        // Col PC scollegato non ha senso proseguire: si lascia tutto in
+        // attesa, cosi' riprende da dove era quando torna disponibile.
+        if (!sync.isConnected) {
+          job.status = DownloadJobStatus.attesa;
+          notifyListeners();
+          break;
+        }
+
         final avviato = await sync.startPlaylistSync(
           job.url,
           createPlaylist: job.createPlaylist,
@@ -165,6 +174,9 @@ class DownloadQueueService extends ChangeNotifier {
             notifyListeners();
           }
           if (p == null || !p.active) break;
+
+          // Se la connessione cade a meta' lavoro si interrompe l'attesa.
+          if (!sync.isConnected) break;
         }
 
         final finale = sync.syncProgress;

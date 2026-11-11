@@ -4,10 +4,12 @@ import 'dart:io';
 import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
+import '../../services/pc_sync_service.dart';
 import '../../services/stats_service.dart';
 import '../../services/theme_service.dart';
 import '../../services/view_mode_service.dart';
 import '../theme.dart';
+import '../widgets/sync_indicator.dart';
 import '../widgets/track_tile.dart';
 import 'stats_screen.dart';
 
@@ -43,7 +45,34 @@ class _LibraryTabState extends State<LibraryTab> {
   final ScrollController _scrollCtrl = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    PcSyncService.instance.addListener(_avvisaCadutaConnessione);
+  }
+
+  /// Avvisa quando la connessione col PC cade, cosi' non si resta ad
+  /// aspettare download che non arriveranno.
+  void _avvisaCadutaConnessione() {
+    if (!mounted || !PcSyncService.instance.connessionePersa) return;
+    PcSyncService.instance.consumaConnessionePersa();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Connessione col PC caduta: coda e download sono in pausa.',
+          ),
+          backgroundColor: const Color(0xFFE5534B),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    });
+  }
+
+  @override
   void dispose() {
+    PcSyncService.instance.removeListener(_avvisaCadutaConnessione);
     _filterCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -66,16 +95,30 @@ class _LibraryTabState extends State<LibraryTab> {
     return RegExp(r'[A-Z]').hasMatch(c) ? c : '#';
   }
 
-  /// Etichette dell'indice, nell'ordine in cui compaiono nella lista.
+  /// Etichette dell'indice, ordinate.
+  ///
+  /// Prima raccoglievo le chiavi nell'ordine della lista scartando quelle
+  /// uguali alla precedente: con la lista non ordinata, che e' il caso di
+  /// default, saltavano fuori solo alcune lettere e in ordine casuale.
+  /// Ora si raccolgono tutte e si ordinano, con i numeri in ordine numerico
+  /// e il simbolo # in fondo.
   List<String> _etichetteIndice(List<Track> tracks) {
-    final viste = <String>[];
+    final insieme = <String>{};
     for (final t in tracks) {
-      final k = _chiaveIndice(t);
-      if (viste.isEmpty || viste.last != k) {
-        if (!viste.contains(k)) viste.add(k);
-      }
+      insieme.add(_chiaveIndice(t));
     }
-    return viste;
+    final lista = insieme.toList();
+
+    if (_sortMode == TrackSortMode.duration) {
+      lista.sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
+    } else {
+      lista.sort((a, b) {
+        if (a == '#') return 1;
+        if (b == '#') return -1;
+        return a.compareTo(b);
+      });
+    }
+    return lista;
   }
 
   /// Altezza stimata di una riga, per sapere dove saltare.
@@ -118,50 +161,56 @@ class _LibraryTabState extends State<LibraryTab> {
     );
   }
 
-  /// Barra verticale delle lettere, sovrapposta a destra della lista.
+  /// Striscia verticale delle lettere, ancorata al bordo destro.
+  ///
+  /// Si usa Positioned e non Align: dentro uno Stack l'allineamento da solo
+  /// non garantisce la striscia stretta sul lato, e la barra finiva per
+  /// occupare la larghezza dello schermo.
   Widget _indiceLaterale(List<Track> tracks, LibraryViewMode mode) {
     final etichette = _etichetteIndice(tracks);
     if (etichette.isEmpty) return const SizedBox.shrink();
 
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 2, top: 4, bottom: 110),
+    const passo = 17.0;
+
+    void scegliDaPosizione(double dy) {
+      final i = (dy / passo).floor().clamp(0, etichette.length - 1);
+      if (_letteraPremuta != etichette[i]) {
+        setState(() => _letteraPremuta = etichette[i]);
+        _saltaA(etichette[i], tracks, mode);
+      }
+    }
+
+    return Positioned(
+      top: 8,
+      bottom: 116,
+      right: 3,
+      child: Center(
         child: GestureDetector(
-          // Trascinando il dito si scorre tra le lettere senza staccarlo.
-          onVerticalDragUpdate: (d) {
-            final box = context.findRenderObject() as RenderBox?;
-            if (box == null) return;
-            final locale = d.localPosition.dy;
-            final passo = 18.0;
-            final i = (locale / passo).floor().clamp(0, etichette.length - 1);
-            if (_letteraPremuta != etichette[i]) {
-              setState(() => _letteraPremuta = etichette[i]);
-              _saltaA(etichette[i], tracks, mode);
-            }
-          },
+          behavior: HitTestBehavior.opaque,
+          onVerticalDragStart: (d) => scegliDaPosizione(d.localPosition.dy),
+          onVerticalDragUpdate: (d) => scegliDaPosizione(d.localPosition.dy),
           onVerticalDragEnd: (_) => setState(() => _letteraPremuta = null),
+          onTapDown: (d) => scegliDaPosizione(d.localPosition.dy),
+          onTapUp: (_) => setState(() => _letteraPremuta = null),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            width: 26,
+            padding: const EdgeInsets.symmetric(vertical: 6),
             decoration: BoxDecoration(
-              color: AppTheme.surfaceCard.withOpacity(0.92),
-              borderRadius: BorderRadius.circular(14),
+              color: AppTheme.surfaceCard.withOpacity(0.94),
+              borderRadius: BorderRadius.circular(13),
               border: Border.all(color: AppTheme.goldBorder),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: etichette.map((e) {
                 final attiva = _letteraPremuta == e;
-                return GestureDetector(
-                  onTap: () => _saltaA(e, tracks, mode),
-                  child: Container(
-                    height: 18,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                return SizedBox(
+                  height: passo,
+                  child: Center(
                     child: Text(
                       e,
                       style: TextStyle(
-                        fontSize: attiva ? 13 : 11,
+                        fontSize: attiva ? 12 : 10,
                         fontWeight: attiva ? FontWeight.bold : FontWeight.w600,
                         color: attiva ? AppTheme.primary : AppTheme.textSecondary,
                       ),
@@ -206,6 +255,44 @@ class _LibraryTabState extends State<LibraryTab> {
         );
       }
     }
+  }
+
+  Widget _buildShuffleTile(
+    BuildContext ctx,
+    List<Track> tracks,
+    ShuffleMode mode,
+    String title,
+    String subtitle,
+    Color color,
+  ) {
+    return ListTile(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.18),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(mode.icon, color: color, size: 20),
+      ),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary, fontSize: 14)),
+      subtitle: Text(subtitle, style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+      onTap: () {
+        Navigator.pop(ctx);
+        final player = AudioPlayerService.instance;
+        player.setShuffleMode(mode, baseList: tracks);
+        if (player.queue.isNotEmpty) {
+          player.playTrack(player.queue.first);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Avviato $title!'),
+            backgroundColor: AppTheme.surfaceLight,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+    );
   }
 
   void _showMagicShufflePicker(BuildContext context, List<Track> tracks) {
@@ -311,44 +398,6 @@ class _LibraryTabState extends State<LibraryTab> {
     );
   }
 
-  Widget _buildShuffleTile(
-    BuildContext ctx,
-    List<Track> tracks,
-    ShuffleMode mode,
-    String title,
-    String subtitle,
-    Color color,
-  ) {
-    return ListTile(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.18),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(mode.icon, color: color, size: 20),
-      ),
-      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary, fontSize: 14)),
-      subtitle: Text(subtitle, style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
-      onTap: () {
-        Navigator.pop(ctx);
-        final player = AudioPlayerService.instance;
-        player.setShuffleMode(mode, baseList: tracks);
-        if (player.queue.isNotEmpty) {
-          player.playTrack(player.queue.first);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Avviato $title!'),
-            backgroundColor: AppTheme.surfaceLight,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -436,6 +485,8 @@ class _LibraryTabState extends State<LibraryTab> {
               ],
             ),
             actions: [
+              // Frecce rotanti visibili anche fuori da PC Companion
+              const SyncIndicator(),
               // Cambio tema con un tocco; tenendo premuto si apre la scelta
               // completa con le anteprime, nelle impostazioni.
               IconButton(

@@ -197,21 +197,39 @@ class AudioPlayerService extends ChangeNotifier {
     return null;
   }
 
-  /// Mette il brano subito dopo quello in riproduzione.
+  /// Mette il brano subito dopo quello in riproduzione, scavalcando la coda.
   void playNext(Track track) {
     _queue.removeWhere((t) => t.id == track.id && t.id != currentTrack?.id);
     final pos = _currentIndex >= 0 ? _currentIndex + 1 : 0;
     _queue.insert(pos.clamp(0, _queue.length), track);
+    _ultimoAccodato = pos;
     if (!_originalQueue.any((t) => t.id == track.id)) {
       _originalQueue.add(track);
     }
     notifyListeners();
   }
 
-  /// Aggiunge il brano in fondo alla coda.
+  /// Posizione dell'ultimo brano accodato a mano: serve a incatenarli.
+  int _ultimoAccodato = -1;
+
+  /// Accoda il brano subito dopo l'ultimo accodato a mano.
+  ///
+  /// Il primo finisce subito dopo quello in riproduzione, cioe' e' il
+  /// prossimo; il secondo si mette dopo il primo, e cosi' via. Prima finivano
+  /// tutti in fondo alla coda, che con una libreria lunga voleva dire dopo
+  /// centinaia di brani.
   void addToQueue(Track track) {
-    if (_queue.any((t) => t.id == track.id)) return;
-    _queue.add(track);
+    _queue.removeWhere((t) => t.id == track.id && t.id != currentTrack?.id);
+
+    // Se l'ultimo accodato non e' piu' valido, si riparte da quello corrente.
+    if (_ultimoAccodato < _currentIndex || _ultimoAccodato >= _queue.length) {
+      _ultimoAccodato = _currentIndex;
+    }
+
+    final pos = (_ultimoAccodato + 1).clamp(0, _queue.length);
+    _queue.insert(pos, track);
+    _ultimoAccodato = pos;
+
     if (!_originalQueue.any((t) => t.id == track.id)) {
       _originalQueue.add(track);
     }

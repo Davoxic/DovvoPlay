@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
 import '../theme.dart';
+import '../widgets/sync_indicator.dart';
 import 'playlist_detail_screen.dart';
 
 class PlaylistTab extends StatelessWidget {
@@ -20,6 +21,7 @@ class PlaylistTab extends StatelessWidget {
           appBar: AppBar(
             title: const Text('Playlist'),
             actions: [
+              const SyncIndicator(),
               IconButton(
                 icon: Icon(Icons.add_rounded, color: AppTheme.primary, size: 28),
                 tooltip: 'Crea nuova playlist',

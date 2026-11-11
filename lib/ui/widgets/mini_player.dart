@@ -60,6 +60,16 @@ class _MiniPlayerState extends State<MiniPlayer> with SingleTickerProviderStateM
     _animCtrl.forward(from: 0.0);
   }
 
+  /// Riporta a zero lo scostamento senza animarlo.
+  ///
+  /// A swipe completato il brano e' gia' cambiato e quello nuovo va disegnato
+  /// subito al centro: animando il ritorno si vedeva la canzone nuova
+  /// scivolare da destra verso il centro, pur essendo gia' al suo posto.
+  void _azzeraSenzaAnimazione() {
+    _animCtrl.stop();
+    setState(() => _dragOffset = 0.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -90,13 +100,15 @@ class _MiniPlayerState extends State<MiniPlayer> with SingleTickerProviderStateM
             // Se swipe verso sinistra (prossimo brano)
             if (_dragOffset < -60 || velocity < -250) {
               player.next();
-              _animateReset();
+              _azzeraSenzaAnimazione();
             }
             // Se swipe verso destra (brano precedente)
             else if (_dragOffset > 60 || velocity > 250) {
               player.previous();
-              _animateReset();
+              _azzeraSenzaAnimazione();
             } else {
+              // Swipe non completato: il brano resta, quindi torna al centro
+              // con l'animazione.
               _animateReset();
             }
           },

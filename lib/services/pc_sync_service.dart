@@ -173,6 +173,8 @@ class PcSyncService extends ChangeNotifier {
   final List<PcDownloadTask> _activeTasks = [];
   Timer? _autoSyncTimer;
   Timer? _progressTimer;
+  Timer? _watchdogTimer;
+  bool _cadutaSegnalata = false;
   int _lastPulledCount = 0;
   SyncProgress? _syncProgress;
   // Ultimi brani arrivati dal PC, che l'interfaccia deve annunciare.
@@ -192,6 +194,66 @@ class PcSyncService extends ChangeNotifier {
   bool get isSyncing => _syncProgress?.active == true;
   bool get hasArrivedTracks => _arrivedTracks.isNotEmpty;
 
+  /// Vero quando la connessione col PC e' caduta e non e' ancora stata
+  /// annunciata all'utente. La schermata la consuma e mostra l'avviso.
+  bool _connessionePersa = false;
+  bool get connessionePersa => _connessionePersa;
+  void consumaConnessionePersa() {
+    _connessionePersa = false;
+  }
+
+  /// Controlla a intervalli che il PC risponda ancora.
+  ///
+  /// Senza questo, con il computer spento o uscito dalla rete la coda
+  /// continuava a provare e i download restavano appesi senza che nessuno
+  /// dicesse niente.
+  void startWatchdog({Duration intervallo = const Duration(seconds: 25)}) {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = Timer.periodic(intervallo, (_) async {
+      if (_pcHost.isEmpty || !_isConnected) return;
+
+      final vivo = await _pingSilenzioso();
+      if (vivo) {
+        _cadutaSegnalata = false;
+        return;
+      }
+
+      // Secondo tentativo: un singolo pacchetto perso non e' una caduta.
+      final conferma = await _pingSilenzioso();
+      if (conferma) {
+        _cadutaSegnalata = false;
+        return;
+      }
+
+      if (_cadutaSegnalata) return;
+      _cadutaSegnalata = true;
+
+      _isConnected = false;
+      _connessionePersa = true;
+      _statusMessage = 'Connessione col PC caduta';
+      stopAutoSync();
+      stopProgressPolling();
+      notifyListeners();
+    });
+  }
+
+  void stopWatchdog() {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+  }
+
+  /// Ping che non tocca lo stato: serve solo a sapere se il PC risponde.
+  Future<bool> _pingSilenzioso() async {
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/ping'))
+          .timeout(const Duration(seconds: 5));
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Restituisce i titoli arrivati dall'ultima chiamata e svuota la coda,
   /// cosi' lo stesso brano non viene annunciato due volte.
   List<String> consumeArrivedTracks() {
@@ -204,6 +266,7 @@ class PcSyncService extends ChangeNotifier {
   Future<void> disconnect() async {
     stopAutoSync();
     stopProgressPolling();
+    stopWatchdog();
     _pcHost = '';
     _isConnected = false;
     _syncProgress = null;
@@ -284,6 +347,8 @@ class PcSyncService extends ChangeNotifier {
         // canale di pull attivo: e' questo che fa arrivare la musica anche
         // quando il server interno dell'app era spento o in background.
         startAutoSync();
+        startWatchdog();
+        _cadutaSegnalata = false;
         unawaited(syncPendingFromPc());
         return true;
       } else {
@@ -765,6 +830,7 @@ class PcSyncService extends ChangeNotifier {
   void dispose() {
     _autoSyncTimer?.cancel();
     _progressTimer?.cancel();
+    _watchdogTimer?.cancel();
     super.dispose();
   }
 
