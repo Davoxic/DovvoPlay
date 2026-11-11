@@ -12,7 +12,6 @@ import '../theme.dart';
 import '../widgets/equalizer_sheet.dart';
 import 'pc_companion_screen.dart';
 import 'stats_screen.dart';
-import 'wifi_tab.dart';
 import 'youtube_tab.dart';
 
 class SettingsTab extends StatelessWidget {
@@ -70,37 +69,131 @@ class SettingsTab extends StatelessWidget {
                     shrinkWrap: true,
                     children: ThemeService.themes.map((vt) {
                       final isSelected = vt.id == current.id;
-                      return ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        tileColor: isSelected ? vt.primary.withOpacity(0.18) : Colors.transparent,
-                        leading: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            gradient: vt.primaryGradient,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+                      // Anteprima vera invece del solo pallino: ogni riga
+                      // mostra sfondo, card, testo e accento del tema, cosi'
+                      // non si sceglie alla cieca.
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            ThemeService.instance.setTheme(vt.id);
+                            Navigator.pop(ctx);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isSelected ? vt.primary : vt.goldBorder,
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                // --- Mini anteprima dello stile ---
+                                Container(
+                                  width: 76,
+                                  height: 58,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    gradient: vt.isGradient ? vt.darkGradient : null,
+                                    color: vt.isGradient ? null : vt.background,
+                                    border: Border.all(color: vt.goldBorder),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // finta card con copertina e righe
+                                        Row(
+                                          children: [
+                                            Container(
+                                              width: 16,
+                                              height: 16,
+                                              decoration: BoxDecoration(
+                                                gradient: vt.primaryGradient,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Container(
+                                                      height: 4,
+                                                      color: vt.textPrimary.withOpacity(0.85)),
+                                                  const SizedBox(height: 3),
+                                                  Container(
+                                                      height: 3,
+                                                      width: 24,
+                                                      color: vt.textSecondary.withOpacity(0.7)),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        // finta barra di avanzamento
+                                        Container(
+                                          height: 3,
+                                          decoration: BoxDecoration(
+                                            color: vt.surfaceLight,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        // finto tasto play
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              gradient: vt.primaryGradient,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        vt.name,
+                                        style: TextStyle(
+                                          color: isSelected ? vt.primary : AppTheme.textPrimary,
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        vt.description,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            color: AppTheme.textSecondary, fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(Icons.check_circle_rounded,
+                                      color: vt.primary, size: 22),
+                              ],
+                            ),
                           ),
                         ),
-                        title: Text(
-                          vt.name,
-                          style: TextStyle(
-                            color: isSelected ? vt.primary : AppTheme.textPrimary,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        subtitle: Text(
-                          vt.description,
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                        ),
-                        trailing: isSelected
-                            ? Icon(Icons.check_circle_rounded, color: vt.primary, size: 22)
-                            : null,
-                        onTap: () {
-                          ThemeService.instance.setTheme(vt.id);
-                          Navigator.pop(ctx);
-                        },
                       );
                     }).toList(),
                   ),
@@ -380,29 +473,6 @@ class SettingsTab extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              // SEZIONE PERSONALIZZAZIONE & TEMI
-              _buildSectionHeader('PERSONALIZZAZIONE & TEMI'),
-              _buildSettingTile(
-                icon: Icons.palette_rounded,
-                title: 'Temi Visivi & Palette Colori (12+ Temi)',
-                subtitle: 'Attuale: ${theme.name} • Gradienti e fissi OLED',
-                onTap: () => _showThemeSelector(context),
-              ),
-              _buildSettingTile(
-                icon: Icons.animation_rounded,
-                title: 'Temi di Animazione Brani (16+ Effetti)',
-                subtitle: 'Attuale: ${anim.name} • Esplosione, Fade, Caduta, Cubo 3D',
-                onTap: () => _showAnimationSelector(context),
-              ),
-              _buildSettingTile(
-                icon: Icons.view_quilt_rounded,
-                title: 'Stile di Visualizzazione Libreria (8 Layout)',
-                subtitle: 'Attuale: ${view.name} • Griglie, CD, Vinili, Cassette',
-                onTap: () => _showViewModeSelector(context),
-              ),
-
-              const SizedBox(height: 20),
-
               // SEZIONE FONTI & TRASFERIMENTO
               _buildSectionHeader('FONTI, TRASFERIMENTO & PC SYNC'),
               _buildFeatureTile(
@@ -432,19 +502,6 @@ class SettingsTab extends StatelessWidget {
                 },
               ),
               _buildFeatureTile(
-                icon: Icons.wifi_tethering_rounded,
-                iconGradient: const LinearGradient(colors: [Color(0xFF00E5FF), Color(0xFF0091EA)]),
-                title: 'Trasferimento Wi-Fi PC',
-                subtitle: 'Carica canzoni dal computer tramite browser (senza cavi né iTunes)',
-                badgeText: 'WIRELESS',
-                badgeColor: const Color(0xFF00E5FF),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const WifiTab()),
-                  );
-                },
-              ),
-              _buildFeatureTile(
                 icon: Icons.tune_rounded,
                 iconGradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFF9100)]),
                 title: 'Equalizzatore Audio',
@@ -452,6 +509,29 @@ class SettingsTab extends StatelessWidget {
                 badgeText: 'AUDIO EQ',
                 badgeColor: AppTheme.primary,
                 onTap: () => EqualizerSheet.show(context),
+              ),
+
+              const SizedBox(height: 20),
+
+              // SEZIONE PERSONALIZZAZIONE & TEMI
+              _buildSectionHeader('PERSONALIZZAZIONE & TEMI'),
+              _buildSettingTile(
+                icon: Icons.palette_rounded,
+                title: 'Temi Visivi & Palette Colori (12+ Temi)',
+                subtitle: 'Attuale: ${theme.name} • Gradienti e fissi OLED',
+                onTap: () => _showThemeSelector(context),
+              ),
+              _buildSettingTile(
+                icon: Icons.animation_rounded,
+                title: 'Temi di Animazione Brani (16+ Effetti)',
+                subtitle: 'Attuale: ${anim.name} • Esplosione, Fade, Caduta, Cubo 3D',
+                onTap: () => _showAnimationSelector(context),
+              ),
+              _buildSettingTile(
+                icon: Icons.view_quilt_rounded,
+                title: 'Stile di Visualizzazione Libreria (8 Layout)',
+                subtitle: 'Attuale: ${view.name} • Griglie, CD, Vinili, Cassette',
+                onTap: () => _showViewModeSelector(context),
               ),
 
               const SizedBox(height: 20),

@@ -5,6 +5,7 @@ import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
 import '../../services/stats_service.dart';
+import '../../services/theme_service.dart';
 import '../../services/view_mode_service.dart';
 import '../theme.dart';
 import '../widgets/track_tile.dart';
@@ -355,6 +356,7 @@ class _LibraryTabState extends State<LibraryTab> {
         LibraryService.instance,
         StatsService.instance,
         ViewModeService.instance,
+        ThemeService.instance,
       ]),
       builder: (context, _) {
         final lib = LibraryService.instance;
@@ -434,6 +436,23 @@ class _LibraryTabState extends State<LibraryTab> {
               ],
             ),
             actions: [
+              // Cambio tema con un tocco; tenendo premuto si apre la scelta
+              // completa con le anteprime, nelle impostazioni.
+              IconButton(
+                icon: Icon(Icons.palette_rounded, color: AppTheme.primary),
+                tooltip: 'Cambia tema (${ThemeService.instance.currentTheme.name})',
+                onPressed: () {
+                  ThemeService.instance.cycleNextTheme();
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      duration: const Duration(milliseconds: 900),
+                      content: Text('Tema: ${ThemeService.instance.currentTheme.name}'),
+                      backgroundColor: AppTheme.surfaceCard,
+                    ),
+                  );
+                },
+              ),
               IconButton(
                 icon: Icon(ViewModeService.instance.currentInfo.icon, color: AppTheme.primary),
                 tooltip: 'Cambia layout (${ViewModeService.instance.currentInfo.name})',

@@ -541,6 +541,13 @@ class ThemeService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Passa al tema successivo, per il cambio rapido da un'icona.
+  Future<void> cycleNextTheme() async {
+    final i = themes.indexWhere((t) => t.id == _currentTheme.id);
+    final next = themes[(i + 1) % themes.length];
+    await setTheme(next.id);
+  }
+
   Future<void> setTheme(String themeId) async {
     final found = themes.firstWhere((t) => t.id == themeId, orElse: () => themes.first);
     _currentTheme = found;

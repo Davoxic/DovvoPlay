@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/download_queue_service.dart';
+import '../../services/wifi_server_service.dart';
 import '../../services/pc_sync_service.dart';
 import '../../services/soundcloud_service.dart';
 import '../../services/spotify_service.dart';
 import '../../services/youtube_service.dart';
 import '../theme.dart';
+import 'wifi_tab.dart';
 import '../widgets/track_artwork.dart';
 
 class PcCompanionScreen extends StatefulWidget {
@@ -307,6 +309,12 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
                 const SizedBox(height: 14),
                 _buildCodaCard(coda),
               ],
+
+              // 2d. TRASFERIMENTO WI-FI: era una voce separata nelle
+              // impostazioni, ma appartiene a questa schermata, dove si
+              // gestisce tutto il rapporto col computer.
+              const SizedBox(height: 14),
+              _buildWifiCard(),
 
               const SizedBox(height: 22),
 
@@ -788,6 +796,81 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with TickerProvid
           }),
         ],
       ),
+    );
+  }
+
+  /// Trasferimento Wi-Fi dal computer: stato del server interno dell'app e
+  /// accesso alla schermata completa.
+  Widget _buildWifiCard() {
+    return ListenableBuilder(
+      listenable: WifiServerService.instance,
+      builder: (context, _) {
+        final wifi = WifiServerService.instance;
+        final attivo = wifi.isRunning;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceCard,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.goldBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.wifi_tethering_rounded,
+                    color: attivo ? const Color(0xFF4ADE80) : AppTheme.textSecondary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Trasferimento Wi-Fi dal computer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Switch(
+                    value: attivo,
+                    activeColor: const Color(0xFF4ADE80),
+                    onChanged: (_) => wifi.toggle(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                attivo
+                    ? 'Server attivo: apri ${wifi.serverUrl} dal browser del computer e trascina i brani.'
+                    : 'Da spento il computer non puo\' inviare brani con il push diretto: restano in coda e li ritira l\'app.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const WifiTab()),
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('Apri il pannello completo',
+                      style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.textPrimary,
+                    side: BorderSide(color: AppTheme.goldBorder),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
