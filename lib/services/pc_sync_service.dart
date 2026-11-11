@@ -45,10 +45,18 @@ class PcSyncService extends ChangeNotifier {
   }
 
   static const String _prefHostKey = 'sborraplay_pc_host_ip_v2';
-  static const String _prefPortKey = 'sborraplay_pc_port_v2';
+  static const String _prefPortKey = 'sborraplay_pc_port_v3';
+
+  /// Porta di default del server sul PC.
+  /// Deve combaciare con DEFAULT_SERVER_PORT in server.py.
+  /// Spostata dalla 8080, troppo spesso occupata o intercettata sui PC, a una
+  /// porta alta ma sotto la 49152 dove inizia il range dinamico di Windows.
+  /// Non va confusa con la porta del server interno dell'app
+  /// (WifiServerService._port), che resta la 8080.
+  static const int defaultPcPort = 45678;
 
   String _pcHost = '';
-  int _pcPort = 8080;
+  int _pcPort = defaultPcPort;
   bool _isConnected = false;
   bool _isSearching = false;
   bool _isPulling = false;
@@ -72,7 +80,7 @@ class PcSyncService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       _pcHost = prefs.getString(_prefHostKey) ?? '';
-      _pcPort = prefs.getInt(_prefPortKey) ?? 8080;
+      _pcPort = prefs.getInt(_prefPortKey) ?? defaultPcPort;
       if (_pcHost.isNotEmpty) {
         testConnection();
       }
@@ -88,7 +96,7 @@ class PcSyncService extends ChangeNotifier {
     if (cleanHost.contains('/')) {
       cleanHost = cleanHost.split('/').first.trim();
     }
-    // Se l'utente ha scritto IP:PORTA (es. 192.168.1.174:8080)
+    // Se l'utente ha scritto IP:PORTA (es. 192.168.1.174:45678)
     if (cleanHost.contains(':')) {
       final parts = cleanHost.split(':');
       cleanHost = parts[0].trim();
@@ -165,7 +173,7 @@ class PcSyncService extends ChangeNotifier {
   }
 
   /// Scansiona l'intera subnet locale (es. 192.168.1.1 - 254) alla ricerca del server PC
-  Future<String?> discoverPcOnLan({int port = 8080}) async {
+  Future<String?> discoverPcOnLan({int port = defaultPcPort}) async {
     _isSearching = true;
     _statusMessage = 'Ricerca automatica PC su rete locale (porta $port)...';
     notifyListeners();

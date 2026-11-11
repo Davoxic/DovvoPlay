@@ -253,7 +253,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
                   decoration: InputDecoration(
                     labelText: 'Porta',
                     labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                    hintText: '8080',
+                    hintText: '45678',
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.goldBorder)),
@@ -263,7 +263,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () {
-                  final p = int.tryParse(_portCtrl.text.trim()) ?? 8080;
+                  final p = int.tryParse(_portCtrl.text.trim()) ?? PcSyncService.defaultPcPort;
                   sync.setHostAndPort(_ipCtrl.text.trim(), p);
                 },
                 style: ElevatedButton.styleFrom(
@@ -278,7 +278,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
           ),
           const SizedBox(height: 6),
           Text(
-            'Nota: il PC deve essere connesso allo stesso Wi-Fi dell\'iPhone e la porta 8080 sbloccata nel Firewall.',
+            'Nota: il PC deve essere connesso allo stesso Wi-Fi dell\'iPhone e la porta ${PcSyncService.defaultPcPort} sbloccata nel Firewall.',
             style: TextStyle(fontSize: 10, color: AppTheme.textSecondary.withOpacity(0.8)),
           ),
           const SizedBox(height: 10),
@@ -287,7 +287,7 @@ class _PcCompanionScreenState extends State<PcCompanionScreen> with SingleTicker
             child: OutlinedButton.icon(
               onPressed: sync.isSearching
                   ? null
-                  : () => sync.discoverPcOnLan(port: int.tryParse(_portCtrl.text) ?? 8080),
+                  : () => sync.discoverPcOnLan(port: int.tryParse(_portCtrl.text) ?? PcSyncService.defaultPcPort),
               icon: sync.isSearching
                   ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary))
                   : const Icon(Icons.radar_rounded, size: 16),
