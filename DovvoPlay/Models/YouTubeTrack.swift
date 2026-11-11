@@ -32,6 +32,8 @@ public struct YouTubeTrack: Identifiable, Equatable, Hashable {
         return String(format: "%d:%02d", mins, rem)
     }
 
+    public var durationSeconds: Double { duration }
+
     public func toTrack(streamUrl: String? = nil) -> Track {
         return Track(
             id: "yt_\(id)",

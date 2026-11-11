@@ -17,6 +17,10 @@ public class YouTubeService: ObservableObject {
 
     // --- SEARCH ---
 
+    public func search(_ query: String) async throws -> [YouTubeTrack] {
+        return try await search(query: query)
+    }
+
     public func search(query: String) async throws -> [YouTubeTrack] {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return [] }
@@ -332,6 +336,22 @@ public class YouTubeService: ObservableObject {
         } catch {
             return nil
         }
+    }
+
+    public struct AudioStreamInfo {
+        public let url: String
+        public init(url: String) { self.url = url }
+    }
+
+    public func extractAudioStream(_ videoId: String) async -> AudioStreamInfo? {
+        if let url = await getPlayableStreamUrl(videoId: videoId) {
+            return AudioStreamInfo(url: url.absoluteString)
+        }
+        return nil
+    }
+
+    public func downloadAudioStream(_ videoId: String, _ title: String, onProgress: ((Double) -> Void)? = nil) async -> URL? {
+        return await downloadAudioStream(videoId: videoId, title: title, onProgress: onProgress)
     }
 
     public func downloadAudioStream(videoId: String, title: String, onProgress: ((Double) -> Void)? = nil) async -> URL? {

@@ -42,6 +42,33 @@ public struct Track: Identifiable, Codable, Equatable, Hashable {
         self.addedAt = addedAt
     }
 
+    public init(
+        id: String,
+        title: String,
+        artist: String,
+        album: String = "",
+        path: String? = nil,
+        duration: Double = 0,
+        artworkPath: String? = nil,
+        dateAdded: Date = Date()
+    ) {
+        self.id = id
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.durationMs = Int(duration * 1000)
+        self.filePath = path
+        self.isOnline = path?.hasPrefix("http") == true
+        self.streamUrl = path?.hasPrefix("http") == true ? path : nil
+        self.thumbnailUrl = artworkPath
+        self.fileSize = nil
+        self.bpm = nil
+        self.addedAt = dateAdded
+    }
+
+    public var artworkPath: String? { thumbnailUrl }
+    public var path: String { filePath ?? streamUrl ?? "" }
+
     public var displayTitle: String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Traccia sconosciuta" : trimmed

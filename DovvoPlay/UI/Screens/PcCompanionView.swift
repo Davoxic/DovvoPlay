@@ -641,14 +641,14 @@ public struct PcCompanionView: View {
                         if res.isEmpty { searchError = "Nessun risultato YouTube trovato per \"\(q)\"" }
                     }
                 } else if selectedSearchTab == 1 {
-                    let res = try await SpotifyService.shared.search(q)
+                    let res = await SpotifyService.shared.search(q)
                     await MainActor.run {
                         self.spotifyResults = res
                         self.isSearching = false
                         if res.isEmpty { searchError = "Nessun risultato Spotify trovato per \"\(q)\"" }
                     }
                 } else {
-                    let res = try await SoundCloudService.shared.search(q)
+                    let res = await SoundCloudService.shared.search(q)
                     await MainActor.run {
                         self.soundCloudResults = res
                         self.isSearching = false

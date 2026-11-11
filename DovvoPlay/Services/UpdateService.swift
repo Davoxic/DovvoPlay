@@ -163,4 +163,8 @@ public class UpdateService: ObservableObject {
             rootVC.present(activityVC, animated: true)
         }
     }
+
+    public func shareFile(_ fileURL: URL) {
+        shareIpa(fileURL: fileURL)
+    }
 }

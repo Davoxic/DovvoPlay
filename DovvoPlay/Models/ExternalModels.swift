@@ -26,7 +26,7 @@ public struct SpotifyItem: Identifiable, Equatable, Hashable {
 
     public var artworkUrl: String { thumbnailUrl }
     public var permalinkUrl: String { url }
-    public var user: String { author }
+    public var user: String { artist }
 }
 
 public struct SpotifyPlaylistInfo {

@@ -199,6 +199,10 @@ public class AudioPlayerService: NSObject, ObservableObject {
 
     // --- PLAYBACK CONTROLS ---
 
+    public func play(track: Track, from queue: [Track]? = nil) {
+        playTrack(track, newQueue: queue)
+    }
+
     public func playTrack(_ track: Track, newQueue: [Track]? = nil) {
         playRequestId += 1
         let currentRequestId = playRequestId
