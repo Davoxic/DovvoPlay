@@ -19,6 +19,112 @@ class NowPlayingScreen extends StatefulWidget {
 class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerProviderStateMixin {
   double _dragOffset = 0.0;
 
+  /// Effetto ambient dietro la copertina, si accende toccandola.
+  bool _ambiente = false;
+  late AnimationController _pulsazione;
+
+  @override
+  void initState() {
+    super.initState();
+    // Durata provvisoria: viene riallineata al BPM del brano quando si accende
+    _pulsazione = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulsazione.dispose();
+    super.dispose();
+  }
+
+  /// Accende o spegne l'ambient, sincronizzandolo al BPM del brano.
+  ///
+  /// Il BPM arriva dal tag TBPM, che il PC scrive durante il download: su iOS
+  /// non si puo' analizzare l'audio in uscita senza permessi che non vogliamo
+  /// chiedere, quindi il tempo viene calcolato una volta sola sul computer.
+  /// Senza BPM noto si usa un respiro lento, senza finta sincronia.
+  void _toggleAmbiente(Track? track) {
+    setState(() => _ambiente = !_ambiente);
+    if (!_ambiente) {
+      _pulsazione.stop();
+      return;
+    }
+    final bpm = track?.bpm;
+    final ms = (bpm != null && bpm >= 40 && bpm <= 220)
+        ? (60000 / bpm).round()
+        : 2000;
+    _pulsazione.duration = Duration(milliseconds: ms);
+    _pulsazione.repeat(reverse: true);
+  }
+
+  /// Scelta dell'animazione di transizione tra i brani.
+  void _showAnimationSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return ListenableBuilder(
+          listenable: AnimationThemeService.instance,
+          builder: (context, _) {
+            final servizio = AnimationThemeService.instance;
+            return SafeArea(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: Text(
+                      'Animazione tra i brani',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  ...servizio.animations.map((a) {
+                    final scelta = servizio.selectedType == a.type;
+                    return ListTile(
+                      leading: Icon(
+                        a.icon,
+                        color: scelta ? AppTheme.primary : AppTheme.textSecondary,
+                      ),
+                      title: Text(
+                        a.name,
+                        style: TextStyle(
+                          color: scelta ? AppTheme.primary : AppTheme.textPrimary,
+                          fontWeight: scelta ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: Text(
+                        a.description,
+                        style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                      ),
+                      trailing: scelta
+                          ? Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 20)
+                          : null,
+                      onTap: () {
+                        servizio.setAnimationType(a.type);
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  }),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _formatTime(Duration d) {
     final m = d.inMinutes;
     final s = d.inSeconds % 60;
@@ -129,7 +235,20 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    final playerGesti = AudioPlayerService.instance;
     return GestureDetector(
+      // Swipe a destra: brano successivo. A sinistra: precedente.
+      onHorizontalDragEnd: (details) {
+        final v = details.primaryVelocity ?? 0;
+        if (v.abs() < 120) return;
+        if (v > 0) {
+          playerGesti.next();
+        } else {
+          playerGesti.previous();
+        }
+      },
+      // Doppio tocco al centro: ricomincia il brano da capo.
+      onDoubleTap: () => playerGesti.seek(Duration.zero),
       onVerticalDragUpdate: (details) {
         if (details.delta.dy > 0 || _dragOffset > 0) {
           setState(() {
@@ -233,6 +352,19 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                   tooltip: 'Equalizzatore audio',
                                   onPressed: () => EqualizerSheet.show(context),
                                 ),
+                                // Animazione di transizione, accanto all'EQ
+                                ListenableBuilder(
+                                  listenable: AnimationThemeService.instance,
+                                  builder: (context, _) => IconButton(
+                                    icon: Icon(
+                                      AnimationThemeService.instance.currentTheme.icon,
+                                      size: 22,
+                                      color: AppTheme.primary,
+                                    ),
+                                    tooltip: 'Animazione tra i brani',
+                                    onPressed: () => _showAnimationSheet(context),
+                                  ),
+                                ),
                                 IconButton(
                                   icon: Icon(Icons.playlist_add_rounded, size: 26, color: AppTheme.textPrimary),
                                   tooltip: 'Aggiungi a playlist',
@@ -313,8 +445,38 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                           },
                         ),
 
-                        // Artwork con Animazione Selezionabile (16+ Temi di Transizione)
-                        Hero(
+                        // Artwork: toccandola si accende l'effetto ambient,
+                        // un bagliore che pulsa a tempo col BPM del brano.
+                        GestureDetector(
+                          onTap: () => _toggleAmbiente(track),
+                          child: AnimatedBuilder(
+                            animation: _pulsazione,
+                            builder: (context, child) {
+                              final t = _ambiente ? _pulsazione.value : 0.0;
+                              return Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // Bagliore dietro la copertina
+                                  if (_ambiente)
+                                    Container(
+                                      width: MediaQuery.of(context).size.width * (0.80 + 0.10 * t),
+                                      height: MediaQuery.of(context).size.width * (0.80 + 0.10 * t),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(40),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppTheme.primary.withOpacity(0.18 + 0.32 * t),
+                                            blurRadius: 40 + 60 * t,
+                                            spreadRadius: 4 + 16 * t,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  child!,
+                                ],
+                              );
+                            },
+                            child: Hero(
                           tag: 'current_artwork',
                           child: AnimatedTrackTransition(
                             trackKey: track.id,
@@ -339,6 +501,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                 borderRadius: 28,
                               ),
                             ),
+                          ),
+                        ),
                           ),
                         ),
 
@@ -473,98 +637,140 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                         const SizedBox(height: 16),
 
                         // Controls
+                        // Minuti ascoltati oggi: stava dentro il tasto shuffle
+                        // e lo rendeva larghissimo, sbilanciando tutta la riga.
+                        ListenableBuilder(
+                          listenable: StatsService.instance,
+                          builder: (context, _) {
+                            final mins = StatsService.instance.todayStat.listeningSeconds ~/ 60;
+                            return Text(
+                              '$mins minuti ascoltati oggi',
+                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        // Tre zone: i laterali occupano lo stesso spazio, quindi
+                        // il gruppo centrale resta centrato qualunque sia la
+                        // larghezza di shuffle e repeat. Con spaceEvenly e un
+                        // tasto shuffle largo, play e frecce finivano spostati.
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            // Shuffle Button interattivo con selezione modalità e minuti ascoltati oggi
-                            ListenableBuilder(
-                              listenable: StatsService.instance,
-                              builder: (context, _) {
-                                final todayMins = StatsService.instance.todayStat.listeningSeconds ~/ 60;
-                                return GestureDetector(
-                                  onTap: () => _showShuffleModeSheet(context, player),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: player.isShuffle ? AppTheme.primary.withOpacity(0.18) : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: player.isShuffle ? AppTheme.primary : Colors.white12,
+                            // --- Shuffle, piccolo ---
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                // Un solo gestore per tocco e pressione lunga:
+                                // dentro un IconButton l'InkWell intercetta il
+                                // gesto e onLongPress non scatterebbe.
+                                child: Tooltip(
+                                  message: player.isShuffle
+                                      ? 'Shuffle: ${player.shuffleMode.label} - tieni premuto per il tipo'
+                                      : 'Shuffle casuale - tieni premuto per il tipo',
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(24),
+                                    onTap: () {
+                                      // Un tocco: casuale puro, oppure spegne.
+                                      if (player.shuffleMode == ShuffleMode.standard) {
+                                        player.setShuffleMode(ShuffleMode.off);
+                                      } else {
+                                        player.setShuffleMode(ShuffleMode.standard);
+                                      }
+                                    },
+                                    // Pressione lunga: menu con i tipi di shuffle.
+                                    onLongPress: () => _showShuffleModeSheet(context, player),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Icon(
+                                        player.shuffleMode.icon,
+                                        size: 22,
+                                        color: player.isShuffle
+                                            ? AppTheme.primary
+                                            : AppTheme.textSecondary,
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          player.shuffleMode.icon,
-                                          color: player.isShuffle ? AppTheme.primary : AppTheme.textSecondary,
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          '${todayMins}m oggi',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: player.isShuffle ? AppTheme.primary : AppTheme.textSecondary,
-                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // --- Gruppo centrale: precedente, play, successivo ---
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 56, minHeight: 56),
+                                  icon: Icon(Icons.skip_previous_rounded,
+                                      size: 46, color: AppTheme.textPrimary),
+                                  onPressed: () => player.previous(),
+                                ),
+                                const SizedBox(width: 10),
+                                GestureDetector(
+                                  onTap: () => player.togglePlayPause(),
+                                  child: Container(
+                                    width: 84,
+                                    height: 84,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: AppTheme.primaryGradient,
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x55FFD700),
+                                          blurRadius: 26,
+                                          offset: Offset(0, 8),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.skip_previous_rounded, size: 36, color: AppTheme.textPrimary),
-                              onPressed: () => player.previous(),
-                            ),
-                            GestureDetector(
-                              onTap: () => player.togglePlayPause(),
-                              child: Container(
-                                width: 70,
-                                height: 70,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: AppTheme.primaryGradient,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Color(0x55FFD700),
-                                      blurRadius: 22,
-                                      offset: Offset(0, 6),
+                                    child: Center(
+                                      child: player.isBuffering
+                                          ? const SizedBox(
+                                              width: 32,
+                                              height: 32,
+                                              child: CircularProgressIndicator(
+                                                  color: Colors.black, strokeWidth: 3),
+                                            )
+                                          : Icon(
+                                              player.isPlaying
+                                                  ? Icons.pause_rounded
+                                                  : Icons.play_arrow_rounded,
+                                              size: 50,
+                                              color: Colors.black,
+                                            ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                                child: Center(
-                                  child: player.isBuffering
-                                      ? const SizedBox(
-                                          width: 28,
-                                          height: 28,
-                                          child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3),
-                                        )
-                                      : Icon(
-                                          player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                          size: 40,
-                                          color: Colors.black,
-                                        ),
+                                const SizedBox(width: 10),
+                                IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 56, minHeight: 56),
+                                  icon: Icon(Icons.skip_next_rounded,
+                                      size: 46, color: AppTheme.textPrimary),
+                                  onPressed: () => player.next(),
+                                ),
+                              ],
+                            ),
+
+                            // --- Repeat, piccolo ---
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: IconButton(
+                                  icon: Icon(
+                                    player.loopMode == PlayerLoopMode.one
+                                        ? Icons.repeat_one_rounded
+                                        : Icons.repeat_rounded,
+                                    size: 22,
+                                    color: player.loopMode != PlayerLoopMode.off
+                                        ? AppTheme.primary
+                                        : AppTheme.textSecondary,
+                                  ),
+                                  tooltip: 'Ripetizione',
+                                  onPressed: () => player.toggleLoopMode(),
                                 ),
                               ),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.skip_next_rounded, size: 36, color: AppTheme.textPrimary),
-                              onPressed: () => player.next(),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                player.loopMode == PlayerLoopMode.one
-                                    ? Icons.repeat_one_rounded
-                                    : Icons.repeat_rounded,
-                                color: player.loopMode != PlayerLoopMode.off
-                                    ? AppTheme.primary
-                                    : AppTheme.textSecondary,
-                                size: 24,
-                              ),
-                              onPressed: () => player.toggleLoopMode(),
                             ),
                           ],
                         ),

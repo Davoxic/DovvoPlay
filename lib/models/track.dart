@@ -9,6 +9,10 @@ class Track {
   final String? streamUrl;
   final String? thumbnailUrl;
   final int? fileSize;
+
+  /// Battiti per minuto, dal tag TBPM. Lo scrive il PC durante il download,
+  /// e serve all'effetto ambient per pulsare a tempo. null = sconosciuto.
+  final double? bpm;
   final DateTime addedAt;
 
   Track({
@@ -22,6 +26,7 @@ class Track {
     this.streamUrl,
     this.thumbnailUrl,
     this.fileSize,
+    this.bpm,
     DateTime? addedAt,
   }) : addedAt = addedAt ?? DateTime.now();
 
@@ -39,6 +44,7 @@ class Track {
     String? streamUrl,
     String? thumbnailUrl,
     int? fileSize,
+    double? bpm,
     DateTime? addedAt,
   }) {
     return Track(
@@ -52,6 +58,7 @@ class Track {
       streamUrl: streamUrl ?? this.streamUrl,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       fileSize: fileSize ?? this.fileSize,
+      bpm: bpm ?? this.bpm,
       addedAt: addedAt ?? this.addedAt,
     );
   }
@@ -67,6 +74,7 @@ class Track {
     'streamUrl': streamUrl,
     'thumbnailUrl': thumbnailUrl,
     'fileSize': fileSize,
+    'bpm': bpm,
     'addedAt': addedAt.toIso8601String(),
     'file': filePath != null ? filePath!.split('/').last : id,
   };
@@ -83,6 +91,7 @@ class Track {
       streamUrl: json['streamUrl'],
       thumbnailUrl: json['thumbnailUrl'],
       fileSize: json['fileSize'],
+      bpm: (json['bpm'] as num?)?.toDouble(),
       addedAt: json['addedAt'] != null
           ? DateTime.tryParse(json['addedAt']) ?? DateTime.now()
           : DateTime.now(),

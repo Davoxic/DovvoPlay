@@ -151,6 +151,7 @@ class LibraryService extends ChangeNotifier {
         fileSize: size,
         thumbnailUrl: cover,
         duration: meta.duration ?? existing?.duration ?? Duration.zero,
+        bpm: meta.bpm ?? existing?.bpm,
       ));
     }
 

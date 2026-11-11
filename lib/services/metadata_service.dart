@@ -9,12 +9,16 @@ class AudioMetadata {
   final String? coverPath;
   final Duration? duration;
 
+  /// Battiti per minuto dal tag TBPM, se presente.
+  final double? bpm;
+
   const AudioMetadata({
     this.title,
     this.artist,
     this.album,
     this.coverPath,
     this.duration,
+    this.bpm,
   });
 }
 
@@ -89,6 +93,7 @@ class MetadataService {
     String? artist;
     String? album;
     String? coverPath;
+    double? bpm;
 
     int offset = 0;
     final idLen = version == 2 ? 3 : 4;
@@ -130,6 +135,10 @@ class MetadataService {
         artist = _decodeId3Text(frameData);
       } else if (frameId == 'TALB' || frameId == 'TAL') {
         album = _decodeId3Text(frameData);
+      } else if (frameId == 'TBPM' || frameId == 'TBP') {
+        // Lo scrive il PC dopo il download: serve all'effetto ambient.
+        final grezzo = _decodeId3Text(bytes.sublist(offset, offset + frameSize));
+        bpm = double.tryParse(grezzo.replaceAll(',', '.').trim());
       } else if (frameId == 'APIC' || frameId == 'PIC') {
         // Estrazione copertina
         if (coverPath == null) {
@@ -144,6 +153,7 @@ class MetadataService {
       album: album,
       coverPath: coverPath,
       duration: durata,
+      bpm: bpm,
     );
   }
 
