@@ -255,12 +255,37 @@ class LibraryService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Solo il nome del file, senza cartelle: e' la parte stabile di un id.
+  static String _nomeFile(String percorso) {
+    // Niente regex: una classe di caratteri con la barra rovesciata va
+    // sfuggita, ed e' facile sbagliarla. Due ricerche sono piu' chiare.
+    final slash = percorso.lastIndexOf('/');
+    final backslash = percorso.lastIndexOf('\\');
+    final i = slash > backslash ? slash : backslash;
+    return i == -1 ? percorso : percorso.substring(i + 1);
+  }
+
+  /// Cerca una traccia per id, con una rete di sicurezza sul nome del file.
+  ///
+  /// Gli id delle tracce locali sono percorsi assoluti, e su iOS il percorso
+  /// della cartella Documents contiene un UUID che cambia a ogni
+  /// reinstallazione dell'app. Dopo un aggiornamento dell'IPA le playlist
+  /// salvate contengono quindi percorsi che non esistono piu': il confronto
+  /// esatto non trova nulla e la playlist risulta vuota, mentre il conteggio
+  /// resta giusto perche' legge trackIds.length. Confrontando anche il solo
+  /// nome del file le playlist sopravvivono ai reinstalli.
   Track? getTrackById(String id) {
-    try {
-      return _tracks.firstWhere((t) => t.id == id);
-    } catch (_) {
-      return null;
+    for (final t in _tracks) {
+      if (t.id == id) return t;
     }
+    final nome = _nomeFile(id);
+    if (nome.isEmpty) return null;
+    for (final t in _tracks) {
+      if (_nomeFile(t.id) == nome) return t;
+      final fp = t.filePath;
+      if (fp != null && _nomeFile(fp) == nome) return t;
+    }
+    return null;
   }
 
   List<Track> getTracksForPlaylist(Playlist playlist) {
