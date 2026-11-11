@@ -14,8 +14,9 @@ enum TrackSortMode {
   none('Nessuno', Icons.sort_rounded),
   duration('Durata', Icons.timer_outlined),
   playCount('Ascolti Totali', Icons.local_fire_department_rounded),
-  artist('Artista', Icons.person_rounded),
-  alphabetical('A-Z', Icons.sort_by_alpha_rounded);
+  artist('Artista', Icons.person_rounded);
+  // Il vecchio 'A-Z' e' stato rimosso: l'ordinamento alfabetico ora si fa
+  // col tasto A accanto alla ricerca, che apre l'indice laterale.
 
   final String label;
   final IconData icon;
@@ -35,10 +36,143 @@ class _LibraryTabState extends State<LibraryTab> {
   String _activeCategory = 'all'; // 'all', 'top', 'least', 'recent'
   TrackSortMode _sortMode = TrackSortMode.none;
 
+  /// Indice laterale: si apre col tasto quadrato accanto alla ricerca.
+  bool _indiceAperto = false;
+  String? _letteraPremuta;
+  final ScrollController _scrollCtrl = ScrollController();
+
   @override
   void dispose() {
     _filterCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  /// La chiave di un brano nell'indice dipende da come e' ordinata la lista:
+  /// per artista si usa l'iniziale dell'artista, per durata i minuti, negli
+  /// altri casi l'iniziale del titolo.
+  String _chiaveIndice(Track t) {
+    if (_sortMode == TrackSortMode.artist) {
+      final a = t.displayArtist.trim();
+      return a.isEmpty ? '#' : a[0].toUpperCase();
+    }
+    if (_sortMode == TrackSortMode.duration) {
+      return '${t.duration.inMinutes}';
+    }
+    final titolo = t.displayTitle.trim();
+    if (titolo.isEmpty) return '#';
+    final c = titolo[0].toUpperCase();
+    return RegExp(r'[A-Z]').hasMatch(c) ? c : '#';
+  }
+
+  /// Etichette dell'indice, nell'ordine in cui compaiono nella lista.
+  List<String> _etichetteIndice(List<Track> tracks) {
+    final viste = <String>[];
+    for (final t in tracks) {
+      final k = _chiaveIndice(t);
+      if (viste.isEmpty || viste.last != k) {
+        if (!viste.contains(k)) viste.add(k);
+      }
+    }
+    return viste;
+  }
+
+  /// Altezza stimata di una riga, per sapere dove saltare.
+  /// Non e' esatta al pixel, ma porta il brano cercato in vista.
+  double _altezzaRiga(LibraryViewMode mode) {
+    switch (mode) {
+      case LibraryViewMode.compactList:
+        return 56.0;
+      case LibraryViewMode.gridCovers:
+        return 210.0;
+      case LibraryViewMode.gridCompact:
+        return 140.0;
+      case LibraryViewMode.cdJewelCase:
+        return 200.0;
+      case LibraryViewMode.vinylCrate:
+        return 200.0;
+      case LibraryViewMode.cassetteTape:
+        return 190.0;
+      case LibraryViewMode.minimalTypography:
+        return 64.0;
+      case LibraryViewMode.modernCards:
+        return 76.0;
+    }
+    // Rete di sicurezza: se in futuro si aggiunge un layout, la funzione
+    // continua a restituire un valore invece di non compilare.
+    return 72.0;
+  }
+
+  void _saltaA(String etichetta, List<Track> tracks, LibraryViewMode mode) {
+    final idx = tracks.indexWhere((t) => _chiaveIndice(t) == etichetta);
+    if (idx < 0 || !_scrollCtrl.hasClients) return;
+    final target = (idx * _altezzaRiga(mode)).clamp(
+      0.0,
+      _scrollCtrl.position.maxScrollExtent,
+    );
+    _scrollCtrl.animateTo(
+      target,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// Barra verticale delle lettere, sovrapposta a destra della lista.
+  Widget _indiceLaterale(List<Track> tracks, LibraryViewMode mode) {
+    final etichette = _etichetteIndice(tracks);
+    if (etichette.isEmpty) return const SizedBox.shrink();
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 2, top: 4, bottom: 110),
+        child: GestureDetector(
+          // Trascinando il dito si scorre tra le lettere senza staccarlo.
+          onVerticalDragUpdate: (d) {
+            final box = context.findRenderObject() as RenderBox?;
+            if (box == null) return;
+            final locale = d.localPosition.dy;
+            final passo = 18.0;
+            final i = (locale / passo).floor().clamp(0, etichette.length - 1);
+            if (_letteraPremuta != etichette[i]) {
+              setState(() => _letteraPremuta = etichette[i]);
+              _saltaA(etichette[i], tracks, mode);
+            }
+          },
+          onVerticalDragEnd: (_) => setState(() => _letteraPremuta = null),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceCard.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.goldBorder),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: etichette.map((e) {
+                final attiva = _letteraPremuta == e;
+                return GestureDetector(
+                  onTap: () => _saltaA(e, tracks, mode),
+                  child: Container(
+                    height: 18,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      e,
+                      style: TextStyle(
+                        fontSize: attiva ? 13 : 11,
+                        fontWeight: attiva ? FontWeight.bold : FontWeight.w600,
+                        color: attiva ? AppTheme.primary : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _pickFiles() async {
@@ -258,9 +392,6 @@ class _LibraryTabState extends State<LibraryTab> {
           case TrackSortMode.artist:
             sortedTracks.sort((a, b) => a.displayArtist.toLowerCase().compareTo(b.displayArtist.toLowerCase()));
             break;
-          case TrackSortMode.alphabetical:
-            sortedTracks.sort((a, b) => a.displayTitle.toLowerCase().compareTo(b.displayTitle.toLowerCase()));
-            break;
           case TrackSortMode.none:
             break;
         }
@@ -432,10 +563,12 @@ class _LibraryTabState extends State<LibraryTab> {
                     ),
                   ),
 
-                // Campo ricerca locale
+                // Campo ricerca locale, col tasto dell'indice a destra
                 if (lib.tracks.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: Row(children: [
+                      Expanded(
                     child: TextField(
                       controller: _filterCtrl,
                       onChanged: (val) => setState(() => _filterText = val),
@@ -457,6 +590,34 @@ class _LibraryTabState extends State<LibraryTab> {
                         ),
                       ),
                     ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Tasto quadrato "A": vuoto di default, a colori
+                      // invertiti quando l'indice e' aperto.
+                      GestureDetector(
+                        onTap: () => setState(() => _indiceAperto = !_indiceAperto),
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: _indiceAperto ? AppTheme.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _indiceAperto ? AppTheme.primary : AppTheme.goldBorder,
+                            ),
+                          ),
+                          child: Text(
+                            'A',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: _indiceAperto ? Colors.black : AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ]),
                   ),
 
                 // Chip filtri rapidi
@@ -639,17 +800,23 @@ class _LibraryTabState extends State<LibraryTab> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 110, top: 4),
-      itemCount: tracks.length,
-      itemBuilder: (context, idx) {
-        return TrackTile(
-          track: tracks[idx],
-          queue: tracks,
-          mode: viewMode,
-          index: idx,
-        );
-      },
+    return Stack(
+      children: [
+        ListView.builder(
+          controller: _scrollCtrl,
+          padding: const EdgeInsets.only(bottom: 110, top: 4),
+          itemCount: tracks.length,
+          itemBuilder: (context, idx) {
+            return TrackTile(
+              track: tracks[idx],
+              queue: tracks,
+              mode: viewMode,
+              index: idx,
+            );
+          },
+        ),
+        if (_indiceAperto) _indiceLaterale(tracks, viewMode),
+      ],
     );
   }
 
