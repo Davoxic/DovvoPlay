@@ -118,9 +118,11 @@ class EqualizerService extends ChangeNotifier {
   /// guadagno medio e il preamp, in modo prevedibile.
   void _applyEqualizer() {
     try {
-      final player = AudioPlayerService.instance.player;
+      // Il volume passa dal player, che ci moltiplica sopra la dissolvenza
+      // tra i brani: impostandolo qui direttamente i due si annullerebbero.
+      final player = AudioPlayerService.instance;
       if (!_isEnabled) {
-        player.setVolume(1.0);
+        player.setBaseVolume(1.0);
         return;
       }
 
@@ -132,7 +134,7 @@ class EqualizerService extends ChangeNotifier {
       final fattore = totale >= 0
           ? 1.0
           : math.pow(10, totale / 20.0).toDouble();
-      player.setVolume(fattore.clamp(0.15, 1.0));
+      player.setBaseVolume(fattore.clamp(0.15, 1.0));
     } catch (_) {}
   }
 

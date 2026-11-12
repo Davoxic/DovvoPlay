@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../services/app_notice.dart';
 import '../../services/update_service.dart';
 import '../theme.dart';
 import '../widgets/mini_player.dart';
+import 'explore_tab.dart';
 import 'library_tab.dart';
 import 'playlist_tab.dart';
 import 'settings_tab.dart';
@@ -17,18 +19,48 @@ class _HomeScreenState extends State<HomeScreen> {
   // Schermata di default su cui si apre: Libreria al centro (indice 1)
   int _currentIndex = 1;
 
-  final List<Widget> _tabs = const [
-    PlaylistTab(),  // Sinistra
-    LibraryTab(),   // Centro (Default)
-    SettingsTab(),  // Destra
-  ];
+  /// Posizione della scheda Esplora: i suoi contenuti si caricano solo
+  /// quando viene aperta.
+  static const int _indiceEsplora = 2;
 
   @override
   void initState() {
     super.initState();
+    AppNotice.tick.addListener(_mostraAvviso);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAutoUpdate();
     });
+  }
+
+  @override
+  void dispose() {
+    AppNotice.tick.removeListener(_mostraAvviso);
+    super.dispose();
+  }
+
+  /// Mostra in fondo allo schermo gli avvisi lasciati dai servizi (radio
+  /// avviata, timer scaduto, messaggi del party...). Questa schermata resta
+  /// sempre sotto alle altre, quindi li raccoglie per tutta l'app.
+  void _mostraAvviso() {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          AppNotice.last,
+          style: TextStyle(color: AppTheme.textPrimary, fontSize: 13.5),
+        ),
+        backgroundColor: AppTheme.surfaceLight,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppTheme.goldBorder),
+        ),
+      ),
+    );
   }
 
   Future<void> _checkAutoUpdate() async {
@@ -52,7 +84,12 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           IndexedStack(
             index: _currentIndex,
-            children: _tabs,
+            children: [
+              const PlaylistTab(), // Sinistra
+              const LibraryTab(), // Centro (Default)
+              ExploreTab(active: _currentIndex == _indiceEsplora),
+              const SettingsTab(), // Destra
+            ],
           ),
           const Positioned(
             left: 0,
@@ -92,6 +129,11 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.library_music_rounded),
               activeIcon: Icon(Icons.library_music_rounded, color: AppTheme.primary),
               label: 'Libreria',
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.explore_rounded),
+              activeIcon: Icon(Icons.explore_rounded, color: AppTheme.primary),
+              label: 'Esplora',
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.settings_rounded),

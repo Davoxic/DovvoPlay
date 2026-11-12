@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:audio_session/audio_session.dart';
 import 'services/backup_service.dart';
+import 'services/history_service.dart';
 import 'services/library_service.dart';
+import 'services/likes_service.dart';
 import 'services/pc_sync_service.dart';
+import 'services/playback_settings.dart';
+import 'services/scrobble_service.dart';
+import 'services/search_history_service.dart';
 import 'services/theme_service.dart';
 import 'services/wifi_server_service.dart';
 import 'ui/screens/home_screen.dart';
@@ -33,8 +38,23 @@ Future<void> main() async {
     print('Avviso AudioSession: $e');
   }
 
+  // Preferenze di riproduzione: vanno lette prima che parta un brano,
+  // perche' AutoPlay, dissolvenza e qualita' dipendono da queste.
+  await PlaybackSettings.instance.load();
+
   // Inizializza e carica la libreria locale
   await LibraryService.instance.init();
+
+  // Cuori, cronologia, ricerche recenti e scrobbling. Ognuno si arrangia se
+  // il suo file manca o e' rovinato, quindi un errore qui non blocca l'avvio.
+  try {
+    await LikesService.instance.load();
+    await HistoryService.instance.load();
+    await SearchHistoryService.instance.load();
+    await ScrobbleService.instance.load();
+  } catch (e) {
+    print('Avviso caricamento dati utente: $e');
+  }
 
   // Verifica e ripristina automaticamente backup dopo aggiornamenti se presente
   try {

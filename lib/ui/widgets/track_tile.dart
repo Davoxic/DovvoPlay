@@ -1,72 +1,19 @@
 import 'package:flutter/material.dart';
 import '../../models/track.dart';
 import '../../services/audio_player_service.dart';
-import '../../services/library_service.dart';
 import '../../services/view_mode_service.dart';
 import '../theme.dart';
+import 'song_actions_sheet.dart';
 import 'track_artwork.dart';
 
-/// Menu che compare tenendo premuto un brano: lo si puo' mettere subito dopo
-/// quello in riproduzione, oppure in fondo alla coda.
+/// Menu che compare tenendo premuto un brano.
+///
+/// E' lo stesso che si apre dai tre puntini: coda, cuore, playlist, radio,
+/// condivisione. Prima la pressione lunga offriva solo le due voci della
+/// coda e i tre puntini solo playlist ed elimina: due menu diversi per lo
+/// stesso brano.
 void _mostraMenuCoda(BuildContext context, AudioPlayerService player, Track track) {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: AppTheme.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (ctx) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
-            child: Row(
-              children: [
-                Icon(Icons.queue_music_rounded, color: AppTheme.primary, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    track.displayTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.playlist_play_rounded, color: AppTheme.textPrimary),
-            title: Text('Riproduci dopo',
-                style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
-            subtitle: Text('Subito dopo il brano in riproduzione',
-                style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
-            onTap: () {
-              player.playNext(track);
-              Navigator.pop(ctx);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.queue_rounded, color: AppTheme.textPrimary),
-            title: Text('Aggiungi in coda',
-                style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
-            subtitle: Text('In fondo alla coda attuale',
-                style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
-            onTap: () {
-              player.addToQueue(track);
-              Navigator.pop(ctx);
-            },
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
-  );
+  SongActionsSheet.show(context, track);
 }
 
 class TrackTile extends StatelessWidget {
@@ -665,103 +612,10 @@ class TrackTile extends StatelessWidget {
   }
 
   Widget _buildOptionsButton(BuildContext context) {
-    return PopupMenuButton<String>(
+    return IconButton(
       icon: Icon(Icons.more_vert_rounded, color: AppTheme.textSecondary, size: 20),
-      color: AppTheme.surfaceLight,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: (val) {
-        if (val == 'playlist') {
-          _showAddToPlaylistSheet(context, track);
-        } else if (val == 'delete') {
-          LibraryService.instance.deleteTrack(track);
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: 'playlist',
-          child: Row(
-            children: [
-              Icon(Icons.playlist_add_rounded, size: 18, color: AppTheme.primary),
-              SizedBox(width: 10),
-              Text('Aggiungi a playlist'),
-            ],
-          ),
-        ),
-        if (!track.isOnline)
-          const PopupMenuItem(
-            value: 'delete',
-            child: Row(
-              children: [
-                Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
-                SizedBox(width: 10),
-                Text('Elimina file'),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  void _showAddToPlaylistSheet(BuildContext context, Track track) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final playlists = LibraryService.instance.playlists;
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Aggiungi a playlist',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (playlists.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text('Nessuna playlist creata.', style: TextStyle(color: AppTheme.textSecondary)),
-                )
-              else
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: playlists.length,
-                    itemBuilder: (c, i) {
-                      final pl = playlists[i];
-                      final alreadyIn = pl.trackIds.contains(track.id);
-                      return ListTile(
-                        leading: Icon(Icons.playlist_play_rounded, color: AppTheme.primary),
-                        title: Text(pl.name, style: TextStyle(color: AppTheme.textPrimary)),
-                        subtitle: Text('${pl.trackIds.length} brani', style: TextStyle(color: AppTheme.textSecondary)),
-                        trailing: alreadyIn
-                            ? Icon(Icons.check_rounded, color: AppTheme.primary)
-                            : Icon(Icons.add_rounded, color: AppTheme.textSecondary),
-                        onTap: () async {
-                          if (alreadyIn) {
-                            await LibraryService.instance.removeTrackFromPlaylist(pl.id, track.id);
-                          } else {
-                            await LibraryService.instance.addTrackToPlaylist(pl.id, track.id);
-                          }
-                          if (ctx.mounted) Navigator.pop(ctx);
-                        },
-                      );
-                    },
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
+      tooltip: 'Azioni sul brano',
+      onPressed: () => SongActionsSheet.show(context, track),
     );
   }
 }

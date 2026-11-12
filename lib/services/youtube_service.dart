@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/youtube_track.dart';
+import 'cache_service.dart';
+import 'playback_settings.dart';
 
 class YouTubeService {
   static final YouTubeService instance = YouTubeService._();
@@ -85,7 +87,10 @@ class YouTubeService {
   /// che AVPlayer su iOS non riproduce.
   String? lastFailureReason;
 
-  Future<StreamInfo?> getPlayableStreamInfo(String videoId) async {
+  Future<StreamInfo?> getPlayableStreamInfo(
+    String videoId, {
+    bool forDownload = false,
+  }) async {
     lastFailureReason = null;
     StreamManifest? manifest;
 
@@ -130,7 +135,14 @@ class YouTubeService {
     }).toList();
 
     if (mp4Audio.isNotEmpty) {
-      return mp4Audio.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+      // Con il risparmio dati lo streaming prende il flusso piu' leggero;
+      // i download restano sempre alla qualita' piu' alta disponibile.
+      final leggero = !forDownload && PlaybackSettings.instance.dataSaver;
+      return mp4Audio.reduce((a, b) {
+        final aPiuAlto = a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond;
+        if (leggero) return aPiuAlto ? b : a;
+        return aPiuAlto ? a : b;
+      });
     }
 
     // 2. Se non c'è audio-only MP4 puro, usa i flussi muxed MP4 (audio AAC nativo hardware per iOS)
@@ -253,6 +265,8 @@ class YouTubeService {
           await targetFile.delete();
         }
         await tempFile.rename(targetFile.path);
+        // Tiene la cache sotto il limite scelto, senza toccare questo file.
+        CacheService.instance.enforceLimit(tieni: safeId);
         return targetFile;
       } else {
         if (await tempFile.exists()) await tempFile.delete();
@@ -291,7 +305,7 @@ class YouTubeService {
         return targetFile;
       }
 
-      final streamInfo = await getPlayableStreamInfo(videoId);
+      final streamInfo = await getPlayableStreamInfo(videoId, forDownload: true);
       if (streamInfo == null) return null;
 
       final tempFile = File('${musicDir.path}/${safeName}_$safeId.m4a.tmp');

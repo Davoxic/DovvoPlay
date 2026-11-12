@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../services/audio_player_service.dart';
+import '../../services/history_service.dart';
 import '../../services/library_service.dart';
+import '../../services/likes_service.dart';
 import '../theme.dart';
 import '../widgets/sync_indicator.dart';
+import 'history_screen.dart';
+import 'liked_screen.dart';
 import 'playlist_detail_screen.dart';
 
 class PlaylistTab extends StatelessWidget {
@@ -29,16 +33,21 @@ class PlaylistTab extends StatelessWidget {
               ),
             ],
           ),
-          body: playlists.isEmpty
-              ? _buildEmptyState(context)
-              : ListView.builder(
+          // In cima le due raccolte automatiche, sempre presenti anche
+          // senza playlist: brani piaciuti e cronologia.
+          body: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
-                  itemCount: playlists.length + 1,
+                  itemCount: playlists.length + 2,
                   itemBuilder: (ctx, idx) {
                     if (idx == 0) {
-                      return _buildHeader(context, playlists.length);
+                      return _buildSmartRow(context);
                     }
-                    final pl = playlists[idx - 1];
+                    if (idx == 1) {
+                      return playlists.isEmpty
+                          ? _buildEmptyState(context)
+                          : _buildHeader(context, playlists.length);
+                    }
+                    final pl = playlists[idx - 2];
                     final count = pl.trackIds.length;
 
                     return Container(
@@ -127,6 +136,112 @@ class PlaylistTab extends StatelessWidget {
                 ),
         );
       },
+    );
+  }
+
+  Widget _buildSmartCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            gradient: AppTheme.goldSurfaceGradient,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.goldBorder, width: 1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: Colors.black, size: 21),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: AppTheme.secondary, fontSize: 11.5),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmartRow(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: ListenableBuilder(
+        listenable: Listenable.merge([
+          LikesService.instance,
+          HistoryService.instance,
+        ]),
+        builder: (context, _) {
+          final piaciuti = LikesService.instance.count;
+          final ascoltati = HistoryService.instance.entries.length;
+          return Row(
+            children: [
+              Expanded(
+                child: _buildSmartCard(
+                  icon: Icons.favorite_rounded,
+                  title: 'Mi piace',
+                  subtitle: piaciuti == 1 ? '1 brano' : '$piaciuti brani',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LikedScreen()),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildSmartCard(
+                  icon: Icons.history_rounded,
+                  title: 'Cronologia',
+                  subtitle: ascoltati == 0 ? 'Ancora vuota' : 'Ultimi $ascoltati ascolti',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 

@@ -35,7 +35,14 @@ def configure_info_plist():
 
     # Permessi rete locale per server Wi-Fi
     plist["NSLocalNetworkUsageDescription"] = (
-        "DovvoPlay usa la rete locale per consentire il caricamento di file musicali via Wi-Fi dal tuo computer."
+        "DovvoPlay usa la rete locale per ricevere musica dal tuo computer via Wi-Fi "
+        "e per ascoltare insieme ad altri dispositivi sulla stessa rete."
+    )
+
+    # Il poster del Replay si condivide come immagine: senza questa voce,
+    # scegliendo "Salva immagine" dal menu di condivisione iOS chiude l'app.
+    plist["NSPhotoLibraryAddUsageDescription"] = (
+        "DovvoPlay salva in Foto il poster del tuo Replay quando scegli di salvarlo."
     )
 
     # ATS per consentire stream audio HTTP locali / CDN

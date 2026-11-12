@@ -1,13 +1,21 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/track.dart';
 import '../../services/animation_theme_service.dart';
 import '../../services/audio_player_service.dart';
-import '../../services/library_service.dart';
+import '../../services/likes_service.dart';
+import '../../services/party_service.dart';
+import '../../services/playback_settings.dart';
 import '../../services/stats_service.dart';
 import '../theme.dart';
 import '../widgets/animated_track_transition.dart';
 import '../widgets/equalizer_sheet.dart';
+import '../widgets/player_sheets.dart';
+import '../widgets/queue_sheet.dart';
+import '../widgets/song_actions_sheet.dart';
 import '../widgets/track_artwork.dart';
+import 'listen_together_screen.dart';
+import 'lyrics_screen.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
@@ -22,6 +30,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
   /// Effetto ambient dietro la copertina, si accende toccandola.
   bool _ambiente = false;
   late AnimationController _pulsazione;
+
+  /// Posizione scelta col dito mentre si trascina il cursore. Finche' non e'
+  /// null il cursore segue il dito e non la riproduzione: lo spostamento
+  /// vero avviene una volta sola, al rilascio.
+  double? _trascinamento;
 
   @override
   void initState() {
@@ -131,6 +144,56 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
     final m = d.inMinutes;
     final s = d.inSeconds % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  void _apriTesti(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        pageBuilder: (context, a1, a2) => const LyricsScreen(),
+        transitionsBuilder: (context, a1, a2, child) {
+          return FadeTransition(opacity: a1, child: child);
+        },
+      ),
+    );
+  }
+
+  /// Pulsante piccolo della riga in fondo: icona, eventuale etichetta sotto.
+  Widget _azione({
+    required IconData icona,
+    required String suggerimento,
+    required VoidCallback onTap,
+    bool attivo = false,
+    String? etichetta,
+  }) {
+    final colore = attivo ? AppTheme.primary : AppTheme.textSecondary;
+    return Tooltip(
+      message: suggerimento,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: SizedBox(
+          width: 46,
+          height: 44,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icona, size: 22, color: colore),
+              if (etichetta != null)
+                Text(
+                  etichetta,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 9,
+                    height: 1.1,
+                    color: colore,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showShuffleModeSheet(BuildContext context, AudioPlayerService player) {
@@ -295,9 +358,23 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                   }
 
                   final maxDuration = player.duration.inMilliseconds.toDouble();
-                  final currentPos = player.position.inMilliseconds
-                      .toDouble()
-                      .clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
+                  final limite = maxDuration > 0 ? maxDuration : 1.0;
+                  final currentPos = (_trascinamento ??
+                          player.position.inMilliseconds.toDouble())
+                      .clamp(0.0, limite);
+                  final party = PartyService.instance;
+
+                  return LayoutBuilder(
+                    builder: (context, vincoli) {
+                  // La copertina prende lo spazio che resta: il resto della
+                  // schermata ha altezza fissa, e su un telefono piccolo una
+                  // copertina larga quanto lo schermo lo farebbe traboccare.
+                  final larghezza = MediaQuery.of(context).size.width;
+                  final riservato = player.lastErrorMessage != null ? 450.0 : 390.0;
+                  final lato = math.max(
+                    120.0,
+                    math.min(larghezza * 0.78, vincoli.maxHeight - riservato),
+                  );
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
@@ -337,7 +414,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                   ),
                                 ),
                                 Text(
-                                  track.isOnline ? 'YouTube Stream' : 'Libreria Locale',
+                                  party.inParty
+                                      ? 'Party ${party.code}'
+                                      : (track.isOnline ? 'Streaming' : 'Libreria Locale'),
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: AppTheme.primary,
@@ -370,7 +449,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                 IconButton(
                                   icon: Icon(Icons.playlist_add_rounded, size: 26, color: AppTheme.textPrimary),
                                   tooltip: 'Aggiungi a playlist',
-                                  onPressed: () => _showAddToPlaylistSheet(context, track),
+                                  onPressed: () => PlaylistPickerSheet.show(context, [track]),
                                 ),
                               ],
                             ),
@@ -393,8 +472,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                   // Bagliore dietro la copertina
                                   if (_ambiente)
                                     Container(
-                                      width: MediaQuery.of(context).size.width * (0.80 + 0.10 * t),
-                                      height: MediaQuery.of(context).size.width * (0.80 + 0.10 * t),
+                                      width: lato * (1.03 + 0.12 * t),
+                                      height: lato * (1.03 + 0.12 * t),
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(40),
                                         boxShadow: [
@@ -415,8 +494,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                           child: AnimatedTrackTransition(
                             trackKey: track.id,
                             child: Container(
-                              width: MediaQuery.of(context).size.width * 0.78,
-                              height: MediaQuery.of(context).size.width * 0.78,
+                              width: lato,
+                              height: lato,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(28),
                                 border: Border.all(color: AppTheme.goldBorder, width: 1.5),
@@ -430,8 +509,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                               ),
                               child: TrackArtwork(
                                 url: track.thumbnailUrl,
-                                width: MediaQuery.of(context).size.width * 0.78,
-                                height: MediaQuery.of(context).size.width * 0.78,
+                                width: lato,
+                                height: lato,
                                 borderRadius: 28,
                               ),
                             ),
@@ -473,6 +552,23 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                                 ],
                               ),
                             ),
+                            ListenableBuilder(
+                              listenable: LikesService.instance,
+                              builder: (context, _) {
+                                final piace = LikesService.instance.isLiked(track);
+                                return IconButton(
+                                  icon: Icon(
+                                    piace
+                                        ? Icons.favorite_rounded
+                                        : Icons.favorite_border_rounded,
+                                    color: piace ? AppTheme.primary : AppTheme.textSecondary,
+                                    size: 26,
+                                  ),
+                                  tooltip: piace ? 'Rimuovi da Mi piace' : 'Mi piace',
+                                  onPressed: () => LikesService.instance.toggle(track),
+                                );
+                              },
+                            ),
                             if (player.shuffleMode != ShuffleMode.off)
                               GestureDetector(
                                 onTap: () => _showShuffleModeSheet(context, player),
@@ -503,7 +599,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                           ],
                         ),
 
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
 
                         if (player.lastErrorMessage != null)
                           Container(
@@ -543,8 +639,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                           child: Slider(
                             value: currentPos,
                             min: 0.0,
-                            max: maxDuration > 0 ? maxDuration : 1.0,
+                            max: limite,
                             onChanged: (val) {
+                              setState(() => _trascinamento = val);
+                            },
+                            onChangeEnd: (val) {
+                              setState(() => _trascinamento = null);
                               player.seek(Duration(milliseconds: val.toInt()));
                             },
                           ),
@@ -557,7 +657,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                _formatTime(player.position),
+                                _formatTime(Duration(milliseconds: currentPos.toInt())),
                                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                               ),
                               Text(
@@ -568,23 +668,33 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                           ),
                         ),
 
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
 
                         // Controls
                         // Minuti ascoltati oggi: stava dentro il tasto shuffle
                         // e lo rendeva larghissimo, sbilanciando tutta la riga.
+                        // Con le "statistiche per nerd" accese la riga mostra
+                        // invece formato, bitrate e peso del file.
                         ListenableBuilder(
-                          listenable: StatsService.instance,
+                          listenable: Listenable.merge([
+                            StatsService.instance,
+                            PlaybackSettings.instance,
+                          ]),
                           builder: (context, _) {
+                            final nerd = PlaybackSettings.instance.nerdStats
+                                ? player.nerdStatsLabel
+                                : '';
                             final mins = StatsService.instance.todayStat.listeningSeconds ~/ 60;
                             return Text(
-                              '$mins minuti ascoltati oggi',
+                              nerd.isNotEmpty ? nerd : '$mins minuti ascoltati oggi',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                             );
                           },
                         ),
 
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
 
                         // Tre zone: i laterali occupano lo stesso spazio, quindi
                         // il gruppo centrale resta centrato qualunque sia la
@@ -709,9 +819,67 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
                           ],
                         ),
 
-                        const Spacer(flex: 2),
+                        const SizedBox(height: 8),
+
+                        // Testi, coda, timer, velocita', party e menu del brano.
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _azione(
+                              icona: Icons.lyrics_rounded,
+                              suggerimento: 'Testi',
+                              onTap: () => _apriTesti(context),
+                            ),
+                            _azione(
+                              icona: Icons.queue_music_rounded,
+                              suggerimento: 'Coda',
+                              onTap: () => QueueSheet.show(context),
+                            ),
+                            _azione(
+                              icona: Icons.bedtime_rounded,
+                              suggerimento: 'Timer di spegnimento',
+                              attivo: player.hasSleepTimer,
+                              etichetta: player.sleepAfterTrack
+                                  ? 'fine brano'
+                                  : (player.sleepRemaining != null
+                                      ? SleepTimerSheet.formatRemaining(player.sleepRemaining!)
+                                      : null),
+                              onTap: () => SleepTimerSheet.show(context),
+                            ),
+                            _azione(
+                              icona: Icons.speed_rounded,
+                              suggerimento: 'Velocità di riproduzione',
+                              attivo: (player.speed - 1.0).abs() > 0.01,
+                              etichetta: (player.speed - 1.0).abs() > 0.01
+                                  ? '${AudioPlayerService.formatSpeed(player.speed)}x'
+                                  : null,
+                              onTap: () => SpeedSheet.show(context),
+                            ),
+                            _azione(
+                              icona: Icons.groups_rounded,
+                              suggerimento: 'Ascolta insieme',
+                              attivo: party.inParty,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const ListenTogetherScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _azione(
+                              icona: Icons.more_horiz_rounded,
+                              suggerimento: 'Altro',
+                              onTap: () => SongActionsSheet.show(context, track),
+                            ),
+                          ],
+                        ),
+
+                        const Spacer(flex: 1),
                       ],
                     ),
+                  );
+                    },
                   );
                 },
               ),
@@ -719,61 +887,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> with SingleTickerPr
           ),
         ),
       ),
-    );
-  }
-
-  void _showAddToPlaylistSheet(BuildContext context, Track track) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final playlists = LibraryService.instance.playlists;
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Aggiungi a Playlist',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-              ),
-              const SizedBox(height: 16),
-              if (playlists.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Center(
-                    child: Text('Nessuna playlist presente.', style: TextStyle(color: AppTheme.textSecondary)),
-                  ),
-                )
-              else
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: playlists.length,
-                    itemBuilder: (context, idx) {
-                      final p = playlists[idx];
-                      return ListTile(
-                        leading: Icon(Icons.queue_music_rounded, color: AppTheme.primary),
-                        title: Text(p.name, style: TextStyle(color: AppTheme.textPrimary)),
-                        onTap: () {
-                          LibraryService.instance.addTrackToPlaylist(p.id, track.id);
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Aggiunto a "${p.name}"')),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

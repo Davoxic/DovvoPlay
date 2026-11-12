@@ -7,6 +7,11 @@ Player musicale per iPhone scritto in **Flutter / Dart** con ricerca **YouTube**
 - **Ricerca YouTube & Streaming Audio** (`youtube_explode_dart`): cerca qualsiasi brano su YouTube e ascoltalo direttamente in streaming audio leggero (AAC/m4a nativo iOS), funzionante anche a **schermo spento** e con comandi dalla **lock screen** / Centro di Controllo.
 - **Salvataggio Offline**: scarica i brani da YouTube direttamente nella memoria locale dell'app con un tocco.
 - **Libreria & Playlist**: crea playlist, organizza i brani locali e online, visualizza copertine e metadati.
+- **Esplora (catalogo YouTube Music)**: home con le file proposte, classifiche, mood e generi, nuove uscite; ricerca con filtri (brani, video, album, artisti, playlist), completamenti e ricerche recenti; pagine di album, artisti e playlist con "Riproduci", "Casuale", "Scarica tutto" e "Salva come playlist".
+- **Player esteso**: coda riordinabile, AutoPlay e radio di un brano con musica simile, testi sincronizzati (LRCLIB), timer di spegnimento, velocita' di riproduzione, dissolvenza tra i brani, "Mi piace", statistiche per nerd.
+- **Cronologia e Replay**: tutto cio' che hai ascoltato giorno per giorno, e un riassunto del periodo (brani, artisti, album, orari) condivisibile come immagine.
+- **Ascolta insieme**: un party sulla rete Wi-Fi con un codice da condividere; stessa musica in sincrono, coda in comune.
+- **Download e scrobbling**: coda dei download sul telefono, gestione delle cache, scrobbling su ListenBrainz.
 - **Server Wi-Fi integrato**: attiva il server dall'app, collegati da qualsiasi browser su PC (`http://<ip-iphone>:8080`) e trascina i tuoi file musicali (.mp3, .m4a, .flac, .wav).
 - **Tool PC da riga di comando** (`tools/`): esporta playlist Spotify, scarica e invia automaticamente all'iPhone via rete.
 
@@ -50,7 +55,7 @@ dovvoplay/
 ├── lib/                             # Codice Dart / Flutter
 │   ├── main.dart
 │   ├── models/                      # Track, Playlist, YouTubeTrack
-│   ├── services/                    # AudioPlayer, YouTubeService, LibraryService, WifiServer
+│   ├── services/                    # AudioPlayer, YouTubeService, YtMusicService, Lyrics, Party, LibraryService, WifiServer
 │   └── ui/                          # Schermate, temi e widget
 ├── scripts/                         # Script di configurazione per iOS
 ├── tools/                           # Tool Python da PC per Spotify/YouTube download

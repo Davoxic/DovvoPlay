@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/playlist.dart';
 import '../models/track.dart';
 import 'library_service.dart';
+import 'likes_service.dart';
 import 'stats_service.dart';
 
 class BackupResult {
@@ -56,6 +57,10 @@ class BackupService {
       },
       'playlists': lib.playlists.map((p) => p.toJson()).toList(),
       'tracks': lib.tracks.map((t) => t.toJson()).toList(),
+      // Cuori e brani in streaming delle playlist: senza questi un backup
+      // riporterebbe playlist con dentro brani che l'app non sa piu' mostrare.
+      'likes': LikesService.instance.exportJson(),
+      'online_tracks': lib.onlineTracks.map((t) => t.toJson()).toList(),
     };
   }
 
@@ -160,6 +165,15 @@ class BackupService {
           }
         }
         await lib.saveLibrary();
+      }
+
+      // 4. Ripristina cuori e brani in streaming delle playlist
+      if (decoded['online_tracks'] is List) {
+        restoredTracks += await LibraryService.instance
+            .importOnlineTracks(decoded['online_tracks'] as List);
+      }
+      if (decoded['likes'] is List) {
+        await LikesService.instance.importJson(decoded['likes'] as List);
       }
 
       // Salva copia aggiornata

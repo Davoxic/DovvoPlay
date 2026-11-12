@@ -10,7 +10,12 @@ import '../../services/update_service.dart';
 import '../../services/view_mode_service.dart';
 import '../theme.dart';
 import '../widgets/equalizer_sheet.dart';
+import 'downloads_screen.dart';
+import 'history_screen.dart';
+import 'listen_together_screen.dart';
 import 'pc_companion_screen.dart';
+import 'playback_settings_screen.dart';
+import 'replay_screen.dart';
 import 'stats_screen.dart';
 import 'youtube_tab.dart';
 
@@ -509,6 +514,61 @@ class SettingsTab extends StatelessWidget {
                 badgeText: 'AUDIO EQ',
                 badgeColor: AppTheme.primary,
                 onTap: () => EqualizerSheet.show(context),
+              ),
+
+              const SizedBox(height: 20),
+
+              // SEZIONE RIPRODUZIONE, STREAMING & ASCOLTO INSIEME
+              _buildSectionHeader('RIPRODUZIONE, STREAMING & SOCIAL'),
+              _buildSettingTile(
+                icon: Icons.play_circle_outline_rounded,
+                title: 'Riproduzione, Testi e Scrobbling',
+                subtitle: 'AutoPlay, dissolvenza, risparmio dati, testi sincronizzati, ListenBrainz',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PlaybackSettingsScreen()),
+                  );
+                },
+              ),
+              _buildSettingTile(
+                icon: Icons.download_rounded,
+                title: 'Download e Archiviazione',
+                subtitle: 'Coda dei download dei brani in streaming, cache di brani e immagini',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DownloadsScreen()),
+                  );
+                },
+              ),
+              _buildSettingTile(
+                icon: Icons.groups_rounded,
+                title: 'Ascolta Insieme',
+                subtitle: 'Crea un party o entra con un codice: stessa musica, in sincrono, sul Wi-Fi',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ListenTogetherScreen()),
+                  );
+                },
+              ),
+              _buildSettingTile(
+                icon: Icons.auto_awesome_rounded,
+                title: 'Replay',
+                subtitle: 'I tuoi brani, artisti e album più ascoltati, da condividere come immagine',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ReplayScreen()),
+                  );
+                },
+              ),
+              _buildSettingTile(
+                icon: Icons.history_rounded,
+                title: 'Cronologia',
+                subtitle: 'Tutto ciò che hai ascoltato, giorno per giorno',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                  );
+                },
               ),
 
               const SizedBox(height: 20),

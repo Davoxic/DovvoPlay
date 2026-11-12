@@ -14,6 +14,13 @@ class LibraryService extends ChangeNotifier {
   List<Playlist> _playlists = [];
   bool _isLoading = false;
 
+  /// Brani in streaming a cui punta una playlist.
+  ///
+  /// Stanno a parte, fuori da [_tracks]: cosi' una playlist puo' contenere
+  /// brani online senza che questi compaiano nell'elenco dei file della
+  /// libreria e senza falsarne i conteggi.
+  final Map<String, Track> _onlineTracks = {};
+
   List<Track> get tracks => _tracks;
   List<Playlist> get playlists => _playlists;
   bool get isLoading => _isLoading;
@@ -35,6 +42,63 @@ class LibraryService extends ChangeNotifier {
   Future<File> get _playlistsFile async {
     final docs = await getApplicationDocumentsDirectory();
     return File('${docs.path}/playlists.json');
+  }
+
+  Future<File> get _onlineFile async {
+    final docs = await getApplicationDocumentsDirectory();
+    return File('${docs.path}/online_tracks.json');
+  }
+
+  List<Track> get onlineTracks => _onlineTracks.values.toList();
+
+  /// Ricorda un brano in streaming, cosi' le playlist che lo contengono
+  /// sanno come mostrarlo e riprodurlo.
+  Future<void> rememberOnlineTrack(Track track) async {
+    if (!track.isOnline || track.id.isEmpty) return;
+    if (_onlineTracks.containsKey(track.id)) return;
+    _onlineTracks[track.id] = track;
+    await _saveOnlineTracks();
+  }
+
+  /// Aggiunge in blocco, per il ripristino di un backup.
+  Future<int> importOnlineTracks(List lista) async {
+    var aggiunti = 0;
+    for (final e in lista) {
+      if (e is! Map) continue;
+      try {
+        final t = Track.fromJson(Map<String, dynamic>.from(e));
+        if (t.isOnline && t.id.isNotEmpty && !_onlineTracks.containsKey(t.id)) {
+          _onlineTracks[t.id] = t;
+          aggiunti++;
+        }
+      } catch (_) {}
+    }
+    if (aggiunti > 0) await _saveOnlineTracks();
+    return aggiunti;
+  }
+
+  Future<void> _saveOnlineTracks() async {
+    try {
+      final file = await _onlineFile;
+      await file.writeAsString(
+        jsonEncode(_onlineTracks.values.map((t) => t.toJson()).toList()),
+      );
+    } catch (e) {
+      print('Errore salvataggio online_tracks.json: $e');
+    }
+  }
+
+  /// Inserisce subito in libreria un brano appena scaricato, con titolo,
+  /// artista e copertina gia' noti.
+  ///
+  /// I file .m4a di YouTube non hanno tag: lasciati alla sola scansione
+  /// comparirebbero col nome del file come titolo e senza artista.
+  Future<void> registerDownloadedTrack(Track track) async {
+    if (track.filePath == null) return;
+    _tracks.removeWhere((t) => t.filePath == track.filePath || t.id == track.id);
+    _tracks.add(track);
+    await saveLibrary();
+    notifyListeners();
   }
 
   Future<void> init() async {
@@ -74,6 +138,18 @@ class LibraryService extends ChangeNotifier {
               .toList();
         }
       }
+
+      final onFile = await _onlineFile;
+      if (await onFile.exists()) {
+        final data = jsonDecode(await onFile.readAsString());
+        if (data is List) {
+          for (final e in data) {
+            if (e is! Map) continue;
+            final t = Track.fromJson(Map<String, dynamic>.from(e));
+            if (t.id.isNotEmpty) _onlineTracks[t.id] = t;
+          }
+        }
+      }
     } catch (e) {
       print('Errore lettura file indice: $e');
     }
@@ -104,11 +180,32 @@ class LibraryService extends ChangeNotifier {
     }
 
     final existingMap = {for (var t in _tracks) if (t.filePath != null) t.filePath!: t};
+    final existingByName = <String, Track>{};
+    for (final t in _tracks) {
+      final fp = t.filePath;
+      if (fp != null) existingByName[_nomeFile(fp)] = t;
+    }
     final newTracks = <Track>[];
 
     for (final file in foundFiles) {
       final path = file.path;
-      final existing = existingMap[path];
+      var existing = existingMap[path];
+
+      // Dopo una reinstallazione iOS rinomina la cartella Documents: il
+      // percorso salvato non combacia piu', ma il file e' lo stesso. Lo si
+      // riconosce dal nome, cosi' titolo e artista gia' noti non vanno persi
+      // (i download da YouTube non hanno tag da cui rileggerli).
+      if (existing == null) {
+        final perNome = existingByName[_nomeFile(path)];
+        if (perNome != null) {
+          var cover = perNome.thumbnailUrl ?? '';
+          if (cover.isNotEmpty && !cover.startsWith('http')) {
+            final spostata = '${coversDir.path}/${_nomeFile(cover)}';
+            cover = File(spostata).existsSync() ? spostata : '';
+          }
+          existing = perNome.copyWith(id: path, filePath: path, thumbnailUrl: cover);
+        }
+      }
 
       // Se già esiste e ha già copertina salvata, mantienilo per velocità
       if (existing != null && existing.thumbnailUrl != null && existing.thumbnailUrl!.isNotEmpty) {
@@ -199,6 +296,22 @@ class LibraryService extends ChangeNotifier {
     return pl;
   }
 
+  /// Crea una playlist gia' piena, salvando una volta sola.
+  ///
+  /// Serve per importare un album o una playlist online: aggiungendo i
+  /// brani uno alla volta si riscriverebbero i file a ogni brano.
+  Future<Playlist> createPlaylistWithTracks(String name, List<Track> tracks) async {
+    final ids = <String>[];
+    final visti = <String>{};
+    for (final t in tracks) {
+      if (t.id.isEmpty || !visti.add(t.id)) continue;
+      ids.add(t.id);
+      if (t.isOnline) _onlineTracks.putIfAbsent(t.id, () => t);
+    }
+    await _saveOnlineTracks();
+    return createPlaylist(name, ids);
+  }
+
   Future<void> renamePlaylist(String id, String newName) async {
     final pl = _playlists.firstWhere((p) => p.id == id, orElse: () => Playlist(id: '', name: ''));
     if (pl.id.isNotEmpty) {
@@ -278,6 +391,8 @@ class LibraryService extends ChangeNotifier {
     for (final t in _tracks) {
       if (t.id == id) return t;
     }
+    final online = _onlineTracks[id];
+    if (online != null) return online;
     final nome = _nomeFile(id);
     if (nome.isEmpty) return null;
     for (final t in _tracks) {

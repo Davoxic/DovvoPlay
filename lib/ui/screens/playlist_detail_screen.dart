@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/playlist.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/library_service.dart';
+import '../../services/view_mode_service.dart';
 import '../theme.dart';
 import '../widgets/track_tile.dart';
 
@@ -15,6 +16,17 @@ class PlaylistDetailScreen extends StatefulWidget {
 }
 
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
+  /// Qui i brani stanno in un elenco verticale: i due layout a griglia
+  /// della libreria non avrebbero una griglia in cui disporsi, quindi al
+  /// loro posto si usa la riga classica.
+  LibraryViewMode _modoRiga() {
+    final m = ViewModeService.instance.currentMode;
+    if (m == LibraryViewMode.gridCovers || m == LibraryViewMode.gridCompact) {
+      return LibraryViewMode.modernCards;
+    }
+    return m;
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -115,7 +127,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 child: tracks.isEmpty
                     ? Center(
                         child: Text(
-                          'Nessun brano in questa playlist.\nAggiungi brani dalla Libreria o da YouTube!',
+                          'Nessun brano in questa playlist.\nAggiungi brani dalla Libreria o da Esplora!',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: AppTheme.textSecondary),
                         ),
@@ -137,7 +149,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                             onDismissed: (_) {
                               lib.removeTrackFromPlaylist(currentPl.id, t.id);
                             },
-                            child: TrackTile(track: t, queue: tracks),
+                            child: TrackTile(track: t, queue: tracks, mode: _modoRiga()),
                           );
                         },
                       ),

@@ -5,8 +5,14 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import '../models/track.dart';
 import '../models/youtube_track.dart';
+import 'app_notice.dart';
+import 'history_service.dart';
+import 'party_service.dart';
+import 'playback_settings.dart';
+import 'scrobble_service.dart';
 import 'stats_service.dart';
 import 'youtube_service.dart';
+import 'ytmusic_service.dart';
 
 enum PlayerLoopMode { off, all, one }
 
@@ -50,6 +56,35 @@ class AudioPlayerService extends ChangeNotifier {
 
   Timer? _secondTicker;
 
+  /// Il completamento di un brano e' gia' stato gestito: lo stato "finito"
+  /// puo' essere notificato piu' volte e non deve far scattare due cambi.
+  bool _fineGestita = false;
+
+  // Volume: quello scelto dall'equalizzatore per la dissolvenza in corso.
+  double _volumeBase = 1.0;
+  double _fattoreDissolvenza = 1.0;
+
+  double _speed = 1.0;
+
+  // Timer di spegnimento.
+  Timer? _timerSpegnimento;
+  DateTime? _spegniAlle;
+  bool _spegniAFineBrano = false;
+
+  // AutoPlay.
+  bool _autoplayInCorso = false;
+  final Set<String> _autoplayVisti = {};
+
+  // Dati della sorgente, per le "statistiche per nerd".
+  String _formatoSorgente = '';
+  int _byteSorgente = 0;
+  String _notaSorgente = '';
+
+  /// Id del brano in riproduzione. Chi deve solo evidenziare la riga
+  /// corrente ascolta questo, che cambia a ogni brano, invece dell'intero
+  /// player, che notifica piu' volte al secondo per l'avanzamento.
+  final ValueNotifier<String?> currentTrackId = ValueNotifier<String?>(null);
+
   AudioPlayer get player => _player;
   Track? get currentTrack => _currentTrack;
   List<Track> get queue => _queue;
@@ -62,6 +97,45 @@ class AudioPlayerService extends ChangeNotifier {
   ShuffleMode get shuffleMode => _shuffleMode;
   bool get isShuffle => _shuffleMode != ShuffleMode.off;
   String? get lastErrorMessage => _lastErrorMessage;
+
+  /// Velocita' di riproduzione, 1.0 = normale.
+  double get speed => _speed;
+
+  /// Tempo che manca allo spegnimento, null se non c'e' un timer a tempo.
+  Duration? get sleepRemaining {
+    final alle = _spegniAlle;
+    if (alle == null) return null;
+    final resto = alle.difference(DateTime.now());
+    return resto.isNegative ? Duration.zero : resto;
+  }
+
+  /// true se la riproduzione si fermera' alla fine del brano corrente.
+  bool get sleepAfterTrack => _spegniAFineBrano;
+  bool get hasSleepTimer => _spegniAlle != null || _spegniAFineBrano;
+
+  /// true mentre AutoPlay sta cercando altri brani.
+  bool get isLoadingAutoplay => _autoplayInCorso;
+
+  /// Formato, bitrate e peso di cio' che sta suonando, in una riga.
+  String get nerdStatsLabel {
+    if (_currentTrack == null) return '';
+    final parti = <String>[];
+    if (_formatoSorgente.isNotEmpty) parti.add(_formatoSorgente);
+    final ms = _duration.inMilliseconds;
+    if (_byteSorgente > 0) {
+      if (ms > 0) parti.add('${(_byteSorgente * 8 / ms).round()} kbps');
+      parti.add('${(_byteSorgente / (1024 * 1024)).toStringAsFixed(1)} MB');
+    }
+    if (_notaSorgente.isNotEmpty) parti.add(_notaSorgente);
+    if ((_speed - 1.0).abs() > 0.01) parti.add('${formatSpeed(_speed)}x');
+    return parti.join(' · ');
+  }
+
+  /// 1.0 -> "1.0", 1.25 -> "1.25".
+  static String formatSpeed(double v) {
+    final s = v.toStringAsFixed(2);
+    return s.endsWith('0') ? s.substring(0, s.length - 1) : s;
+  }
 
   void _initListeners() {
     // Ticker secondo per secondo per le statistiche reali
@@ -87,7 +161,13 @@ class AudioPlayerService extends ChangeNotifier {
       }
 
       if (state.processingState == ProcessingState.completed) {
-        _onTrackCompleted();
+        if (!_fineGestita) {
+          _fineGestita = true;
+          _onTrackCompleted();
+        }
+      } else if (state.processingState == ProcessingState.ready ||
+          state.processingState == ProcessingState.buffering) {
+        _fineGestita = false;
       }
       notifyListeners();
     });
@@ -109,6 +189,7 @@ class AudioPlayerService extends ChangeNotifier {
 
     _player.positionStream.listen((pos) {
       _position = pos;
+      _aggiornaDissolvenza();
       notifyListeners();
     });
 
@@ -132,6 +213,8 @@ class AudioPlayerService extends ChangeNotifier {
     final totalDur = _duration > Duration.zero
         ? _duration
         : (_currentTrack!.duration > Duration.zero ? _currentTrack!.duration : Duration.zero);
+
+    ScrobbleService.instance.onTrackEnd(_currentTrack!, listenedMs, totalDur);
 
     double percent = 0.0;
     if (totalDur.inMilliseconds > 0) {
@@ -161,6 +244,23 @@ class AudioPlayerService extends ChangeNotifier {
       _recordCurrentTrackStats();
     }
 
+    // Timer "dopo questo brano": ci si ferma qui, col brano riportato
+    // all'inizio cosi' il tasto play lo fa ripartire.
+    if (_spegniAFineBrano) {
+      _spegniAFineBrano = false;
+      _player.pause();
+      _player.seek(Duration.zero);
+      AppNotice.show('Timer di spegnimento: riproduzione in pausa');
+      notifyListeners();
+      return;
+    }
+
+    // Da ospite di un party e' l'host a decidere cosa viene dopo.
+    if (PartyService.instance.isGuest) {
+      _player.pause();
+      return;
+    }
+
     if (_loopMode == PlayerLoopMode.one) {
       _trackListenWatch.reset();
       _trackListenWatch.start();
@@ -171,6 +271,8 @@ class AudioPlayerService extends ChangeNotifier {
     } else if (_loopMode == PlayerLoopMode.all && _queue.isNotEmpty) {
       _currentIndex = 0;
       playTrack(_queue[0]);
+    } else if (PlaybackSettings.instance.autoplay && _currentTrack != null) {
+      _continuaConAutoplay();
     } else {
       _player.pause();
     }
@@ -199,6 +301,7 @@ class AudioPlayerService extends ChangeNotifier {
 
   /// Mette il brano subito dopo quello in riproduzione, scavalcando la coda.
   void playNext(Track track) {
+    if (PartyService.instance.interceptAdd(track, next: true)) return;
     _queue.removeWhere((t) => t.id == track.id && t.id != currentTrack?.id);
     final pos = _currentIndex >= 0 ? _currentIndex + 1 : 0;
     _queue.insert(pos.clamp(0, _queue.length), track);
@@ -219,6 +322,7 @@ class AudioPlayerService extends ChangeNotifier {
   /// tutti in fondo alla coda, che con una libreria lunga voleva dire dopo
   /// centinaia di brani.
   void addToQueue(Track track) {
+    if (PartyService.instance.interceptAdd(track)) return;
     _queue.removeWhere((t) => t.id == track.id && t.id != currentTrack?.id);
 
     // Se l'ultimo accodato non e' piu' valido, si riparte da quello corrente.
@@ -245,6 +349,51 @@ class AudioPlayerService extends ChangeNotifier {
     notifyListeners();
   }
   bool get hasPrevious => _currentIndex > 0;
+
+  /// Sposta un brano della coda da una posizione a un'altra.
+  void moveQueueItem(int da, int a) {
+    if (da < 0 || da >= _queue.length || a < 0 || a >= _queue.length || da == a) {
+      return;
+    }
+    final corrente = _currentTrack;
+    final brano = _queue.removeAt(da);
+    _queue.insert(a, brano);
+    if (corrente != null) {
+      final i = _queue.indexWhere((t) => t.id == corrente.id);
+      if (i != -1) _currentIndex = i;
+    }
+    _ultimoAccodato = -1;
+    notifyListeners();
+  }
+
+  /// Toglie dalla coda il brano in [indice], se non e' quello che suona.
+  void removeQueueAt(int indice) {
+    if (indice < 0 || indice >= _queue.length || indice == _currentIndex) return;
+    _queue.removeAt(indice);
+    if (indice < _currentIndex) _currentIndex--;
+    _ultimoAccodato = -1;
+    notifyListeners();
+  }
+
+  /// Svuota tutto cio' che viene dopo il brano in riproduzione.
+  void clearUpcoming() {
+    if (_currentIndex >= 0 && _currentIndex < _queue.length - 1) {
+      _queue.removeRange(_currentIndex + 1, _queue.length);
+    }
+    _ultimoAccodato = -1;
+    notifyListeners();
+  }
+
+  /// Salta direttamente a un brano della coda.
+  Future<void> jumpToQueueIndex(int indice) async {
+    if (indice < 0 || indice >= _queue.length) return;
+    if (PartyService.instance.isGuest) {
+      AppNotice.show("Nel party e' l'host a scegliere i brani");
+      return;
+    }
+    _currentIndex = indice;
+    await playTrack(_queue[indice]);
+  }
 
   Future<void> playTrack(Track track, {List<Track>? newQueue}) async {
     final requestId = ++_playRequestId;
@@ -276,14 +425,20 @@ class AudioPlayerService extends ChangeNotifier {
     }
 
     _currentTrack = track;
+    currentTrackId.value = track.id;
     _position = Duration.zero;
     _duration = track.duration > Duration.zero ? track.duration : Duration.zero;
     _isBuffering = true;
     _lastErrorMessage = null;
+    _formatoSorgente = '';
+    _byteSorgente = 0;
+    _notaSorgente = '';
     notifyListeners();
 
     // Registra statistiche di avvio riproduzione
     StatsService.instance.recordTrackStart(track);
+    HistoryService.instance.record(track);
+    ScrobbleService.instance.onTrackStart(track);
 
     try {
       Uri? artUri;
@@ -308,6 +463,11 @@ class AudioPlayerService extends ChangeNotifier {
         // 1. Controlla se la canzone è già scaricata o in cache locale completa
         final localFile = await YouTubeService.instance.getLocalAudioFile(track.id);
         if (localFile != null && await localFile.exists() && await localFile.length() > 50000) {
+          _descriviSorgente(
+            percorso: localFile.path,
+            bytes: await localFile.length(),
+            nota: localFile.path.contains('yt_cache') ? 'cache' : 'offline',
+          );
           final audioSource = AudioSource.uri(Uri.file(localFile.path), tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
@@ -320,6 +480,11 @@ class AudioPlayerService extends ChangeNotifier {
         if (_playRequestId != requestId) return;
 
         if (cached != null && await cached.exists() && await cached.length() > 50000) {
+          _descriviSorgente(
+            percorso: cached.path,
+            bytes: await cached.length(),
+            nota: 'streaming',
+          );
           final audioSource = AudioSource.uri(Uri.file(cached.path), tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
@@ -332,6 +497,9 @@ class AudioPlayerService extends ChangeNotifier {
         if (_playRequestId != requestId) return;
 
         if (streamInfo != null) {
+          _formatoSorgente = 'AAC';
+          _byteSorgente = streamInfo.size.totalBytes;
+          _notaSorgente = 'streaming diretto';
           final audioSource = AudioSource.uri(streamInfo.url, tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
@@ -341,11 +509,17 @@ class AudioPlayerService extends ChangeNotifier {
 
         throw Exception('Impossibile ottenere il flusso audio compatibile per iOS.');
       } else if (track.filePath != null) {
+        _descriviSorgente(
+          percorso: track.filePath!,
+          bytes: track.fileSize ?? 0,
+          nota: 'file locale',
+        );
         final audioSource = AudioSource.uri(Uri.file(track.filePath!), tag: mediaItem);
         await _player.setAudioSource(audioSource);
         if (_playRequestId != requestId) return;
         await _player.play();
       } else if (track.streamUrl != null && track.streamUrl!.isNotEmpty) {
+        _notaSorgente = 'dalla rete';
         final audioSource = AudioSource.uri(Uri.parse(track.streamUrl!), tag: mediaItem);
         await _player.setAudioSource(audioSource);
         if (_playRequestId != requestId) return;
@@ -375,9 +549,15 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   Future<void> togglePlayPause() async {
+    if (PartyService.instance.interceptCommand('toggle')) return;
     if (_player.playing) {
       await _player.pause();
     } else {
+      if (_player.processingState == ProcessingState.completed) {
+        // A coda finita il tasto play fa ripartire l'ultimo brano, invece
+        // di non fare nulla.
+        await _player.seek(Duration.zero);
+      }
       await _player.play();
     }
     notifyListeners();
@@ -387,27 +567,224 @@ class AudioPlayerService extends ChangeNotifier {
   Future<void> pause() async => await _player.pause();
 
   Future<void> seek(Duration position) async {
+    if (PartyService.instance.interceptCommand(
+      'seek',
+      positionMs: position.inMilliseconds,
+    )) {
+      return;
+    }
+    await _player.seek(position);
+  }
+
+  /// Sposta la riproduzione senza passare dal party: lo usa il party stesso
+  /// per riallineare un ospite all'host.
+  Future<void> seekDirect(Duration position) async {
     await _player.seek(position);
   }
 
   Future<void> next() async {
+    if (PartyService.instance.interceptCommand('next')) return;
     if (hasNext) {
       _currentIndex++;
       await playTrack(_queue[_currentIndex]);
     } else if (_loopMode == PlayerLoopMode.all && _queue.isNotEmpty) {
       _currentIndex = 0;
       await playTrack(_queue[0]);
+    } else if (PlaybackSettings.instance.autoplay && _currentTrack != null) {
+      await _continuaConAutoplay();
     }
   }
 
   Future<void> previous() async {
+    if (PartyService.instance.interceptCommand('prev')) return;
     if (_position.inSeconds > 3) {
-      await seek(Duration.zero);
+      await _player.seek(Duration.zero);
     } else if (hasPrevious) {
       _currentIndex--;
       await playTrack(_queue[_currentIndex]);
     } else {
-      await seek(Duration.zero);
+      await _player.seek(Duration.zero);
+    }
+  }
+
+  // --- VELOCITA', VOLUME E DISSOLVENZA ---
+
+  Future<void> setSpeed(double velocita) async {
+    _speed = velocita.clamp(0.5, 2.0);
+    try {
+      await _player.setSpeed(_speed);
+    } catch (e) {
+      print('Avviso velocita: $e');
+    }
+    notifyListeners();
+  }
+
+  /// Volume deciso dall'equalizzatore. La dissolvenza ci si moltiplica
+  /// sopra: se ognuno impostasse il volume per conto suo si annullerebbero
+  /// a vicenda.
+  void setBaseVolume(double volume) {
+    _volumeBase = volume.clamp(0.0, 1.0);
+    _applicaVolume();
+  }
+
+  void _applicaVolume() {
+    try {
+      _player.setVolume((_volumeBase * _fattoreDissolvenza).clamp(0.0, 1.0));
+    } catch (_) {}
+  }
+
+  /// Abbassa il volume negli ultimi secondi di un brano e lo rialza
+  /// all'inizio del successivo.
+  ///
+  /// Non e' una dissolvenza incrociata vera: servirebbero due lettori che
+  /// suonano insieme, e i controlli da schermata di blocco ne reggono uno
+  /// solo. L'effetto all'ascolto e' comunque un passaggio morbido.
+  void _aggiornaDissolvenza() {
+    final secondi = PlaybackSettings.instance.fadeSeconds;
+    var fattore = 1.0;
+    final totaleMs = _duration.inMilliseconds;
+    if (secondi > 0 && totaleMs > secondi * 3000) {
+      final uscitaMs = secondi * 1000;
+      final ingressoMs = min(uscitaMs, 2500);
+      final posMs = _position.inMilliseconds;
+      final restoMs = totaleMs - posMs;
+      if (restoMs < uscitaMs) {
+        fattore = (restoMs / uscitaMs).clamp(0.0, 1.0);
+      } else if (posMs < ingressoMs) {
+        fattore = (0.25 + 0.75 * posMs / ingressoMs).clamp(0.0, 1.0);
+      }
+    }
+    if ((fattore - _fattoreDissolvenza).abs() > 0.01) {
+      _fattoreDissolvenza = fattore;
+      _applicaVolume();
+    }
+  }
+
+  // --- TIMER DI SPEGNIMENTO ---
+
+  /// Mette in pausa la riproduzione dopo [durata].
+  void startSleepTimer(Duration durata) {
+    _timerSpegnimento?.cancel();
+    _spegniAFineBrano = false;
+    _spegniAlle = DateTime.now().add(durata);
+    _timerSpegnimento = Timer(durata, () {
+      _spegniAlle = null;
+      _timerSpegnimento = null;
+      _player.pause();
+      AppNotice.show('Timer di spegnimento: riproduzione in pausa');
+      notifyListeners();
+    });
+    notifyListeners();
+  }
+
+  /// Mette in pausa alla fine del brano in riproduzione.
+  void sleepAfterCurrentTrack() {
+    _timerSpegnimento?.cancel();
+    _timerSpegnimento = null;
+    _spegniAlle = null;
+    _spegniAFineBrano = true;
+    notifyListeners();
+  }
+
+  void cancelSleepTimer() {
+    _timerSpegnimento?.cancel();
+    _timerSpegnimento = null;
+    _spegniAlle = null;
+    _spegniAFineBrano = false;
+    notifyListeners();
+  }
+
+  // --- RADIO E AUTOPLAY ---
+
+  void _descriviSorgente({
+    required String percorso,
+    required int bytes,
+    required String nota,
+  }) {
+    final punto = percorso.lastIndexOf('.');
+    final ext = punto == -1 ? '' : percorso.substring(punto + 1).toUpperCase();
+    _formatoSorgente = ext == 'M4A' ? 'AAC' : ext;
+    _byteSorgente = bytes;
+    _notaSorgente = nota;
+  }
+
+  /// Avvia una radio: il brano scelto seguito da musica simile.
+  Future<void> startRadio(Track seme) async {
+    if (PartyService.instance.isGuest) {
+      AppNotice.show("Nel party e' l'host a scegliere i brani");
+      return;
+    }
+    AppNotice.show('Cerco brani simili a "${seme.displayTitle}"...');
+    List<Track> simili;
+    try {
+      simili = await YtMusicService.instance.radioFor(seme);
+    } catch (e) {
+      AppNotice.show('Radio non disponibile: controlla la connessione.');
+      return;
+    }
+    if (simili.isEmpty) {
+      AppNotice.show('Nessun brano simile trovato.');
+      return;
+    }
+
+    final coda = <Track>[seme, ...simili];
+    for (final t in simili) {
+      _autoplayVisti.add(t.id);
+    }
+    // L'ordine della radio e' gia' ragionato: mescolarlo lo rovinerebbe.
+    _shuffleMode = ShuffleMode.off;
+
+    if (_currentTrack?.id == seme.id) {
+      // Sta gia' suonando: si cambia solo cio' che viene dopo.
+      _queue = coda;
+      _originalQueue = List.from(coda);
+      _currentIndex = 0;
+      _ultimoAccodato = -1;
+      notifyListeners();
+    } else {
+      playTrack(seme, newQueue: coda);
+    }
+    AppNotice.show('Radio avviata: ${simili.length} brani simili in coda');
+  }
+
+  /// A coda finita, aggiunge musica simile all'ultimo brano e prosegue.
+  Future<void> _continuaConAutoplay() async {
+    if (_autoplayInCorso) return;
+    final seme = _currentTrack;
+    if (seme == null) return;
+
+    _autoplayInCorso = true;
+    notifyListeners();
+
+    var aggiunti = 0;
+    try {
+      final simili = await YtMusicService.instance.radioFor(seme);
+      final presenti = _queue.map((t) => t.id).toSet();
+      final senzaRipetere = PlaybackSettings.instance.noRepeatAutoplay;
+      for (final t in simili) {
+        if (presenti.contains(t.id)) continue;
+        if (senzaRipetere && _autoplayVisti.contains(t.id)) continue;
+        _autoplayVisti.add(t.id);
+        _queue.add(t);
+        _originalQueue.add(t);
+        aggiunti++;
+        if (aggiunti >= 25) break;
+      }
+    } catch (e) {
+      print('Avviso AutoPlay: $e');
+    } finally {
+      _autoplayInCorso = false;
+    }
+
+    // Nel frattempo si potrebbe aver scelto altro: in quel caso i brani
+    // restano in coda e basta.
+    if (aggiunti > 0 && _currentTrack?.id == seme.id && hasNext) {
+      AppNotice.show('AutoPlay: continuo con musica simile');
+      notifyListeners();
+      next();
+    } else {
+      if (aggiunti == 0) _player.pause();
+      notifyListeners();
     }
   }
 
