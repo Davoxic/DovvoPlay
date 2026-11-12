@@ -111,6 +111,7 @@ class _YouTubeTileState extends State<YouTubeTile> {
     final file = await YouTubeService.instance.downloadAudioStream(
       widget.track.id,
       widget.track.title,
+      artist: widget.track.author,
       onProgress: (p) {
         setState(() => _downloadProgress = p);
       },

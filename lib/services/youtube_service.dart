@@ -4,6 +4,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/youtube_track.dart';
 import 'cache_service.dart';
 import 'playback_settings.dart';
+import 'stream_resolver.dart';
 
 class YouTubeService {
   static final YouTubeService instance = YouTubeService._();
@@ -171,7 +172,14 @@ class YouTubeService {
   }
 
   /// Recupera l'URL diretto dello stream audio (se disponibile)
-  Future<String?> getAudioStreamUrl(String videoId) async {
+  Future<String?> getAudioStreamUrl(String videoId, {String? title, String? artist}) async {
+    final resolved = await StreamResolver.instance.resolve(
+      videoId: videoId,
+      title: title,
+      artist: artist,
+    );
+    if (resolved != null) return resolved.url;
+
     final info = await getPlayableStreamInfo(videoId);
     return info?.url.toString();
   }
@@ -214,11 +222,12 @@ class YouTubeService {
   /// Alias retrocompatibile
   Future<File?> getLocalDownloadedFile(String trackId) => getLocalAudioFile(trackId);
 
-  /// Scarica il flusso audio AAC (.m4a) in cache temporanea via youtube_explode
-  /// (senza 403 Forbidden di Apple AVPlayer)
+  /// Scarica il flusso audio AAC (.m4a) in cache temporanea via BitChord StreamResolver
+  /// (senza blocchi bot di YouTube, senza 403 Forbidden di Apple AVPlayer)
   Future<File?> downloadToCache(
     String videoId,
     String title, {
+    String? artist,
     void Function(double progress)? onProgress,
   }) async {
     try {
@@ -234,6 +243,26 @@ class YouTubeService {
         return targetFile;
       }
 
+      // 1. Risolvi e scarica tramite StreamResolver (BitChord: JioSaavn 320k + InnerTube)
+      final resolved = await StreamResolver.instance.resolve(
+        videoId: videoId,
+        title: title,
+        artist: artist,
+      );
+
+      if (resolved != null) {
+        final downloaded = await StreamResolver.instance.downloadToFile(
+          stream: resolved,
+          targetFile: targetFile,
+          onProgress: onProgress,
+        );
+        if (downloaded != null && await downloaded.exists() && await downloaded.length() > 50000) {
+          CacheService.instance.enforceLimit(tieni: safeId);
+          return downloaded;
+        }
+      }
+
+      // 2. Fallback su youtube_explode se StreamResolver non ha scaricato
       final streamInfo = await getPlayableStreamInfo(videoId);
       if (streamInfo == null) return null;
 
@@ -265,7 +294,6 @@ class YouTubeService {
           await targetFile.delete();
         }
         await tempFile.rename(targetFile.path);
-        // Tiene la cache sotto il limite scelto, senza toccare questo file.
         CacheService.instance.enforceLimit(tieni: safeId);
         return targetFile;
       } else {
@@ -278,10 +306,20 @@ class YouTubeService {
     }
   }
 
+  /// Avvia il download in cache in background senza bloccare la riproduzione
+  Future<void> cacheInBackground(String videoId, String title, {String? artist}) async {
+    try {
+      await downloadToCache(videoId, title, artist: artist);
+    } catch (e) {
+      print('Errore cacheInBackground: $e');
+    }
+  }
+
   /// Scarica il brano audio in background nella cartella Music per ascolto offline
   Future<File?> downloadAudioStream(
     String videoId,
     String title, {
+    String? artist,
     void Function(double progress)? onProgress,
   }) async {
     try {
@@ -305,6 +343,26 @@ class YouTubeService {
         return targetFile;
       }
 
+      // 1. Risolvi e scarica tramite StreamResolver (BitChord: JioSaavn 320k + InnerTube)
+      final resolved = await StreamResolver.instance.resolve(
+        videoId: videoId,
+        title: title,
+        artist: artist,
+        highQuality: true,
+      );
+
+      if (resolved != null) {
+        final downloaded = await StreamResolver.instance.downloadToFile(
+          stream: resolved,
+          targetFile: targetFile,
+          onProgress: onProgress,
+        );
+        if (downloaded != null && await downloaded.exists() && await downloaded.length() > 50000) {
+          return downloaded;
+        }
+      }
+
+      // 2. Fallback su youtube_explode
       final streamInfo = await getPlayableStreamInfo(videoId, forDownload: true);
       if (streamInfo == null) return null;
 

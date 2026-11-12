@@ -11,6 +11,7 @@ import 'party_service.dart';
 import 'playback_settings.dart';
 import 'scrobble_service.dart';
 import 'stats_service.dart';
+import 'stream_resolver.dart';
 import 'youtube_service.dart';
 import 'ytmusic_service.dart';
 
@@ -475,24 +476,41 @@ class AudioPlayerService extends ChangeNotifier {
           return;
         }
 
-        // 2. Scarica in cache locale via youtube_explode (evita 403 e (-1) unknown error di iOS AVPlayer)
-        final cached = await YouTubeService.instance.downloadToCache(videoId, track.title);
+        // 2. Risoluzione immediata tramite BitChord StreamResolver (JioSaavn 320k + InnerTube)
+        final resolvedStream = await StreamResolver.instance.resolve(
+          videoId: videoId,
+          title: track.title,
+          artist: track.artist,
+          highQuality: !PlaybackSettings.instance.dataSaver,
+        );
         if (_playRequestId != requestId) return;
 
-        if (cached != null && await cached.exists() && await cached.length() > 50000) {
-          _descriviSorgente(
-            percorso: cached.path,
-            bytes: await cached.length(),
-            nota: 'streaming',
+        if (resolvedStream != null) {
+          _formatoSorgente = resolvedStream.format.toUpperCase();
+          _byteSorgente = 0;
+          _notaSorgente = resolvedStream.source == 'jiosaavn'
+              ? 'BitChord JioSaavn (320k)'
+              : (resolvedStream.source == 'youtube_innertube' ? 'BitChord InnerTube' : 'streaming');
+
+          final audioSource = AudioSource.uri(
+            Uri.parse(resolvedStream.url),
+            headers: resolvedStream.headers.isNotEmpty ? resolvedStream.headers : null,
+            tag: mediaItem,
           );
-          final audioSource = AudioSource.uri(Uri.file(cached.path), tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
           await _player.play();
+
+          // 3. Cache asincrona in background senza bloccare la riproduzione istantanea
+          unawaited(YouTubeService.instance.cacheInBackground(
+            videoId,
+            track.title,
+            artist: track.artist,
+          ));
           return;
         }
 
-        // 3. Fallback: tenta lo stream diretto se il download in cache ha fallito
+        // 4. Fallback estremo: tenta lo stream da youtube_explode se StreamResolver non ha trovato nulla
         final streamInfo = await YouTubeService.instance.getPlayableStreamInfo(videoId);
         if (_playRequestId != requestId) return;
 

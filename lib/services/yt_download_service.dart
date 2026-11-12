@@ -173,6 +173,7 @@ class YtDownloadService extends ChangeNotifier {
       file = await YouTubeService.instance.downloadAudioStream(
         voce.videoId,
         nome,
+        artist: artista,
         onProgress: (p) {
           voce.progress = p;
           // Senza freno arriverebbero migliaia di notifiche a brano.
