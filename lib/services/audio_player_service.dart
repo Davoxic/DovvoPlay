@@ -11,7 +11,7 @@ import 'party_service.dart';
 import 'playback_settings.dart';
 import 'scrobble_service.dart';
 import 'stats_service.dart';
-import 'stream_resolver.dart';
+import 'youtube_audio_source.dart';
 import 'youtube_service.dart';
 import 'ytmusic_service.dart';
 
@@ -476,49 +476,64 @@ class AudioPlayerService extends ChangeNotifier {
           return;
         }
 
-        // 2. Risoluzione immediata tramite BitChord StreamResolver (JioSaavn 320k + InnerTube)
-        final resolvedStream = await StreamResolver.instance.resolve(
-          videoId: videoId,
-          title: track.title,
-          artist: track.artist,
-          highQuality: !PlaybackSettings.instance.dataSaver,
-        );
+        // 2. Prova prima lo stream HLS (.m3u8) nativo per iOS (zero download del file, avvio istantaneo)
+        final hlsUrl = await YouTubeService.instance.getHlsStreamUrl(videoId);
         if (_playRequestId != requestId) return;
 
-        if (resolvedStream != null) {
-          _formatoSorgente = resolvedStream.format.toUpperCase();
-          _byteSorgente = 0;
-          _notaSorgente = resolvedStream.source == 'jiosaavn'
-              ? 'BitChord JioSaavn (320k)'
-              : (resolvedStream.source == 'youtube_innertube' ? 'BitChord InnerTube' : 'streaming');
+        if (hlsUrl != null && hlsUrl.isNotEmpty) {
+          try {
+            _formatoSorgente = 'HLS';
+            _notaSorgente = 'streaming Apple nativo';
+            final audioSource = AudioSource.uri(Uri.parse(hlsUrl), tag: mediaItem);
+            await _player.setAudioSource(audioSource);
+            if (_playRequestId != requestId) return;
+            await _player.play();
 
-          final audioSource = AudioSource.uri(
-            Uri.parse(resolvedStream.url),
-            headers: resolvedStream.headers.isNotEmpty ? resolvedStream.headers : null,
-            tag: mediaItem,
-          );
-          await _player.setAudioSource(audioSource);
-          if (_playRequestId != requestId) return;
-          await _player.play();
-
-          // 3. Cache asincrona in background senza bloccare la riproduzione istantanea
-          unawaited(YouTubeService.instance.cacheInBackground(
-            videoId,
-            track.title,
-            artist: track.artist,
-          ));
-          return;
+            // Salva asincronamente in cache in background senza bloccare la riproduzione
+            unawaited(YouTubeService.instance.cacheInBackground(videoId, track.title));
+            return;
+          } catch (hlsErr) {
+            print('Streaming HLS non riuscito ($hlsErr), procedo con stream AAC...');
+          }
         }
 
-        // 4. Fallback estremo: tenta lo stream da youtube_explode se StreamResolver non ha trovato nulla
+        // 3. Prova lo streaming progressivo chunked via YouTubeAudioSource (StreamAudioSource nativo, immune da 403)
         final streamInfo = await YouTubeService.instance.getPlayableStreamInfo(videoId);
         if (_playRequestId != requestId) return;
 
         if (streamInfo != null) {
-          _formatoSorgente = 'AAC';
-          _byteSorgente = streamInfo.size.totalBytes;
-          _notaSorgente = 'streaming diretto';
-          final audioSource = AudioSource.uri(streamInfo.url, tag: mediaItem);
+          try {
+            _formatoSorgente = 'AAC';
+            _byteSorgente = streamInfo.size.totalBytes;
+            _notaSorgente = 'streaming diretto';
+            final audioSource = YouTubeAudioSource(
+              videoId: videoId,
+              streamInfo: streamInfo,
+              tag: mediaItem,
+            );
+            await _player.setAudioSource(audioSource);
+            if (_playRequestId != requestId) return;
+            await _player.play();
+
+            // Salva asincronamente in cache in background senza bloccare la riproduzione
+            unawaited(YouTubeService.instance.cacheInBackground(videoId, track.title));
+            return;
+          } catch (streamErr) {
+            print('Streaming progressivo fallito ($streamErr), procedo al download in cache...');
+          }
+        }
+
+        // 4. Fallback estremo: scarica in cache locale via youtube_explode e riproduci
+        final cached = await YouTubeService.instance.downloadToCache(videoId, track.title);
+        if (_playRequestId != requestId) return;
+
+        if (cached != null && await cached.exists() && await cached.length() > 50000) {
+          _descriviSorgente(
+            percorso: cached.path,
+            bytes: await cached.length(),
+            nota: 'streaming (cache)',
+          );
+          final audioSource = AudioSource.uri(Uri.file(cached.path), tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
           await _player.play();

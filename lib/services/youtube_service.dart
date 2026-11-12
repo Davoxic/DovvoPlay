@@ -4,7 +4,6 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/youtube_track.dart';
 import 'cache_service.dart';
 import 'playback_settings.dart';
-import 'stream_resolver.dart';
 
 class YouTubeService {
   static final YouTubeService instance = YouTubeService._();
@@ -78,16 +77,32 @@ class YouTubeService {
     }
   }
 
-  /// Recupera lo StreamInfo rigorosamente compatibile con iOS (AAC in container MP4/M4A)
-  /// CRITICO: Non restituisce MAI flussi WebM/Opus perché AVPlayer su iOS non li decodifica e lancia fatalmente (-1) unknown error.
   /// Motivo dell'ultimo fallimento, da mostrare all'utente.
-  ///
-  /// Serviva perche' un download che non riusciva restituiva soltanto null e
-  /// l'app diceva "Errore durante il download" senza spiegare niente: il caso
-  /// piu' frequente e' un video che YouTube serve solo in WebM/Opus, formato
-  /// che AVPlayer su iOS non riproduce.
   String? lastFailureReason;
 
+  /// Recupera l'URL dello stream nativo HLS (.m3u8) per iOS se disponibile
+  Future<String?> getHlsStreamUrl(String videoId) async {
+    try {
+      final manifest = await yt.videos.streamsClient.getManifest(
+        videoId,
+        ytClients: [
+          YoutubeApiClient.ios,
+          YoutubeApiClient.safari,
+        ],
+      ).timeout(const Duration(seconds: 7));
+
+      if (manifest.hls.isNotEmpty) {
+        final hls = manifest.hls.first;
+        return hls.url.toString();
+      }
+    } catch (e) {
+      print('getHlsStreamUrl info: $e');
+    }
+    return null;
+  }
+
+  /// Recupera lo StreamInfo rigorosamente compatibile con iOS (AAC in container MP4/M4A)
+  /// CRITICO: Non restituisce MAI flussi WebM/Opus per la riproduzione diretta perché AVPlayer su iOS non li decodifica.
   Future<StreamInfo?> getPlayableStreamInfo(
     String videoId, {
     bool forDownload = false,
@@ -95,25 +110,26 @@ class YouTubeService {
     lastFailureReason = null;
     StreamManifest? manifest;
 
-    // 1. Prova prima il manifest standard (fornisce itag 140 AAC 128kbps m4a e flussi muxed MP4)
+    // 1. Prova prima con client iOS e Safari (generano stream compatibili AAC/MP4 per AVPlayer)
     try {
-      manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 9));
+      manifest = await yt.videos.streamsClient.getManifest(
+        videoId,
+        ytClients: [
+          YoutubeApiClient.ios,
+          YoutubeApiClient.safari,
+          YoutubeApiClient.androidVr,
+        ],
+      ).timeout(const Duration(seconds: 8));
     } catch (e) {
-      print('getManifest standard: $e');
+      print('getManifest ytClients: $e');
     }
 
-    // 2. Se fallisce, prova con client mobile alternativi
+    // 2. Se fallisce, prova il manifest standard
     if (manifest == null) {
       try {
-        manifest = await yt.videos.streamsClient.getManifest(
-          videoId,
-          ytClients: [
-            YoutubeApiClient.androidVr,
-            YoutubeApiClient.tv,
-          ],
-        ).timeout(const Duration(seconds: 9));
+        manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
       } catch (e) {
-        print('getManifest ytClients alternative: $e');
+        print('getManifest standard: $e');
       }
     }
 
@@ -160,26 +176,21 @@ class YouTubeService {
       return mp4Muxed.reduce((a, b) => a.bitrate.bitsPerSecond < b.bitrate.bitsPerSecond ? a : b);
     }
 
-    // Solo WebM/Opus: su iOS AVPlayer non li riproduce, quindi scaricarli
-    // darebbe un file inutilizzabile. Meglio dirlo e indicare la via del PC,
-    // che con yt-dlp e ffmpeg converte in MP3 senza questo limite.
+    // 3. Fallback: qualsiasi audio-only disponibile (per download / conversione)
+    if (forDownload && manifest.audioOnly.isNotEmpty) {
+      return manifest.audioOnly.withHighestBitrate();
+    }
+
     final soloOpus = manifest.audioOnly.isNotEmpty || manifest.muxed.isNotEmpty;
     lastFailureReason = soloOpus
         ? 'Questo video e\' disponibile solo in formato Opus, che iOS non '
-            'riproduce. Scaricalo delegando al PC: lo converte in MP3.'
+            'riproduce direttamente. Scaricalo delegando al PC per convertirlo in MP3.'
         : 'Nessun flusso audio disponibile per questo video.';
     return null;
   }
 
   /// Recupera l'URL diretto dello stream audio (se disponibile)
-  Future<String?> getAudioStreamUrl(String videoId, {String? title, String? artist}) async {
-    final resolved = await StreamResolver.instance.resolve(
-      videoId: videoId,
-      title: title,
-      artist: artist,
-    );
-    if (resolved != null) return resolved.url;
-
+  Future<String?> getAudioStreamUrl(String videoId) async {
     final info = await getPlayableStreamInfo(videoId);
     return info?.url.toString();
   }
@@ -222,12 +233,10 @@ class YouTubeService {
   /// Alias retrocompatibile
   Future<File?> getLocalDownloadedFile(String trackId) => getLocalAudioFile(trackId);
 
-  /// Scarica il flusso audio AAC (.m4a) in cache temporanea via BitChord StreamResolver
-  /// (senza blocchi bot di YouTube, senza 403 Forbidden di Apple AVPlayer)
+  /// Scarica il flusso audio AAC (.m4a) in cache temporanea via youtube_explode
   Future<File?> downloadToCache(
     String videoId,
     String title, {
-    String? artist,
     void Function(double progress)? onProgress,
   }) async {
     try {
@@ -243,26 +252,6 @@ class YouTubeService {
         return targetFile;
       }
 
-      // 1. Risolvi e scarica tramite StreamResolver (BitChord: JioSaavn 320k + InnerTube)
-      final resolved = await StreamResolver.instance.resolve(
-        videoId: videoId,
-        title: title,
-        artist: artist,
-      );
-
-      if (resolved != null) {
-        final downloaded = await StreamResolver.instance.downloadToFile(
-          stream: resolved,
-          targetFile: targetFile,
-          onProgress: onProgress,
-        );
-        if (downloaded != null && await downloaded.exists() && await downloaded.length() > 50000) {
-          CacheService.instance.enforceLimit(tieni: safeId);
-          return downloaded;
-        }
-      }
-
-      // 2. Fallback su youtube_explode se StreamResolver non ha scaricato
       final streamInfo = await getPlayableStreamInfo(videoId);
       if (streamInfo == null) return null;
 
@@ -294,6 +283,7 @@ class YouTubeService {
           await targetFile.delete();
         }
         await tempFile.rename(targetFile.path);
+        // Tiene la cache sotto il limite scelto, senza toccare questo file.
         CacheService.instance.enforceLimit(tieni: safeId);
         return targetFile;
       } else {
@@ -307,9 +297,9 @@ class YouTubeService {
   }
 
   /// Avvia il download in cache in background senza bloccare la riproduzione
-  Future<void> cacheInBackground(String videoId, String title, {String? artist}) async {
+  Future<void> cacheInBackground(String videoId, String title) async {
     try {
-      await downloadToCache(videoId, title, artist: artist);
+      await downloadToCache(videoId, title);
     } catch (e) {
       print('Errore cacheInBackground: $e');
     }
@@ -319,7 +309,6 @@ class YouTubeService {
   Future<File?> downloadAudioStream(
     String videoId,
     String title, {
-    String? artist,
     void Function(double progress)? onProgress,
   }) async {
     try {
@@ -343,26 +332,6 @@ class YouTubeService {
         return targetFile;
       }
 
-      // 1. Risolvi e scarica tramite StreamResolver (BitChord: JioSaavn 320k + InnerTube)
-      final resolved = await StreamResolver.instance.resolve(
-        videoId: videoId,
-        title: title,
-        artist: artist,
-        highQuality: true,
-      );
-
-      if (resolved != null) {
-        final downloaded = await StreamResolver.instance.downloadToFile(
-          stream: resolved,
-          targetFile: targetFile,
-          onProgress: onProgress,
-        );
-        if (downloaded != null && await downloaded.exists() && await downloaded.length() > 50000) {
-          return downloaded;
-        }
-      }
-
-      // 2. Fallback su youtube_explode
       final streamInfo = await getPlayableStreamInfo(videoId, forDownload: true);
       if (streamInfo == null) return null;
 
