@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/track.dart';
 import '../models/youtube_track.dart';
 import 'app_notice.dart';
@@ -531,21 +533,32 @@ class AudioPlayerService extends ChangeNotifier {
         }
 
         // 3. Prova lo streaming progressivo chunked via YouTubeAudioSource (StreamAudioSource nativo, immune da 403)
+        final useNativeIosMp4 = defaultTargetPlatform == TargetPlatform.iOS;
         final streamInfo = await YouTubeService.instance
-            .getPlayableStreamInfo(videoId)
+            .getPlayableStreamInfo(
+              videoId,
+              preferIosMuxedMp4: useNativeIosMp4,
+            )
             .timeout(const Duration(seconds: 25), onTimeout: () => null);
         if (_playRequestId != requestId) return;
 
         if (streamInfo != null) {
           try {
-            _formatoSorgente = 'AAC';
+            _formatoSorgente = useNativeIosMp4 ? 'MP4' : 'AAC';
             _byteSorgente = streamInfo.size.totalBytes;
-            _notaSorgente = 'streaming diretto';
-            final audioSource = YouTubeAudioSource(
-              videoId: videoId,
-              streamInfo: streamInfo,
-              tag: mediaItem,
-            );
+            _notaSorgente =
+                useNativeIosMp4 ? 'MP4 nativo iOS' : 'streaming diretto';
+            final audioSource = useNativeIosMp4
+                ? AudioSource.uri(
+                    streamInfo.url,
+                    headers: YoutubeHttpClient.defaultHeaders,
+                    tag: mediaItem,
+                  )
+                : YouTubeAudioSource(
+                    videoId: videoId,
+                    streamInfo: streamInfo,
+                    tag: mediaItem,
+                  );
             await _player.setAudioSource(audioSource).timeout(
                   const Duration(seconds: 25),
                 );

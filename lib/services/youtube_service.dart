@@ -111,6 +111,7 @@ class YouTubeService {
   Future<StreamInfo?> getPlayableStreamInfo(
     String videoId, {
     bool forDownload = false,
+    bool preferIosMuxedMp4 = false,
   }) async {
     lastFailureReason = null;
     StreamManifest? manifest;
@@ -135,6 +136,21 @@ class YouTubeService {
           'YouTube non ha restituito i formati del video. Potrebbe essere un blocco '
           'temporaneo o un video non disponibile.';
       return null;
+    }
+
+    // AVPlayer su iOS non riproduce sempre gli stream audio-only DASH, anche
+    // quando il codec è AAC. Come in Lollify, in riproduzione iOS preferiamo
+    // il flusso progressivo MP4 muxed (audio + video), gestito nativamente.
+    if (preferIosMuxedMp4) {
+      final iosMp4 = manifest.muxed
+          .where((s) => s.container == StreamContainer.mp4)
+          .toList();
+      if (iosMp4.isEmpty) {
+        lastFailureReason =
+            'YouTube non ha fornito uno stream MP4 compatibile con iOS.';
+        return null;
+      }
+      return iosMp4.withHighestBitrate();
     }
 
     // Preferisci audio-only MP4/AAC, che il proxy StreamAudioSource serve a AVPlayer.
