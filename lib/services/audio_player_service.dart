@@ -19,12 +19,18 @@ enum PlayerLoopMode { off, all, one }
 
 enum ShuffleMode {
   off('Disattivo', Icons.shuffle_rounded, 'Ordine sequenziale'),
-  magic('Magico', Icons.auto_awesome_rounded, 'Mix intelligente tra preferite, medie e da riscoprire'),
-  standard('Casuale 100%', Icons.shuffle_rounded, 'Mescola tutti i brani casualmente'),
-  mostPlayed('Hit Parade', Icons.local_fire_department_rounded, 'Priorità ai brani più ascoltati e ripetuti'),
-  leastPlayed('Riscopri', Icons.explore_rounded, 'Ascolta le canzoni mai o meno ascoltate'),
-  mediumPlayed('Equilibrato', Icons.balance_rounded, 'Canzoni nella fascia media di ascolto'),
-  recent('Freschi & Recenti', Icons.history_rounded, 'Brani recenti o aggiunti ultimamente');
+  magic('Magico', Icons.auto_awesome_rounded,
+      'Mix intelligente tra preferite, medie e da riscoprire'),
+  standard('Casuale 100%', Icons.shuffle_rounded,
+      'Mescola tutti i brani casualmente'),
+  mostPlayed('Hit Parade', Icons.local_fire_department_rounded,
+      'Priorità ai brani più ascoltati e ripetuti'),
+  leastPlayed('Riscopri', Icons.explore_rounded,
+      'Ascolta le canzoni mai o meno ascoltate'),
+  mediumPlayed('Equilibrato', Icons.balance_rounded,
+      'Canzoni nella fascia media di ascolto'),
+  recent('Freschi & Recenti', Icons.history_rounded,
+      'Brani recenti o aggiunti ultimamente');
 
   final String label;
   final IconData icon;
@@ -149,7 +155,7 @@ class AudioPlayerService extends ChangeNotifier {
 
     _player.playerStateStream.listen((state) {
       _isBuffering = state.processingState == ProcessingState.buffering ||
-                     state.processingState == ProcessingState.loading;
+          state.processingState == ProcessingState.loading;
 
       if (_player.playing && !_isBuffering && _currentTrack != null) {
         if (!_trackListenWatch.isRunning) {
@@ -179,7 +185,8 @@ class AudioPlayerService extends ChangeNotifier {
         print('Errore stream riproduzione: $e');
         final s = e.toString();
         if (s.contains('(-1)') || s.toLowerCase().contains('unknown error')) {
-          _lastErrorMessage = 'Riproduzione interrotta o errore di rete. Tocca per riprovare.';
+          _lastErrorMessage =
+              'Riproduzione interrotta o errore di rete. Tocca per riprovare.';
         } else {
           _lastErrorMessage = 'Errore riproduzione ($e)';
         }
@@ -213,7 +220,9 @@ class AudioPlayerService extends ChangeNotifier {
 
     final totalDur = _duration > Duration.zero
         ? _duration
-        : (_currentTrack!.duration > Duration.zero ? _currentTrack!.duration : Duration.zero);
+        : (_currentTrack!.duration > Duration.zero
+            ? _currentTrack!.duration
+            : Duration.zero);
 
     ScrobbleService.instance.onTrackEnd(_currentTrack!, listenedMs, totalDur);
 
@@ -237,7 +246,8 @@ class AudioPlayerService extends ChangeNotifier {
         percent = 5.0;
       }
     }
-    StatsService.instance.recordTrackByPercentage(_currentTrack!, percent.clamp(0.0, 100.0));
+    StatsService.instance
+        .recordTrackByPercentage(_currentTrack!, percent.clamp(0.0, 100.0));
   }
 
   void _onTrackCompleted() {
@@ -349,11 +359,16 @@ class AudioPlayerService extends ChangeNotifier {
     if (i < _currentIndex) _currentIndex--;
     notifyListeners();
   }
+
   bool get hasPrevious => _currentIndex > 0;
 
   /// Sposta un brano della coda da una posizione a un'altra.
   void moveQueueItem(int da, int a) {
-    if (da < 0 || da >= _queue.length || a < 0 || a >= _queue.length || da == a) {
+    if (da < 0 ||
+        da >= _queue.length ||
+        a < 0 ||
+        a >= _queue.length ||
+        da == a) {
       return;
     }
     final corrente = _currentTrack;
@@ -369,7 +384,8 @@ class AudioPlayerService extends ChangeNotifier {
 
   /// Toglie dalla coda il brano in [indice], se non e' quello che suona.
   void removeQueueAt(int indice) {
-    if (indice < 0 || indice >= _queue.length || indice == _currentIndex) return;
+    if (indice < 0 || indice >= _queue.length || indice == _currentIndex)
+      return;
     _queue.removeAt(indice);
     if (indice < _currentIndex) _currentIndex--;
     _ultimoAccodato = -1;
@@ -451,7 +467,9 @@ class AudioPlayerService extends ChangeNotifier {
 
       final mediaItem = MediaItem(
         id: track.id,
-        album: track.album.isNotEmpty ? track.album : (track.isOnline ? 'YouTube' : 'DovvoPlay'),
+        album: track.album.isNotEmpty
+            ? track.album
+            : (track.isOnline ? 'YouTube' : 'DovvoPlay'),
         title: track.displayTitle,
         artist: track.displayArtist,
         artUri: artUri,
@@ -462,43 +480,60 @@ class AudioPlayerService extends ChangeNotifier {
         final videoId = track.id.replaceFirst('yt_', '');
 
         // 1. Controlla se la canzone è già scaricata o in cache locale completa
-        final localFile = await YouTubeService.instance.getLocalAudioFile(track.id);
-        if (localFile != null && await localFile.exists() && await localFile.length() > 50000) {
+        final localFile =
+            await YouTubeService.instance.getLocalAudioFile(track.id);
+        if (localFile != null &&
+            await localFile.exists() &&
+            await localFile.length() > 50000) {
           _descriviSorgente(
             percorso: localFile.path,
             bytes: await localFile.length(),
             nota: localFile.path.contains('yt_cache') ? 'cache' : 'offline',
           );
-          final audioSource = AudioSource.uri(Uri.file(localFile.path), tag: mediaItem);
+          final audioSource =
+              AudioSource.uri(Uri.file(localFile.path), tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
           await _player.play();
           return;
         }
 
-        // 2. Prova prima lo stream HLS (.m3u8) nativo per iOS (zero download del file, avvio istantaneo)
-        final hlsUrl = await YouTubeService.instance.getHlsStreamUrl(videoId);
-        if (_playRequestId != requestId) return;
+        // I brani con durata nota sono normali video YouTube: chiedere prima HLS
+        // può rallentare l'avvio senza offrire un vantaggio. HLS resta utile per live.
+        if (track.duration <= Duration.zero) {
+          final hlsUrl = await YouTubeService.instance
+              .getHlsStreamUrl(videoId)
+              .timeout(const Duration(seconds: 8), onTimeout: () => null);
+          if (_playRequestId != requestId) return;
 
-        if (hlsUrl != null && hlsUrl.isNotEmpty) {
-          try {
-            _formatoSorgente = 'HLS';
-            _notaSorgente = 'streaming Apple nativo';
-            final audioSource = AudioSource.uri(Uri.parse(hlsUrl), tag: mediaItem);
-            await _player.setAudioSource(audioSource);
-            if (_playRequestId != requestId) return;
-            await _player.play();
+          if (hlsUrl != null && hlsUrl.isNotEmpty) {
+            try {
+              _formatoSorgente = 'HLS';
+              _notaSorgente = 'streaming Apple nativo';
+              final audioSource =
+                  AudioSource.uri(Uri.parse(hlsUrl), tag: mediaItem);
+              await _player.setAudioSource(audioSource).timeout(
+                    const Duration(seconds: 20),
+                  );
+              if (_playRequestId != requestId) return;
+              await _player.play();
 
-            // Salva asincronamente in cache in background senza bloccare la riproduzione
-            unawaited(YouTubeService.instance.cacheInBackground(videoId, track.title));
-            return;
-          } catch (hlsErr) {
-            print('Streaming HLS non riuscito ($hlsErr), procedo con stream AAC...');
+              // Salva asincronamente in cache in background senza bloccare la riproduzione
+              unawaited(YouTubeService.instance
+                  .cacheInBackground(videoId, track.title));
+              return;
+            } catch (hlsErr) {
+              print(
+                  'Streaming HLS non riuscito ($hlsErr), procedo con stream AAC...');
+              await _player.stop();
+            }
           }
         }
 
         // 3. Prova lo streaming progressivo chunked via YouTubeAudioSource (StreamAudioSource nativo, immune da 403)
-        final streamInfo = await YouTubeService.instance.getPlayableStreamInfo(videoId);
+        final streamInfo = await YouTubeService.instance
+            .getPlayableStreamInfo(videoId)
+            .timeout(const Duration(seconds: 25), onTimeout: () => null);
         if (_playRequestId != requestId) return;
 
         if (streamInfo != null) {
@@ -511,49 +546,62 @@ class AudioPlayerService extends ChangeNotifier {
               streamInfo: streamInfo,
               tag: mediaItem,
             );
-            await _player.setAudioSource(audioSource);
+            await _player.setAudioSource(audioSource).timeout(
+                  const Duration(seconds: 25),
+                );
             if (_playRequestId != requestId) return;
             await _player.play();
 
             // Salva asincronamente in cache in background senza bloccare la riproduzione
-            unawaited(YouTubeService.instance.cacheInBackground(videoId, track.title));
+            unawaited(YouTubeService.instance
+                .cacheInBackground(videoId, track.title));
             return;
           } catch (streamErr) {
-            print('Streaming progressivo fallito ($streamErr), procedo al download in cache...');
+            print(
+                'Streaming progressivo fallito ($streamErr), procedo al download in cache...');
+            await _player.stop();
           }
         }
 
         // 4. Fallback estremo: scarica in cache locale via youtube_explode e riproduci
-        final cached = await YouTubeService.instance.downloadToCache(videoId, track.title);
+        final cached = await YouTubeService.instance
+            .downloadToCache(videoId, track.title)
+            .timeout(const Duration(seconds: 45), onTimeout: () => null);
         if (_playRequestId != requestId) return;
 
-        if (cached != null && await cached.exists() && await cached.length() > 50000) {
+        if (cached != null &&
+            await cached.exists() &&
+            await cached.length() > 50000) {
           _descriviSorgente(
             percorso: cached.path,
             bytes: await cached.length(),
             nota: 'streaming (cache)',
           );
-          final audioSource = AudioSource.uri(Uri.file(cached.path), tag: mediaItem);
+          final audioSource =
+              AudioSource.uri(Uri.file(cached.path), tag: mediaItem);
           await _player.setAudioSource(audioSource);
           if (_playRequestId != requestId) return;
           await _player.play();
           return;
         }
 
-        throw Exception('Impossibile ottenere il flusso audio compatibile per iOS.');
+        throw Exception(
+            'Impossibile ottenere il flusso audio compatibile per iOS.');
       } else if (track.filePath != null) {
         _descriviSorgente(
           percorso: track.filePath!,
           bytes: track.fileSize ?? 0,
           nota: 'file locale',
         );
-        final audioSource = AudioSource.uri(Uri.file(track.filePath!), tag: mediaItem);
+        final audioSource =
+            AudioSource.uri(Uri.file(track.filePath!), tag: mediaItem);
         await _player.setAudioSource(audioSource);
         if (_playRequestId != requestId) return;
         await _player.play();
       } else if (track.streamUrl != null && track.streamUrl!.isNotEmpty) {
         _notaSorgente = 'dalla rete';
-        final audioSource = AudioSource.uri(Uri.parse(track.streamUrl!), tag: mediaItem);
+        final audioSource =
+            AudioSource.uri(Uri.parse(track.streamUrl!), tag: mediaItem);
         await _player.setAudioSource(audioSource);
         if (_playRequestId != requestId) return;
         await _player.play();
@@ -563,7 +611,8 @@ class AudioPlayerService extends ChangeNotifier {
     } catch (e, stack) {
       final s = e.toString();
       if (s.contains('(-1)') || s.toLowerCase().contains('unknown error')) {
-        _lastErrorMessage = 'Errore connessione audio. Riprova con un altro brano.';
+        _lastErrorMessage =
+            'Errore connessione audio. Riprova con un altro brano.';
       } else {
         _lastErrorMessage = s.replaceFirst('Exception: ', '');
       }
@@ -877,7 +926,8 @@ class AudioPlayerService extends ChangeNotifier {
   void _applyShuffleLogic(ShuffleMode mode, {Track? keepCurrentTrack}) {
     if (_queue.length <= 1) return;
 
-    final pool = List<Track>.from(_originalQueue.isNotEmpty ? _originalQueue : _queue);
+    final pool =
+        List<Track>.from(_originalQueue.isNotEmpty ? _originalQueue : _queue);
     final stats = StatsService.instance;
     final rand = Random();
 
@@ -897,7 +947,8 @@ class AudioPlayerService extends ChangeNotifier {
         // Divide in 3 categorie (Top preferite, Medie, Meno ascoltate / Mai sentite)
         // e le interfaccia con pesatura intelligente, evitando due canzoni dello stesso artista di seguito
         final sortedByPlays = List<Track>.from(pool)
-          ..sort((a, b) => stats.getPlayCount(b.id).compareTo(stats.getPlayCount(a.id)));
+          ..sort((a, b) =>
+              stats.getPlayCount(b.id).compareTo(stats.getPlayCount(a.id)));
 
         final count = sortedByPlays.length;
         final topCut = (count * 0.25).ceil().clamp(1, count);
@@ -908,7 +959,8 @@ class AudioPlayerService extends ChangeNotifier {
         final leastTier = sortedByPlays.sublist(medCut)..shuffle(rand);
 
         final combined = <Track>[];
-        while (topTier.isNotEmpty || medTier.isNotEmpty || leastTier.isNotEmpty) {
+        while (
+            topTier.isNotEmpty || medTier.isNotEmpty || leastTier.isNotEmpty) {
           if (topTier.isNotEmpty) combined.add(topTier.removeLast());
           if (medTier.isNotEmpty) combined.add(medTier.removeLast());
           if (leastTier.isNotEmpty) combined.add(leastTier.removeLast());
@@ -923,8 +975,12 @@ class AudioPlayerService extends ChangeNotifier {
         // Priorità ai brani più ascoltati con un tocco di casualità
         final list = List<Track>.from(pool);
         list.sort((a, b) {
-          final countA = stats.getPlayCount(a.id) * 10 + stats.getRepeatCount(a.id) * 5 + rand.nextInt(5);
-          final countB = stats.getPlayCount(b.id) * 10 + stats.getRepeatCount(b.id) * 5 + rand.nextInt(5);
+          final countA = stats.getPlayCount(a.id) * 10 +
+              stats.getRepeatCount(a.id) * 5 +
+              rand.nextInt(5);
+          final countB = stats.getPlayCount(b.id) * 10 +
+              stats.getRepeatCount(b.id) * 5 +
+              rand.nextInt(5);
           return countB.compareTo(countA);
         });
         result = list;
@@ -944,11 +1000,15 @@ class AudioPlayerService extends ChangeNotifier {
       case ShuffleMode.mediumPlayed:
         // Brani nella fascia media
         final list = List<Track>.from(pool);
-        list.sort((a, b) => stats.getPlayCount(b.id).compareTo(stats.getPlayCount(a.id)));
+        list.sort((a, b) =>
+            stats.getPlayCount(b.id).compareTo(stats.getPlayCount(a.id)));
         final start = (list.length * 0.20).floor();
         final end = (list.length * 0.80).ceil();
-        final middle = list.sublist(start.clamp(0, list.length), end.clamp(0, list.length))..shuffle(rand);
-        final remaining = list.where((t) => !middle.contains(t)).toList()..shuffle(rand);
+        final middle = list.sublist(
+            start.clamp(0, list.length), end.clamp(0, list.length))
+          ..shuffle(rand);
+        final remaining = list.where((t) => !middle.contains(t)).toList()
+          ..shuffle(rand);
         result = [...middle, ...remaining];
         break;
 
