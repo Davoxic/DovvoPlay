@@ -19,9 +19,12 @@ class YouTubeService {
 
     try {
       // 1. Se l'utente ha inserito un link diretto a un video di YouTube
-      if (cleanQuery.contains('youtube.com/watch') || cleanQuery.contains('youtu.be/')) {
+      if (cleanQuery.contains('youtube.com/watch') ||
+          cleanQuery.contains('youtu.be/')) {
         try {
-          final video = await yt.videos.get(cleanQuery).timeout(const Duration(seconds: 8));
+          final video = await yt.videos
+              .get(cleanQuery)
+              .timeout(const Duration(seconds: 8));
           return [
             YouTubeTrack(
               id: video.id.value,
@@ -36,7 +39,9 @@ class YouTubeService {
       }
 
       // 2. Ricerca standard con timeout protetto
-      final searchResults = await yt.search.search(cleanQuery).timeout(const Duration(seconds: 12));
+      final searchResults = await yt.search
+          .search(cleanQuery)
+          .timeout(const Duration(seconds: 12));
       final tracks = <YouTubeTrack>[];
 
       for (final item in searchResults) {
@@ -110,27 +115,19 @@ class YouTubeService {
     lastFailureReason = null;
     StreamManifest? manifest;
 
-    // 1. Prova prima con client iOS e Safari (generano stream compatibili AAC/MP4 per AVPlayer)
+    // Combina più client YouTube: Android SDKless da solo può non restituire
+    // stream e il fallback TV può rispondere VideoUnplayable anche per video validi.
     try {
       manifest = await yt.videos.streamsClient.getManifest(
         videoId,
         ytClients: [
-          YoutubeApiClient.ios,
-          YoutubeApiClient.safari,
           YoutubeApiClient.androidVr,
+          YoutubeApiClient.androidSdkless,
+          YoutubeApiClient.ios,
         ],
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 20));
     } catch (e) {
       print('getManifest ytClients: $e');
-    }
-
-    // 2. Se fallisce, prova il manifest standard
-    if (manifest == null) {
-      try {
-        manifest = await yt.videos.streamsClient.getManifest(videoId).timeout(const Duration(seconds: 8));
-      } catch (e) {
-        print('getManifest standard: $e');
-      }
     }
 
     if (manifest == null) {
@@ -140,14 +137,18 @@ class YouTubeService {
       return null;
     }
 
-    // 1. Cerca PRIMA nei flussi audio-only uno stream MP4 / AAC (itag 140 m4a 128kbps)
+    // Preferisci audio-only MP4/AAC, che il proxy StreamAudioSource serve a AVPlayer.
     final mp4Audio = manifest.audioOnly.where((s) {
       final containerName = s.container.name.toLowerCase();
       final codec = s.audioCodec.toLowerCase();
       final mime = s.codec.mimeType.toLowerCase();
       final isMp4Container = containerName == 'mp4' || containerName == 'm4a';
-      final isAacCodec = codec.contains('mp4a') || codec.contains('aac') || mime.contains('mp4a');
-      final isWebm = containerName.contains('webm') || codec.contains('opus') || mime.contains('opus');
+      final isAacCodec = codec.contains('mp4a') ||
+          codec.contains('aac') ||
+          mime.contains('mp4a');
+      final isWebm = containerName.contains('webm') ||
+          codec.contains('opus') ||
+          mime.contains('opus');
       return isMp4Container && isAacCodec && !isWebm;
     }).toList();
 
@@ -173,7 +174,8 @@ class YouTubeService {
 
     if (mp4Muxed.isNotEmpty) {
       // Prendi il muxed più leggero per risparmiare banda e bufferizzare istantaneamente
-      return mp4Muxed.reduce((a, b) => a.bitrate.bitsPerSecond < b.bitrate.bitsPerSecond ? a : b);
+      return mp4Muxed.reduce(
+          (a, b) => a.bitrate.bitsPerSecond < b.bitrate.bitsPerSecond ? a : b);
     }
 
     // 3. Fallback: qualsiasi audio-only disponibile (per download / conversione)
@@ -197,7 +199,8 @@ class YouTubeService {
 
   /// Cerca se la traccia è già disponibile nei download offline o nella cache locale
   Future<File?> getLocalAudioFile(String trackId) async {
-    final safeId = trackId.replaceAll('yt_', '').replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final safeId =
+        trackId.replaceAll('yt_', '').replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
 
     // 1. Controlla nei download offline permanenti (cartella Music)
     try {
@@ -231,7 +234,8 @@ class YouTubeService {
   }
 
   /// Alias retrocompatibile
-  Future<File?> getLocalDownloadedFile(String trackId) => getLocalAudioFile(trackId);
+  Future<File?> getLocalDownloadedFile(String trackId) =>
+      getLocalAudioFile(trackId);
 
   /// Scarica il flusso audio AAC (.m4a) in cache temporanea via youtube_explode
   Future<File?> downloadToCache(
@@ -327,12 +331,15 @@ class YouTubeService {
 
       // Se il brano è già stato scaricato nella cache streaming, copialo istantaneamente!
       final cached = await getLocalAudioFile(videoId);
-      if (cached != null && await cached.exists() && await cached.length() > 50000) {
+      if (cached != null &&
+          await cached.exists() &&
+          await cached.length() > 50000) {
         await cached.copy(targetFile.path);
         return targetFile;
       }
 
-      final streamInfo = await getPlayableStreamInfo(videoId, forDownload: true);
+      final streamInfo =
+          await getPlayableStreamInfo(videoId, forDownload: true);
       if (streamInfo == null) return null;
 
       final tempFile = File('${musicDir.path}/${safeName}_$safeId.m4a.tmp');

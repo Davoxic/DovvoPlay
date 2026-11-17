@@ -72,12 +72,13 @@ class VisualTheme {
         backgroundColor: background,
         selectedItemColor: primary,
         unselectedItemColor: textMuted,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+        selectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
         unselectedLabelStyle: const TextStyle(fontSize: 11),
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surfaceCard,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -109,7 +110,8 @@ class ThemeService extends ChangeNotifier {
     const VisualTheme(
       id: 'oled_gold',
       name: 'Oro & Nero OLED (Default)',
-      description: 'Lusso assoluto con sfondo 100% OLED black e oro metallico 24K',
+      description:
+          'Lusso assoluto con sfondo 100% OLED black e oro metallico 24K',
       isGradient: true,
       background: Color(0xFF000000),
       surface: Color(0xFF0B0B0A),
@@ -534,7 +536,8 @@ class ThemeService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final savedId = prefs.getString(_prefKey);
       if (savedId != null) {
-        final found = themes.firstWhere((t) => t.id == savedId, orElse: () => themes.first);
+        final found = themes.firstWhere((t) => t.id == savedId,
+            orElse: () => themes.first);
         _currentTheme = found;
         notifyListeners();
       }
@@ -549,7 +552,8 @@ class ThemeService extends ChangeNotifier {
   }
 
   Future<void> setTheme(String themeId) async {
-    final found = themes.firstWhere((t) => t.id == themeId, orElse: () => themes.first);
+    final found =
+        themes.firstWhere((t) => t.id == themeId, orElse: () => themes.first);
     _currentTheme = found;
     notifyListeners();
     try {
